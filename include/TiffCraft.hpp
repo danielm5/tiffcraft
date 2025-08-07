@@ -63,6 +63,8 @@ namespace TiffCraft {
   class TiffImage {
   public:
 
+    // Header class
+    // ============
     // A TIFF file begins with an 8-byte image file header:
     // - Bytes 0-1: The byte order used within the file. Legal values are:
     //   - “II” (4949.H)
@@ -78,61 +80,73 @@ namespace TiffCraft {
     // - Bytes 4-7 The offset (in bytes) of the first IFD. The directory may be
     //   at any location in the file after the header but must begin on a word
     //   boundary.
-    struct Header {
-      uint16_t byteOrder;       // 0x4949 for "II", 0x4D4D for "MM"
-      uint16_t magicNumber;     // 42
-      uint32_t firstIFDOffset;  // Offset of the first IFD
-
-      bool isBigEndian() const {
-        return byteOrder == 0x4D4D; // "MM"
-      }
-
-      bool isLittleEndian() const {
-        return byteOrder == 0x4949; // "II"
-      }
+    class Header {
+      std::endian byteOrder_;
+      uint32_t firstIFDOffset_;
+    public:
+      bool isBigEndian() const { return byteOrder_ == std::endian::big; }
+      bool isLittleEndian() const { return byteOrder_ == std::endian::little; }
 
       bool equalsHostByteOrder() const {
         return (isHostLittleEndian() && isLittleEndian()) ||
                (isHostBigEndian() && isBigEndian());
       }
 
-      static Header read(std::istream& stream) {
-        Header header;
+      uint32_t firstIFDOffset() const { return firstIFDOffset_; }
 
-        // Read the TIFF header from the stream
+      static Header read(std::istream& stream) {
         if (!stream) {
           throw std::runtime_error("Stream is not valid for reading TIFF header");
         }
-        stream.read(reinterpret_cast<char*>(&header), sizeof(Header));
-        if (!stream) {
-          throw std::runtime_error("Failed to read TIFF header");
-        }
 
-        // Validate the byte order
-        if (header.byteOrder != 0x4949 && header.byteOrder != 0x4D4D) {
+        Header header;
+
+        // Byte order
+        uint16_t byteOrder; // 0x4949 for "II", 0x4D4D for "MM"
+        stream.read(reinterpret_cast<char*>(&byteOrder), sizeof(byteOrder));
+        if (byteOrder != 0x4949 && byteOrder != 0x4D4D) {
           throw std::runtime_error("Invalid byte order in TIFF header");
         }
+        header.byteOrder_ =
+          (byteOrder == 0x4949) ? std::endian::little : std::endian::big;
 
-        // Convert to host byte order if necessary
+        // Magic number
+        uint16_t magicNumber;
+        stream.read(reinterpret_cast<char*>(&magicNumber), sizeof(magicNumber));
         if (!header.equalsHostByteOrder()) {
-          header.magicNumber = swap16(header.magicNumber);
-          header.firstIFDOffset = swap32(header.firstIFDOffset);
+          magicNumber = swap16(magicNumber);
         }
-
-        // Validate the magic number
-        if (header.magicNumber != 42) {
+        if (magicNumber != 42) {
           throw std::runtime_error("Invalid magic number in TIFF header");
         }
 
-        // Validate the first IFD offset
-        if (header.firstIFDOffset < sizeof(Header)) {
+        // First IFD offset
+        uint32_t firstIFDOffset;
+        stream.read(reinterpret_cast<char*>(&firstIFDOffset), sizeof(firstIFDOffset));
+        if (!header.equalsHostByteOrder()) {
+          firstIFDOffset = swap32(firstIFDOffset);
+        }
+        if (firstIFDOffset < 8) { // Minimum size of TIFF header
           throw std::runtime_error("Invalid first IFD offset in TIFF header");
         }
+        header.firstIFDOffset_ = firstIFDOffset;
 
         return header;
       }
     };
-    static_assert(sizeof(Header) == 8, "Header size must be 8 bytes");
+
+    // IFD class
+    // =========
+    // An Image File Directory (IFD) consists of a 2-byte count of the
+    // number of directory entries (i.e., the number of fields), followed
+    // by a sequence of 12-byte field entries, followed by a 4-byte offset
+    // of the next IFD (or 0 if none).
+    struct IFD {
+
+      //TODO: add vector of directory entries
+    };
+
+
 
     static TiffImage read(const std::string& filename) {
       std::ifstream file(filename, std::ios::binary);
@@ -143,10 +157,13 @@ namespace TiffCraft {
     }
 
     static TiffImage read(std::istream& stream) {
-      // Implementation for reading a TIFF file and returning a TiffImage object
-      // This is a placeholder; actual implementation will depend on the TIFF format
       TiffImage image;
-      // Read the file and populate the image object
+
+      // Read and parse the header
+      image.header_ = Header::read(stream);
+
+      // TODO: Read IFDs and image data
+
       return image;
     }
 
@@ -159,8 +176,8 @@ namespace TiffCraft {
 }
 
 std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::Header& header) {
-  os << "Byte Order: " << (header.byteOrder == 0x4949 ? "II" : "MM") << "\n"
-     << "Magic Number: " << header.magicNumber << "\n"
-     << "First IFD Offset: " << header.firstIFDOffset;
+  os << "Byte Order: " << (header.isLittleEndian() ? "Little Endian" : "Big Endian") << "\n"
+     << "First IFD Offset: " << header.firstIFDOffset() << "\n"
+     << "Equals Host Byte Order: " << (header.equalsHostByteOrder() ? "Yes" : "No") << "\n";
   return os;
 }
