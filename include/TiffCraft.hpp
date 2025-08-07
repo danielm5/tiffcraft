@@ -360,17 +360,9 @@ namespace TiffCraft {
         uint32_t count() const { return count_; }
         std::byte* values() const { return values_.get(); }
 
-        uint32_t valueBytes() const {
-          return TiffCraft::typeBytes(type_);
-        }
-
-        uint32_t bytes() const {
-          return count() * valueBytes() + (type_ == Type::ASCII ? 1 : 0);
-        }
-
-        void swapValues() {
-          swapArray(values_.get(), type_, count_);
-        }
+        uint32_t valueBytes() const { return TiffCraft::typeBytes(type_); }
+        uint32_t bytes() const { return count() * valueBytes(); }
+        void swapValues() { swapArray(values_.get(), type_, count_); }
 
         static Entry read(std::istream& stream, bool mustSwap = false) {
           Entry entry;
@@ -403,6 +395,13 @@ namespace TiffCraft {
           // interpreted according to their type.
           if (mustSwap) {
             entry.swapValues();
+          }
+
+          if (entry.type_ == Type::ASCII) {
+            // Ensure the last byte is NUL for ASCII type
+            if (entry.values_[valueSize - 1] != std::byte{0}) {
+              throw std::runtime_error("ASCII value must end with NUL byte");
+            }
           }
 
           return entry;

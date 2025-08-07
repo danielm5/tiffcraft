@@ -125,86 +125,123 @@ TEST_CASE("TiffImage IFD::Entry class", "[tiff_IDF_entry]") {
       const std::byte* values,
       uint32_t valueOffset = 0,
       bool mustSwap = false)
-      {
-        const uint32_t valueBytes =
-          count * typeBytes(type) + (type == Type::ASCII ? 1 : 0);
+    {
+      const uint32_t valueBytes = count * typeBytes(type);
 
-        if (count < 1) {
-          throw std::runtime_error("Count must be at least 1");
-        }
-        if (values == nullptr) {
-          throw std::runtime_error("Values pointer cannot be null");
-        }
-        if (valueOffset < 12 && valueOffset != 0) {
-          throw std::runtime_error("Value offset must be zero or greater or equal to 12");
-        }
-        if (valueBytes > 4 && valueOffset == 0) {
-          throw std::runtime_error("Value offset must be provided if values do not fit in 4 bytes");
-        }
-        if (valueBytes <= 4 && valueOffset > 0) {
-          throw std::runtime_error("Value offset must be zero if values fit in 4 bytes");
-        }
-        if (valueOffset % 2 != 0) {
-          throw std::runtime_error("Value offset must be even");
-        }
+      if (count < 1) {
+        throw std::runtime_error("Count must be at least 1");
+      }
+      if (values == nullptr) {
+        throw std::runtime_error("Values pointer cannot be null");
+      }
+      if (valueOffset < 12 && valueOffset != 0) {
+        throw std::runtime_error("Value offset must be zero or greater or equal to 12");
+      }
+      if (valueBytes > 4 && valueOffset == 0) {
+        throw std::runtime_error("Value offset must be provided if values do not fit in 4 bytes");
+      }
+      if (valueBytes <= 4 && valueOffset > 0) {
+        throw std::runtime_error("Value offset must be zero if values fit in 4 bytes");
+      }
+      if (valueOffset % 2 != 0) {
+        throw std::runtime_error("Value offset must be even");
+      }
 
-        auto startPos = os.tellp();
+      auto startPos = os.tellp();
 
-        writeValue(os, tag, mustSwap);
-        writeValue(os, type, mustSwap);
-        writeValue(os, count, mustSwap);
+      writeValue(os, tag, mustSwap);
+      writeValue(os, type, mustSwap);
+      writeValue(os, count, mustSwap);
 
-        if (valueBytes <= 4) {
-          // Values fit in 4 bytes, write them directly
-          std::vector<std::byte> valueBytesVec(4, std::byte{0});
-          std::copy(values, values + valueBytes, valueBytesVec.data());
-          if (mustSwap) {
-            // Note that we swap values as an array, instead of as a single `uint32_t`
-            // This is because the values may not be a single `uint32_t` but rather
-            // a sequence of smaller types (e.g., uint16_t, uint8_t)
-            swapArray(valueBytesVec.data(), type, count);
-          }
-          os.write(reinterpret_cast<const char*>(valueBytesVec.data()), 4);
+      if (valueBytes <= 4) {
+        // Values fit in 4 bytes, write them directly
+        std::vector<std::byte> valueBytesVec(4, std::byte{0});
+        std::copy(values, values + valueBytes, valueBytesVec.data());
+        if (mustSwap) {
+          // Note that we swap values as an array, instead of as a single `uint32_t`
+          // This is because the values may not be a single `uint32_t` but rather
+          // a sequence of smaller types (e.g., uint16_t, uint8_t)
+          swapArray(valueBytesVec.data(), type, count);
+        }
+        os.write(reinterpret_cast<const char*>(valueBytesVec.data()), 4);
+      }
+      else {
+        // Values do not fit in 4 bytes, write the offset
+        writeValue(os, valueOffset, mustSwap);
+        std::streampos offset = startPos + static_cast<std::streampos>(valueOffset);
+        while (os.tellp() < offset) {
+          os.put(0); // Pad with zeros if necessary
+        }
+        if (mustSwap) {
+          std::vector<std::byte> swappedValues(values, values+valueBytes);
+          swapArray(swappedValues.data(), type, count);
+          writeAt(os, offset, swappedValues.data(), valueBytes);
         }
         else {
-          // Values do not fit in 4 bytes, write the offset
-          writeValue(os, valueOffset, mustSwap);
-          std::streampos offset = startPos + static_cast<std::streampos>(valueOffset);
-          if (mustSwap) {
-            std::vector<std::byte> swappedValues(valueBytes);
-            swapArray(swappedValues.data(), type, count);
-            writeAt(os, offset, swappedValues.data(), valueBytes);
-          }
-          else {
-            writeAt(os, offset, values, valueBytes);
-          }
+          writeAt(os, offset, values, valueBytes);
         }
       }
+    }
   };
 
-  // Test entry with single values
-  {
-    std::stringstream stream;
-    uint16_t tag = 0x0100; // ImageWidth
-    Type type = Type::SHORT;
-    uint32_t count = 1;
-    std::byte values[] = { std::byte{0x01}, std::byte{0x00} }; // 1 pixel wide
-    uint32_t valueOffset = 0; // Fits in 4 bytes
-    bool mustSwap = false;
-    EntryWriter::write(stream, tag, type, count, values);
+  auto testEntry = [](
+      uint16_t tag, Type type, uint32_t count,
+      const std::vector<uint8_t>& values,
+      uint32_t valueOffset = 0, bool mustSwap = false) {
 
-    TiffImage::IFD::Entry entry = TiffImage::IFD::Entry::read(stream);
+    std::stringstream stream;
+    EntryWriter::write(
+      stream, tag, type, count,
+      reinterpret_cast<const std::byte*>(values.data()),
+      valueOffset, mustSwap);
+
+    TiffImage::IFD::Entry entry = TiffImage::IFD::Entry::read(stream, mustSwap);
     REQUIRE(entry.tag() == tag);
     REQUIRE(entry.type() == type);
     REQUIRE(entry.count() == count);
-    REQUIRE(entry.valueBytes() == 2);
+    REQUIRE(entry.valueBytes() == typeBytes(type));
     REQUIRE(entry.bytes() == count * entry.valueBytes());
     REQUIRE(entry.values() != nullptr);
 
     const std::byte* valuePtr = entry.values();
     for (uint32_t i = 0; i < entry.bytes(); ++i) {
-      REQUIRE(valuePtr[i] == values[i]);
+      REQUIRE(valuePtr[i] == static_cast<std::byte>(values[i]));
     }
-  }
+  };
 
+  // Test with BYTE type
+  testEntry(0x0101, Type::BYTE, 1, { 0x01 });
+  testEntry(0x0101, Type::BYTE, 2, { 0x01, 0x02 });
+  testEntry(0x0101, Type::BYTE, 3, { 0x01, 0x02, 0x03 });
+  testEntry(0x0101, Type::BYTE, 4, { 0x01, 0x02, 0x03, 0x04 });
+  testEntry(0x0101, Type::BYTE, 5, { 0x01, 0x02, 0x03, 0x04, 0x05 }, 12);
+  testEntry(0x0101, Type::BYTE, 6, { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 }, 20);
+
+  // Test with SHORT type
+  testEntry(0x0102, Type::SHORT, 1, { 0x01, 0x02 });
+  testEntry(0x0102, Type::SHORT, 1, { 0x01, 0x02 }, 0, true); // Must swap
+  testEntry(0x0102, Type::SHORT, 2, { 0x01, 0x02, 0x03, 0x04 });
+  testEntry(0x0102, Type::SHORT, 2, { 0x01, 0x02, 0x03, 0x04 }, 0, true); // Must swap
+  testEntry(0x0102, Type::SHORT, 3, { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 }, 18);
+  testEntry(0x0102, Type::SHORT, 4, { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }, 20, true); // Must swap
+
+  // Test with LONG type
+  testEntry(0x0103, Type::LONG, 1, { 0x01, 0x02, 0x03, 0x04 });
+  testEntry(0x0103, Type::LONG, 1, { 0x01, 0x02, 0x03, 0x04 }, 0, true); // Must swap
+  testEntry(0x0103, Type::LONG, 2, { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }, 22);
+  testEntry(0x0103, Type::LONG, 3, { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C }, 22, true); // Must swap
+
+  // Test with RATIONAL type
+  testEntry(0x0104, Type::RATIONAL, 1, { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }, 12);
+  testEntry(0x0104, Type::RATIONAL, 1, { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }, 12, true); // Must swap
+  testEntry(0x0104, Type::RATIONAL, 2, { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+                                         0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10 }, 24);
+
+  // Test with ASCII type
+  testEntry(0x0105, Type::ASCII, 1, { '\0' });
+  testEntry(0x0105, Type::ASCII, 2, { 'A', '\0' });
+  testEntry(0x0105, Type::ASCII, 3, { 'A', 'B', '\0' });
+  testEntry(0x0105, Type::ASCII, 4, { 'A', 'B', 'C', '\0' });
+  testEntry(0x0105, Type::ASCII, 5, { 'A', 'B', 'C', 'D', '\0' }, 12);
+  testEntry(0x0105, Type::ASCII, 6, { 'A', 'B', 'C', 'D', 'E', '\0' }, 16);
 }
