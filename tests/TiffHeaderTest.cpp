@@ -12,11 +12,122 @@
 
 using namespace TiffCraft;
 
+bool operator==(const TiffImage::IFD::Entry& lhs, const TiffImage::IFD::Entry& rhs) {
+  return lhs.tag() == rhs.tag() &&
+         lhs.type() == rhs.type() &&
+         lhs.count() == rhs.count() &&
+         lhs.valueBytes() == rhs.valueBytes() &&
+         lhs.bytes() == rhs.bytes() &&
+         std::equal(lhs.values(), lhs.values() + lhs.bytes(), rhs.values());
+}
+
 std::string getTestFilePath(const std::string& filename) {
   std::filesystem::path test_file_path(__FILE__);
   std::filesystem::path test_dir = test_file_path.parent_path();
   return (test_dir / "libtiff-pics" / filename).string();
 }
+
+std::ostream& write_IFD_entry(
+  std::ostream& os,
+  uint16_t tag,
+  Type type,
+  uint32_t count,
+  const std::byte* values,
+  uint32_t valueOffset = 0,
+  bool mustSwap = false)
+{
+  const uint32_t valueBytes = count * typeBytes(type);
+
+  if (count < 1) {
+    throw std::runtime_error("Count must be at least 1");
+  }
+  if (values == nullptr) {
+    throw std::runtime_error("Values pointer cannot be null");
+  }
+  if (valueOffset < 12 && valueOffset != 0) {
+    throw std::runtime_error("Value offset must be zero or greater or equal to 12");
+  }
+  if (valueBytes > 4 && valueOffset == 0) {
+    throw std::runtime_error("Value offset must be provided if values do not fit in 4 bytes");
+  }
+  if (valueBytes <= 4 && valueOffset > 0) {
+    throw std::runtime_error("Value offset must be zero if values fit in 4 bytes");
+  }
+  if (valueOffset % 2 != 0) {
+    throw std::runtime_error("Value offset must be even");
+  }
+
+  writeValue(os, tag, mustSwap);
+  writeValue(os, type, mustSwap);
+  writeValue(os, count, mustSwap);
+
+  if (valueBytes <= 4) {
+    // Values fit in 4 bytes, write them directly
+    std::vector<std::byte> valueBytesVec(4, std::byte{0});
+    std::copy(values, values + valueBytes, valueBytesVec.data());
+    if (mustSwap) {
+      // Note that we swap values as an array, instead of as a single `uint32_t`
+      // This is because the values may not be a single `uint32_t` but rather
+      // a sequence of smaller types (e.g., uint16_t, uint8_t)
+      swapArray(valueBytesVec.data(), type, count);
+    }
+    os.write(reinterpret_cast<const char*>(valueBytesVec.data()), 4);
+  }
+  else {
+    // Values do not fit in 4 bytes, write the offset
+    writeValue(os, valueOffset, mustSwap);
+    std::streampos offset = static_cast<std::streampos>(valueOffset);
+    if (mustSwap) {
+      std::vector<std::byte> swappedValues(values, values+valueBytes);
+      swapArray(swappedValues.data(), type, count);
+      writeAt(os, offset, swappedValues.data(), valueBytes);
+    }
+    else {
+      writeAt(os, offset, values, valueBytes);
+    }
+  }
+
+  return os;
+}
+
+std::ostream& write_IFD(
+  std::ostream& os,
+  const std::vector<TiffImage::IFD::Entry>& entries,
+  bool mustSwap = false)
+{
+  // We write the IFD first, and the entry data afterwards. Therefore, we need
+  // calculate the offsets of the entries first.
+  const uint32_t IFD_bytes = 2 + 12 * entries.size(); // 2 bytes for the count,
+                                                      // and 12 bytes per entry
+
+  uint32_t nextOffset = IFD_bytes;
+  std::vector<uint32_t> offsets;
+  offsets.reserve(entries.size());
+  for (const auto& entry : entries) {
+    if (entry.bytes() > 4) {
+      // If the entry value does not fit in 4 bytes, we need to write it at a later offset
+      offsets.emplace_back(nextOffset);
+      nextOffset += entry.bytes();
+    }
+    else {
+      // If the entry value fits in 4 bytes, we can write it directly
+      offsets.emplace_back(0);
+    }
+  }
+
+  // Write the number of entries
+  writeValue(os, static_cast<uint16_t>(entries.size()), mustSwap);
+
+  // Write the entries
+  for (const auto& entry : entries) {
+    write_IFD_entry(os, entry.tag(), entry.type(), entry.count(),
+      entry.values(), offsets[&entry - &entries[0]], mustSwap);
+  }
+
+  return os;
+}
+
+
 
 TEST_CASE("TiffImage Header class", "[tiff_header]") {
 
@@ -114,75 +225,6 @@ TEST_CASE("TiffImage Header class", "[tiff_header]") {
 }
 
 TEST_CASE("TiffImage IFD::Entry class", "[tiff_IDF_entry]") {
-  // Define a helper to write a valid IFD entry
-  struct EntryWriter
-  {
-    static std::ostream& write(
-      std::ostream& os,
-      uint16_t tag,
-      Type type,
-      uint32_t count,
-      const std::byte* values,
-      uint32_t valueOffset = 0,
-      bool mustSwap = false)
-    {
-      const uint32_t valueBytes = count * typeBytes(type);
-
-      if (count < 1) {
-        throw std::runtime_error("Count must be at least 1");
-      }
-      if (values == nullptr) {
-        throw std::runtime_error("Values pointer cannot be null");
-      }
-      if (valueOffset < 12 && valueOffset != 0) {
-        throw std::runtime_error("Value offset must be zero or greater or equal to 12");
-      }
-      if (valueBytes > 4 && valueOffset == 0) {
-        throw std::runtime_error("Value offset must be provided if values do not fit in 4 bytes");
-      }
-      if (valueBytes <= 4 && valueOffset > 0) {
-        throw std::runtime_error("Value offset must be zero if values fit in 4 bytes");
-      }
-      if (valueOffset % 2 != 0) {
-        throw std::runtime_error("Value offset must be even");
-      }
-
-      auto startPos = os.tellp();
-
-      writeValue(os, tag, mustSwap);
-      writeValue(os, type, mustSwap);
-      writeValue(os, count, mustSwap);
-
-      if (valueBytes <= 4) {
-        // Values fit in 4 bytes, write them directly
-        std::vector<std::byte> valueBytesVec(4, std::byte{0});
-        std::copy(values, values + valueBytes, valueBytesVec.data());
-        if (mustSwap) {
-          // Note that we swap values as an array, instead of as a single `uint32_t`
-          // This is because the values may not be a single `uint32_t` but rather
-          // a sequence of smaller types (e.g., uint16_t, uint8_t)
-          swapArray(valueBytesVec.data(), type, count);
-        }
-        os.write(reinterpret_cast<const char*>(valueBytesVec.data()), 4);
-      }
-      else {
-        // Values do not fit in 4 bytes, write the offset
-        writeValue(os, valueOffset, mustSwap);
-        std::streampos offset = startPos + static_cast<std::streampos>(valueOffset);
-        while (os.tellp() < offset) {
-          os.put(0); // Pad with zeros if necessary
-        }
-        if (mustSwap) {
-          std::vector<std::byte> swappedValues(values, values+valueBytes);
-          swapArray(swappedValues.data(), type, count);
-          writeAt(os, offset, swappedValues.data(), valueBytes);
-        }
-        else {
-          writeAt(os, offset, values, valueBytes);
-        }
-      }
-    }
-  };
 
   auto testEntry = [](
       uint16_t tag, Type type, uint32_t count,
@@ -190,7 +232,7 @@ TEST_CASE("TiffImage IFD::Entry class", "[tiff_IDF_entry]") {
       uint32_t valueOffset = 0, bool mustSwap = false) {
 
     std::stringstream stream;
-    EntryWriter::write(
+    write_IFD_entry(
       stream, tag, type, count,
       reinterpret_cast<const std::byte*>(values.data()),
       valueOffset, mustSwap);
@@ -244,4 +286,51 @@ TEST_CASE("TiffImage IFD::Entry class", "[tiff_IDF_entry]") {
   testEntry(0x0105, Type::ASCII, 4, { 'A', 'B', 'C', '\0' });
   testEntry(0x0105, Type::ASCII, 5, { 'A', 'B', 'C', 'D', '\0' }, 12);
   testEntry(0x0105, Type::ASCII, 6, { 'A', 'B', 'C', 'D', 'E', '\0' }, 16);
+}
+
+TEST_CASE("TiffImage IFD class", "[tiff_IFD]") {
+
+  // Create a few entries
+  std::vector<TiffImage::IFD::Entry> entries;
+  {
+    auto addEntry = [&entries](
+      uint16_t tag, Type type, uint32_t count,
+      const std::vector<uint8_t>& values,
+      uint32_t valueOffset = 0, bool mustSwap = false) {
+        std::stringstream stream;
+        // Write the entry
+        write_IFD_entry(
+          stream, tag, type, count,
+          reinterpret_cast<const std::byte*>(values.data()),
+          valueOffset, mustSwap);
+        // Read the entry back
+        TiffImage::IFD::Entry entry = TiffImage::IFD::Entry::read(stream, mustSwap);
+        // Add the entry to the vector
+        entries.push_back(entry);
+    };
+    addEntry(0x0101, Type::BYTE, 6, { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06 }, 12);
+    addEntry(0x0102, Type::SHORT, 1, { 0x01, 0x02 });
+    addEntry(0x0103, Type::LONG, 2, { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }, 12);
+    addEntry(0x0104, Type::RATIONAL, 1, { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }, 12);
+    addEntry(0x0105, Type::ASCII, 6, { 'A', 'B', 'C', 'D', 'E', '\0' }, 12);
+  }
+  REQUIRE(entries.size() == 5);
+
+  { // Test writing and reading IFD
+    std::stringstream stream;
+    write_IFD(stream, entries, false);
+
+    // Read the IFD back
+    TiffImage::IFD ifd = TiffImage::IFD::read(stream, false);
+
+    // Check the number of entries
+    REQUIRE(ifd.entries().size() == entries.size());
+
+    // Check each entry
+    auto it = ifd.entries().begin();
+    for (size_t i = 0; i < entries.size(); ++i, ++it) {
+      REQUIRE(it->second == entries[i]);
+    }
+  }
+
 }

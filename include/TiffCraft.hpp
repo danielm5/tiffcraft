@@ -8,6 +8,8 @@
 #include <fstream>
 #include <stdexcept>
 #include <vector>
+#include <map>
+#include <cassert>
 
 #if __cpp_lib_byteswap >= 201806L
 # include <bit> // C++20 byteswap
@@ -227,13 +229,25 @@ namespace TiffCraft {
       std::ostream& stream;
       std::streampos oldPos;
       SeekGuard(std::ostream& s, std::streampos p) : stream(s), oldPos(s.tellp()) {
+        // try to seek to the specified position
         stream.seekp(p);
+        if (stream.fail()) {
+          // if seeking fails, we check if we tried to seek beyond the end of
+          // the stream and if so, we pad the stream with zeros until we reach
+          // the desired position
+          stream.clear(); // Clear any error flags
+          stream.seekp(0, std::ios_base::end);
+          while (stream && stream.tellp() < p) {
+            stream.put(0); // Pad with zeros if necessary
+          }
+          assert(stream.tellp() == p && "SeekGuard did not reach the desired position");
+        }
       }
       ~SeekGuard() {
         stream.seekp(oldPos);
       }
     } seekGuard(stream, pos);
-    if (!stream) {
+    if (!stream || stream.tellp() != pos) {
       throw std::runtime_error("Failed to seek to position in stream");
     }
     stream.write(reinterpret_cast<const char*>(buffer), size);
@@ -358,11 +372,11 @@ namespace TiffCraft {
         uint16_t tag() const { return tag_; }
         Type type() const { return type_; }
         uint32_t count() const { return count_; }
-        std::byte* values() const { return values_.get(); }
+        const std::byte* values() const { return values_.data(); }
 
         uint32_t valueBytes() const { return TiffCraft::typeBytes(type_); }
         uint32_t bytes() const { return count() * valueBytes(); }
-        void swapValues() { swapArray(values_.get(), type_, count_); }
+        void swapValues() { swapArray(values_.data(), type_, count_); }
 
         static Entry read(std::istream& stream, bool mustSwap = false) {
           Entry entry;
@@ -372,11 +386,11 @@ namespace TiffCraft {
 
           // Read the value
           const uint32_t valueSize = entry.bytes();
-          entry.values_.reset(new std::byte[valueSize]);
+          entry.values_.resize(valueSize);
           if (valueSize <= sizeof(uint32_t)) {
             // Value fits in 4 bytes, read directly
             const uint32_t value = readValue<uint32_t>(stream);
-            std::memcpy(entry.values_.get(), &value, valueSize);
+            std::memcpy(entry.values_.data(), &value, valueSize);
           }
           else {
             // Value is too large, read as an offset
@@ -384,7 +398,7 @@ namespace TiffCraft {
             if (valueOffset < 8 || valueOffset % 2 != 0) {
               throw std::runtime_error("Invalid value offset in TIFF entry");
             }
-            readAt(stream, valueOffset, entry.values_.get(), valueSize);
+            readAt(stream, valueOffset, entry.values_.data(), valueSize);
           }
 
           // Swap values after reading them to treat them as an array, instead
@@ -411,12 +425,33 @@ namespace TiffCraft {
         uint16_t tag_;          // Tag identifying the field
         Type type_;             // Type of the field
         uint32_t count_;        // Number of values
-        std::unique_ptr<std::byte[]> values_; // Pointer to the value data
+        std::vector<std::byte> values_; // Pointer to the value data
       };
 
-      //TODO: add vector of directory entries
+      const std::map<uint32_t, Entry>& entries() const { return entries_; }
+
+      static IFD read(std::istream& stream, bool mustSwap = false) {
+        IFD ifd;
+
+        // Read the number of entries
+        uint16_t entryCount = readValue<uint16_t>(stream, mustSwap);
+
+        // Read each entry
+        uint16_t lastTag = 0;
+        for (uint16_t i = 0; i < entryCount; ++i) {
+          Entry entry = Entry::read(stream, mustSwap);
+          ifd.entries_[entry.tag()] = std::move(entry);
+          if (entry.tag() <= lastTag) {
+            throw std::runtime_error("Entries must be sorted by tag in ascending order");
+          }
+          lastTag = entry.tag();
+        }
+
+        return ifd;
+      }
+
       private:
-        std::vector<Entry> entries_; // Vector of directory entries
+        std::map<uint32_t, Entry> entries_; // Map of directory entries
     };
 
 
