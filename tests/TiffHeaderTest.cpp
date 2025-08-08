@@ -38,13 +38,16 @@ std::ostream& write_IFD_entry(
 {
   const uint32_t valueBytes = count * typeBytes(type);
 
+  // Current position in the stream
+  const uint32_t startPos = static_cast<uint32_t>(os.tellp());
+
   if (count < 1) {
     throw std::runtime_error("Count must be at least 1");
   }
   if (values == nullptr) {
     throw std::runtime_error("Values pointer cannot be null");
   }
-  if (valueOffset < 12 && valueOffset != 0) {
+  if (valueOffset - startPos < 12 && valueOffset != 0) {
     throw std::runtime_error("Value offset must be zero or greater or equal to 12");
   }
   if (valueBytes > 4 && valueOffset == 0) {
@@ -100,7 +103,10 @@ std::ostream& write_IFD(
   const uint32_t IFD_bytes = 2 + 12 * entries.size(); // 2 bytes for the count,
                                                       // and 12 bytes per entry
 
-  uint32_t nextOffset = IFD_bytes;
+  // Current position in the stream
+  std::streampos currentPos = os.tellp();
+
+  uint32_t nextOffset = IFD_bytes + static_cast<uint32_t>(currentPos);
   std::vector<uint32_t> offsets;
   offsets.reserve(entries.size());
   for (const auto& entry : entries) {
@@ -220,7 +226,7 @@ TEST_CASE("TiffImage Header class", "[tiff_header]") {
     REQUIRE(file.is_open());
     REQUIRE(file.good());
     auto header = TiffImage::Header::read(file);
-    std::cout << "header: " << header << std::endl;
+    std::cout << header << std::endl;
   }
 }
 
@@ -332,5 +338,14 @@ TEST_CASE("TiffImage IFD class", "[tiff_IFD]") {
       REQUIRE(it->second == entries[i]);
     }
   }
+}
 
+TEST_CASE("TiffImage class", "[tiff_image]") {
+
+  {
+    const std::string test_file = "fax2d.tif";
+    std::cout << "Test file path: " << getTestFilePath(test_file) << std::endl;
+    TiffImage image = TiffImage::read(getTestFilePath(test_file));
+    std::cout << image << std::endl;
+  }
 }

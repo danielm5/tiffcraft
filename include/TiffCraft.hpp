@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <vector>
 #include <map>
+#include <iomanip>
 #include <cassert>
 
 #if __cpp_lib_byteswap >= 201806L
@@ -422,9 +423,9 @@ namespace TiffCraft {
         }
 
       private:
-        uint16_t tag_;          // Tag identifying the field
-        Type type_;             // Type of the field
-        uint32_t count_;        // Number of values
+        uint16_t tag_;                  // Tag identifying the field
+        Type type_;                     // Type of the field
+        uint32_t count_;                // Number of values
         std::vector<std::byte> values_; // Pointer to the value data
       };
 
@@ -454,7 +455,8 @@ namespace TiffCraft {
         std::map<uint32_t, Entry> entries_; // Map of directory entries
     };
 
-
+    const Header& header() const { return header_; }
+    const std::vector<IFD>& ifds() const { return ifds_; }
 
     static TiffImage read(const std::string& filename) {
       std::ifstream file(filename, std::ios::binary);
@@ -470,22 +472,106 @@ namespace TiffCraft {
       // Read and parse the header
       image.header_ = Header::read(stream);
 
-      // TODO: Read IFDs and image data
+      // Read the IFDs
+      const bool mustSwap = !image.header_.equalsHostByteOrder();
+      uint32_t offset = image.header_.firstIFDOffset();
+      while (offset > 0) {
+        // Seek to the IFD offset
+        stream.seekg(offset);
+        if (stream.fail()) {
+          throw std::runtime_error("Failed to seek to IFD offset");
+        }
+
+        // Read the IFD
+        TiffImage::IFD ifd = TiffImage::IFD::read(stream, mustSwap);
+        image.ifds_.push_back(std::move(ifd));
+
+        // Read the next IFD offset
+        offset = readValue<uint32_t>(stream, mustSwap);
+      }
 
       return image;
     }
 
-
-
     private:
       Header header_;
+      std::vector<IFD> ifds_; // List of IFDs in the TIFF image
   };
 
 }
 
+std::ostream& operator<<(std::ostream& os, const TiffCraft::Type& type) {
+  switch (type) {
+    case TiffCraft::Type::BYTE:      return os << "BYTE";
+    case TiffCraft::Type::ASCII:     return os << "ASCII";
+    case TiffCraft::Type::SHORT:     return os << "SHORT";
+    case TiffCraft::Type::LONG:      return os << "LONG";
+    case TiffCraft::Type::RATIONAL:  return os << "RATIONAL";
+    default:                         return os << "UNKNOWN";
+  }
+  return os;
+}
+
 std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::Header& header) {
-  os << "Byte Order: " << (header.isLittleEndian() ? "Little Endian" : "Big Endian") << "\n"
-     << "First IFD Offset: " << header.firstIFDOffset() << "\n"
-     << "Equals Host Byte Order: " << (header.equalsHostByteOrder() ? "Yes" : "No") << "\n";
+  os << "TIFF Header:\n"
+     << " - Byte Order: " << (header.isLittleEndian() ? "Little Endian" : "Big Endian") << "\n"
+     << " - First IFD Offset: " << header.firstIFDOffset() << "\n"
+     << " - Equals Host Byte Order: " << (header.equalsHostByteOrder() ? "Yes" : "No") << "\n";
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::IFD::Entry& entry) {
+  os << "Tag: " << entry.tag() << "; "
+     << "Type: " << entry.type() << "; "
+     << "Count: " << entry.count() << ": "
+     << "Value:";
+  if (entry.type() == TiffCraft::Type::ASCII) {
+    // For ASCII type, print as a string
+    os << " " << std::string(reinterpret_cast<const char*>(entry.values()), entry.bytes() - 1);
+  } else {
+    for (int i = 0; i < entry.count(); ++i) {
+      const std::byte* value = entry.values() + i * entry.valueBytes();
+      switch (entry.type()) {
+        case TiffCraft::Type::BYTE:
+          os << " " << *reinterpret_cast<const uint8_t*>(value);;
+          break;
+        case TiffCraft::Type::SHORT:
+          os << " " << *reinterpret_cast<const uint16_t*>(value);
+          break;
+        case TiffCraft::Type::LONG:
+          os << " " << *reinterpret_cast<const uint32_t*>(value);
+          break;
+        case TiffCraft::Type::RATIONAL: {
+          const auto* rational = reinterpret_cast<const TiffCraft::Rational*>(value);
+          os << " " << rational->numerator << "/" << rational->denominator;
+          break;
+        }
+        default:
+          os << " <Unsupported Type>";
+      }
+    }
+  }
+  os << "\n";
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::IFD& ifd) {
+  os << "TIFF IFD:\n"
+     << "    Entry count: " << ifd.entries().size() << "\n";
+  int i = 0;
+  for (const auto& entry : ifd.entries()) {
+    os << std::setw(4) << i++ << "# " << entry.second;
+  }
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage& image) {
+  os << "TIFF IMAGE START -----------------------\n"
+     << image.header()
+     << "IFD count: " << image.ifds().size() << "\n";
+  for (int i = 0; i < image.ifds().size(); ++i) {
+    os << std::setw(2) << i << ") " << image.ifds()[i];
+  }
+  os << "TIFF IMAGE END -------------------------\n";
   return os;
 }
