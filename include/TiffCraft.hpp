@@ -490,6 +490,13 @@ namespace TiffCraft {
           return entry;
         }
 
+        bool operator==(const Entry& other) const {
+          return tag_ == other.tag_ &&
+                 type_ == other.type_ &&
+                 count_ == other.count_ &&
+                 values_ == other.values_;
+        }
+
       private:
         Tag tag_;                       // Tag identifying the field
         Type type_;                     // Type of the field

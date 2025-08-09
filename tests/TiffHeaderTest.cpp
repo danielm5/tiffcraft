@@ -14,15 +14,6 @@
 
 using namespace TiffCraft;
 
-bool operator==(const TiffImage::IFD::Entry& lhs, const TiffImage::IFD::Entry& rhs) {
-  return lhs.tag() == rhs.tag() &&
-         lhs.type() == rhs.type() &&
-         lhs.count() == rhs.count() &&
-         lhs.valueBytes() == rhs.valueBytes() &&
-         lhs.bytes() == rhs.bytes() &&
-         std::equal(lhs.values(), lhs.values() + lhs.bytes(), rhs.values());
-}
-
 #ifdef HAS_SPAN
   template <typename T>
   bool operator==(const std::span<const T>& lhs, const std::span<const T>& rhs) {
