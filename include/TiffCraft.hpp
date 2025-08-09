@@ -4,6 +4,7 @@
 #pragma once
 
 #include <type_traits>
+#include <functional>
 #include <stdexcept>
 #include <optional>
 #include <cstdint>
@@ -624,9 +625,9 @@ namespace TiffCraft {
     std::optional<uint16_t> ifdIndex; // Optional IFD index to load
   };
 
-  using LoadCallback = void(*)(const TiffImage::IFD& ifd, TiffImage::ImageData imageData);
+  using LoadCallback = std::function<void(const TiffImage::IFD&, TiffImage::ImageData)>;
 
-  void load(std::istream& stream, const LoadCallback&& callback, const LoadParams& params = {}) {
+  void load(std::istream& stream, LoadCallback&& callback, const LoadParams& params = {}) {
     // Read the TIFF image from the stream
     TiffImage image = TiffImage::read(stream);
 
@@ -644,7 +645,7 @@ namespace TiffCraft {
     }
   }
 
-  void load(const std::string& filename, const LoadCallback&& callback, const LoadParams& params = {}) {
+  void load(const std::string& filename, LoadCallback&& callback, const LoadParams& params = {}) {
     std::ifstream file(filename, std::ios::binary);
     if (!file) {
       throw std::runtime_error("Failed to open TIFF file: " + std::string(filename));
@@ -718,7 +719,7 @@ std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::IFD& ifd)
   } autoRestore(os);
 
   os << "TIFF IFD:\n"
-     << "    Entry count: " << ifd.entries().size() << "\n";
+     << "  Entry count: " << ifd.entries().size() << "\n";
   int i = 0;
   for (const auto& entry : ifd.entries()) {
     os << std::setw(4) << i++ << "# " << entry.second;
