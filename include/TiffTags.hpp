@@ -21,6 +21,7 @@ namespace TiffCraft {
     BitsPerSample = 0x0102,
     Compression = 0x0103,
     PhotometricInterpretation = 0x0106,
+    FillOrder = 0x010A,
     ImageDescription = 0x010E,
     StripOffsets = 0x0111,
     Orientation = 0x0112,
@@ -57,6 +58,7 @@ std::ostream& operator<<(std::ostream& os, const TiffCraft::Tag& type) {
     case TiffCraft::Tag::BitsPerSample: os << "BitsPerSample"; break;
     case TiffCraft::Tag::Compression: os << "Compression"; break;
     case TiffCraft::Tag::PhotometricInterpretation: os << "PhotometricInterpretation"; break;
+    case TiffCraft::Tag::FillOrder: os << "FillOrder"; break;
     case TiffCraft::Tag::ImageDescription: os << "ImageDescription"; break;
     case TiffCraft::Tag::StripOffsets: os << "StripOffsets"; break;
     case TiffCraft::Tag::Orientation: os << "Orientation"; break;
