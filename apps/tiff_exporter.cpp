@@ -112,13 +112,16 @@ public:
     const int photometricInterpretation = getInt(ifd, Tag::PhotometricInterpretation);
     const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
     const int samplesPerPixel = getInt(ifd, Tag::SamplesPerPixel, 1);
-    const int fillOrder = getInt(ifd, Tag::FillOrder, 1);
+
+    //TODO check if image is striped or tiled
 
     // handle bilevel images  (1-bit per pixel)
     if (bitsPerSample == 1) {
       if (compression != 1) {
         throw std::runtime_error("Unsupported compression for bilevel image");
       }
+
+      const int fillOrder = getInt(ifd, Tag::FillOrder, 1);
       if (fillOrder != 1) {
         throw std::runtime_error("Unsupported fill order for bilevel image");
       }
@@ -145,6 +148,41 @@ public:
           if (row >= height) { break; }
         }
         if (row >= height) { break; }
+      }
+
+      return;
+    }
+
+    // handle grayscale images  (8-bit per pixel)
+    if (bitsPerSample == 8) {
+      if (compression != 1) {
+        throw std::runtime_error("Unsupported compression for grayscale image");
+      }
+
+      image_ = Image::makeGray8(width, height);
+      { // copy the pixel data
+        auto* data = image_.getData<std::byte>();
+        int row = 0, col = 0;
+        for (const auto& rowStrip : imageData) {
+          for (auto byte : rowStrip) {
+            *data++ = byte;
+            ++col;
+            if (col >= width) {
+              col = 0;
+              ++row;
+              if (row >= height) { break; }
+            }
+          }
+          if (row >= height) { break; }
+        }
+      }
+
+      if (photometricInterpretation == 0) { // WhiteIsZero
+        // Invert the image
+        uint8_t* data = image_.getData<uint8_t>();
+        for (size_t i = 0; i < image_.data.size(); ++i) {
+          data[i] = ~data[i];
+        }
       }
 
       return;
