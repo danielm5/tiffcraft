@@ -71,12 +71,28 @@ namespace TiffCraft {
   // 4 = LONG 32-bit (4-byte) unsigned integer.
   // 5 = RATIONAL Two LONGs: the first represents the numerator of a
   //     fraction; the second, the denominator.
+  // 6 = SBYTE An 8-bit signed (twos-complement) integer.
+  // 7 = UNDEFINED An 8-bit byte that may contain anything, depending on
+  //     the definition of the field.
+  // 8 = SSHORT A 16-bit (2-byte) signed (twos-complement) integer.
+  // 9 = SLONG A 32-bit (4-byte) signed (twos-complement) integer.
+  // 10 = SRATIONAL Two SLONG’s: the first represents the numerator of a
+  //      fraction, the second the denominator.
+  // 11 = FLOAT Single precision (4-byte) IEEE format.
+  // 12 = DOUBLE Double precision (8-byte) IEEE format
   enum class Type : uint16_t {
     BYTE = 1,
     ASCII = 2,
     SHORT = 3,
     LONG = 4,
-    RATIONAL = 5
+    RATIONAL = 5,
+    SBYTE = 6,
+    UNDEFINED = 7,
+    SSHORT = 8,
+    SLONG = 9,
+    SRATIONAL = 10,
+    FLOAT = 11,
+    DOUBLE = 12
   };
 
   template <Type type> struct TypeTraits;
@@ -85,6 +101,13 @@ namespace TiffCraft {
   template <> struct TypeTraits<Type::SHORT> { using type = uint16_t; };
   template <> struct TypeTraits<Type::LONG> { using type = uint32_t; };
   template <> struct TypeTraits<Type::RATIONAL> { using type = Rational; };
+  template <> struct TypeTraits<Type::SBYTE> { using type = int8_t; };
+  template <> struct TypeTraits<Type::UNDEFINED> { using type = std::byte; };
+  template <> struct TypeTraits<Type::SSHORT> { using type = int16_t; };
+  template <> struct TypeTraits<Type::SLONG> { using type = int32_t; };
+  template <> struct TypeTraits<Type::SRATIONAL> { using type = Rational; }; // TODO: correctly handled signed rational
+  template <> struct TypeTraits<Type::FLOAT> { using type = float; };
+  template <> struct TypeTraits<Type::DOUBLE> { using type = double; };
 
   template <Type type> using TypeTraits_t = typename TypeTraits<type>::type;
 
@@ -100,6 +123,13 @@ namespace TiffCraft {
       case Type::SHORT:     return typeBytes<Type::SHORT>();
       case Type::LONG:      return typeBytes<Type::LONG>();
       case Type::RATIONAL:  return typeBytes<Type::RATIONAL>();
+      case Type::SBYTE:     return typeBytes<Type::SBYTE>();
+      case Type::UNDEFINED: return typeBytes<Type::UNDEFINED>();
+      case Type::SSHORT:    return typeBytes<Type::SSHORT>();
+      case Type::SLONG:     return typeBytes<Type::SLONG>();
+      case Type::SRATIONAL: return typeBytes<Type::SRATIONAL>();
+      case Type::FLOAT:     return typeBytes<Type::FLOAT>();
+      case Type::DOUBLE:    return typeBytes<Type::DOUBLE>();
       default:
         throw std::runtime_error("Unknown TIFF entry type");
     }
@@ -135,6 +165,13 @@ namespace TiffCraft {
       case Type::SHORT:    copyVector_safe<Type::SHORT, DstType>(src, count, dest); break;
       case Type::LONG:     copyVector_safe<Type::LONG, DstType>(src, count, dest); break;
       case Type::RATIONAL: copyVector_safe<Type::RATIONAL, DstType>(src, count, dest); break;
+      case Type::SBYTE:    copyVector_safe<Type::SBYTE, DstType>(src, count, dest); break;
+      case Type::UNDEFINED: copyVector_safe<Type::UNDEFINED, DstType>(src, count, dest); break;
+      case Type::SSHORT:    copyVector_safe<Type::SSHORT, DstType>(src, count, dest); break;
+      case Type::SLONG:     copyVector_safe<Type::SLONG, DstType>(src, count, dest); break;
+      case Type::SRATIONAL: copyVector_safe<Type::SRATIONAL, DstType>(src, count, dest); break;
+      case Type::FLOAT:     copyVector_safe<Type::FLOAT, DstType>(src, count, dest); break;
+      case Type::DOUBLE:    copyVector_safe<Type::DOUBLE, DstType>(src, count, dest); break;
       default:
         throw std::runtime_error("Unknown TIFF entry type");
     }
@@ -662,7 +699,14 @@ std::ostream& operator<<(std::ostream& os, const TiffCraft::Type& type) {
     case TiffCraft::Type::SHORT:     return os << "SHORT";
     case TiffCraft::Type::LONG:      return os << "LONG";
     case TiffCraft::Type::RATIONAL:  return os << "RATIONAL";
-    default:                         return os << "UNKNOWN";
+    case TiffCraft::Type::SBYTE:     return os << "SBYTE";
+    case TiffCraft::Type::UNDEFINED: return os << "UNDEFINED";
+    case TiffCraft::Type::SSHORT:    return os << "SSHORT";
+    case TiffCraft::Type::SLONG:     return os << "SLONG";
+    case TiffCraft::Type::SRATIONAL: return os << "SRATIONAL";
+    case TiffCraft::Type::FLOAT:     return os << "FLOAT";
+    case TiffCraft::Type::DOUBLE:    return os << "DOUBLE";
+    default:                         return os << "!UNKNOWN";
   }
   return os;
 }
@@ -701,8 +745,36 @@ std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::IFD::Entr
           os << " " << rational->numerator << "/" << rational->denominator;
           break;
         }
+        case TiffCraft::Type::SBYTE:
+          os << " " << static_cast<int>(*reinterpret_cast<const int8_t*>(value));
+          break;
+        case TiffCraft::Type::UNDEFINED:
+          os << " " << *reinterpret_cast<const uint8_t*>(value);
+          break;
+        case TiffCraft::Type::SSHORT:
+          os << " " << *reinterpret_cast<const int16_t*>(value);
+          break;
+        case TiffCraft::Type::SLONG:
+          os << " " << *reinterpret_cast<const int32_t*>(value);
+          break;
+        case TiffCraft::Type::SRATIONAL: {
+          const auto* rational = reinterpret_cast<const TiffCraft::Rational*>(value);
+          os << " " << rational->numerator << "/" << rational->denominator;
+          break;
+        }
+        case TiffCraft::Type::FLOAT:
+          os << " " << *reinterpret_cast<const float*>(value);
+          break;
+        case TiffCraft::Type::DOUBLE:
+          os << " " << *reinterpret_cast<const double*>(value);
+          break;
         default:
           os << " <Unsupported Type>";
+      }
+      if (i > 5) {
+        // if there are more than 5 values, skip the rest
+        os << " ...";
+        break;
       }
     }
   }

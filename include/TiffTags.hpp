@@ -17,6 +17,7 @@ namespace TiffCraft {
     // Image File Directory (IFD) tags
     Null = 0x0000, // Not a real tag, used for padding or as a placeholder
     NewSubfileType = 0x00FE,
+    SubfileType = 0x00FF,
     ImageWidth = 0x0100,
     ImageLength = 0x0101,
     BitsPerSample = 0x0102,
@@ -25,6 +26,8 @@ namespace TiffCraft {
     Thresholding = 0x0107,
     FillOrder = 0x010A,
     ImageDescription = 0x010E,
+    Make = 0x010F,
+    Model = 0x0110,
     StripOffsets = 0x0111,
     Orientation = 0x0112,
     SamplesPerPixel = 0x0115,
@@ -38,6 +41,7 @@ namespace TiffCraft {
     Software = 0x0131,
     DateTime = 0x0132,
     Artist = 0x013B,
+    ColorMap = 0x0140,
     HalftoneHints = 0x0141,
     SampleFormat = 0x0153,
 
@@ -57,6 +61,7 @@ std::ostream& operator<<(std::ostream& os, const TiffCraft::Tag& type) {
   switch (type) {
     case TiffCraft::Tag::Null: os << "Null"; break;
     case TiffCraft::Tag::NewSubfileType: os << "NewSubfileType"; break;
+    case TiffCraft::Tag::SubfileType: os << "SubfileType"; break;
     case TiffCraft::Tag::ImageWidth: os << "ImageWidth"; break;
     case TiffCraft::Tag::ImageLength: os << "ImageLength"; break;
     case TiffCraft::Tag::BitsPerSample: os << "BitsPerSample"; break;
@@ -65,6 +70,8 @@ std::ostream& operator<<(std::ostream& os, const TiffCraft::Tag& type) {
     case TiffCraft::Tag::Thresholding: os << "Thresholding"; break;
     case TiffCraft::Tag::FillOrder: os << "FillOrder"; break;
     case TiffCraft::Tag::ImageDescription: os << "ImageDescription"; break;
+    case TiffCraft::Tag::Make: os << "Make"; break;
+    case TiffCraft::Tag::Model: os << "Model"; break;
     case TiffCraft::Tag::StripOffsets: os << "StripOffsets"; break;
     case TiffCraft::Tag::Orientation: os << "Orientation"; break;
     case TiffCraft::Tag::SamplesPerPixel: os << "SamplesPerPixel"; break;
@@ -79,6 +86,7 @@ std::ostream& operator<<(std::ostream& os, const TiffCraft::Tag& type) {
     case TiffCraft::Tag::DateTime: os << "DateTime"; break;
     case TiffCraft::Tag::Artist: os << "Artist"; break;
     case TiffCraft::Tag::HalftoneHints: os << "HalftoneHints"; break;
+    case TiffCraft::Tag::ColorMap: os << "ColorMap"; break;
     case TiffCraft::Tag::SampleFormat: os << "SampleFormat"; break;
     default: os << "0x" << std::hex << std::setw(4) << std::setfill('0')
                 << static_cast<uint16_t>(type); break;

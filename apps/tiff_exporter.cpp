@@ -67,6 +67,9 @@ public:
 
   int getAsInt(const TiffImage::IFD::Entry& entry) const
   {
+    if (entry.count() != 1) {
+      throw std::runtime_error("Expected a single value for integer tag");
+    }
     switch (entry.type()) {
       case Type::BYTE:
         return static_cast<int>(*reinterpret_cast<const TypeTraits_t<Type::BYTE>*>(entry.values()));
@@ -81,6 +84,23 @@ public:
         auto* rational = reinterpret_cast<const TypeTraits_t<Type::RATIONAL>*>(entry.values());
         return static_cast<int>(rational->numerator / rational->denominator);
       }
+      case Type::SBYTE:
+        return static_cast<int>(*reinterpret_cast<const TypeTraits_t<Type::SBYTE>*>(entry.values()));
+      case Type::UNDEFINED:
+        return static_cast<int>(*reinterpret_cast<const TypeTraits_t<Type::UNDEFINED>*>(entry.values()));
+      case Type::SSHORT:
+        return static_cast<int>(*reinterpret_cast<const TypeTraits_t<Type::SSHORT>*>(entry.values()));
+      case Type::SLONG:
+        return static_cast<int>(*reinterpret_cast<const TypeTraits_t<Type::SLONG>*>(entry.values()));
+      case Type::SRATIONAL:
+      {
+        auto* rational = reinterpret_cast<const TypeTraits_t<Type::SRATIONAL>*>(entry.values());
+        return static_cast<int>(rational->numerator / rational->denominator);
+      }
+      case Type::FLOAT:
+        return static_cast<int>(*reinterpret_cast<const TypeTraits_t<Type::FLOAT>*>(entry.values()));
+      case Type::DOUBLE:
+        return static_cast<int>(*reinterpret_cast<const TypeTraits_t<Type::DOUBLE>*>(entry.values()));
       default:
         throw std::runtime_error("Unknown TIFF entry type");
     }
@@ -110,10 +130,14 @@ public:
     const int height = getInt(ifd, Tag::ImageLength);
     const int compression = getInt(ifd, Tag::Compression, 1);
     const int photometricInterpretation = getInt(ifd, Tag::PhotometricInterpretation);
-    const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
+    const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1); // this needs to be a vector
     const int samplesPerPixel = getInt(ifd, Tag::SamplesPerPixel, 1);
 
+    // TODO: I could check samplesPerPixel first to see if is a single channel
+    // image and get the bitsPerSample afterwards depending on that.
+
     //TODO check if image is striped or tiled
+    // try cramps-tile.tif
 
     // handle bilevel images  (1-bit per pixel)
     if (bitsPerSample == 1) {
