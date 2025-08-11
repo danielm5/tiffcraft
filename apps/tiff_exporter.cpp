@@ -3,6 +3,7 @@
 
 #include "TiffCraft.hpp"
 
+#include <algorithm>
 #include <iostream>
 #include <string>
 
@@ -26,6 +27,11 @@ struct Image
   static Image makeGray8(int width, int height)
   {
     return Image{ width, height, 1, 1, width, 1, 8, false, std::vector<std::byte>(width * height) };
+  }
+
+  static Image makeRGB8(int width, int height)
+  {
+    return Image{ width, height, 3, 3, width * 3, 1, 8, false, std::vector<std::byte>(width * height * 3) };
   }
 
   template <typename T>
@@ -54,6 +60,18 @@ void saveImage(const std::string& filename, const Image& image)
     return; // Success
   }
 
+  // 3-channel 8-bit RGB image
+  if (image.channels == 3 && image.bitDepth == 8 && !image.isFloat) {
+    if (image.colStride != 3 || image.chanStride != 1) {
+      throw std::runtime_error("Invalid strides for 3-channel 8-bit RGB image");
+    }
+    if (!stbi_write_png(filename.c_str(), image.width, image.height, image.channels,
+          reinterpret_cast<const uint8_t*>(image.data.data()), image.rowStride)) {
+      throw std::runtime_error("Failed to save PNG image");
+    }
+    return; // Success
+  }
+
   throw std::runtime_error("Unsupported image format for saving");
 }
 
@@ -64,64 +82,83 @@ public:
 
   const Image& getImage() const { return image_; }
 
-
-  int getAsInt(const TiffImage::IFD::Entry& entry) const
+  template <typename T>
+  std::vector<int> makeIntVec(const TiffImage::IFD::Entry& entry) const
   {
-    if (entry.count() != 1) {
-      throw std::runtime_error("Expected a single value for integer tag");
+    std::vector<int> v(entry.count());
+    const auto* values = reinterpret_cast<const T*>(entry.values());
+    for (size_t i = 0; i < entry.count(); ++i) {
+      if constexpr (std::is_same_v<T, Rational>) {
+        v[i] = static_cast<int>(values[i].numerator / values[i].denominator);
+      }
+      else {
+        v[i] = static_cast<int>(values[i]);
+      }
     }
+    return v;
+  }
+
+  std::vector<int> getAsIntVec(const TiffImage::IFD::Entry& entry) const
+  {
     switch (entry.type()) {
       case Type::BYTE:
-        return static_cast<int>(*reinterpret_cast<const TypeTraits_t<Type::BYTE>*>(entry.values()));
+        return makeIntVec<TypeTraits_t<Type::BYTE>>(entry);
       case Type::ASCII:
-        return static_cast<int>(*reinterpret_cast<const TypeTraits_t<Type::ASCII>*>(entry.values()));
+        return makeIntVec<TypeTraits_t<Type::ASCII>>(entry);
       case Type::SHORT:
-        return static_cast<int>(*reinterpret_cast<const TypeTraits_t<Type::SHORT>*>(entry.values()));
+        return makeIntVec<TypeTraits_t<Type::SHORT>>(entry);
       case Type::LONG:
-        return static_cast<int>(*reinterpret_cast<const TypeTraits_t<Type::LONG>*>(entry.values()));
+        return makeIntVec<TypeTraits_t<Type::LONG>>(entry);
       case Type::RATIONAL:
-      {
-        auto* rational = reinterpret_cast<const TypeTraits_t<Type::RATIONAL>*>(entry.values());
-        return static_cast<int>(rational->numerator / rational->denominator);
-      }
+        return makeIntVec<TypeTraits_t<Type::RATIONAL>>(entry);
       case Type::SBYTE:
-        return static_cast<int>(*reinterpret_cast<const TypeTraits_t<Type::SBYTE>*>(entry.values()));
+        return makeIntVec<TypeTraits_t<Type::SBYTE>>(entry);
       case Type::UNDEFINED:
-        return static_cast<int>(*reinterpret_cast<const TypeTraits_t<Type::UNDEFINED>*>(entry.values()));
+        return makeIntVec<TypeTraits_t<Type::UNDEFINED>>(entry);
       case Type::SSHORT:
-        return static_cast<int>(*reinterpret_cast<const TypeTraits_t<Type::SSHORT>*>(entry.values()));
+        return makeIntVec<TypeTraits_t<Type::SSHORT>>(entry);
       case Type::SLONG:
-        return static_cast<int>(*reinterpret_cast<const TypeTraits_t<Type::SLONG>*>(entry.values()));
+        return makeIntVec<TypeTraits_t<Type::SLONG>>(entry);
       case Type::SRATIONAL:
-      {
-        auto* rational = reinterpret_cast<const TypeTraits_t<Type::SRATIONAL>*>(entry.values());
-        return static_cast<int>(rational->numerator / rational->denominator);
-      }
+        return makeIntVec<TypeTraits_t<Type::SRATIONAL>>(entry);
       case Type::FLOAT:
-        return static_cast<int>(*reinterpret_cast<const TypeTraits_t<Type::FLOAT>*>(entry.values()));
+        return makeIntVec<TypeTraits_t<Type::FLOAT>>(entry);
       case Type::DOUBLE:
-        return static_cast<int>(*reinterpret_cast<const TypeTraits_t<Type::DOUBLE>*>(entry.values()));
+        return makeIntVec<TypeTraits_t<Type::DOUBLE>>(entry);
       default:
         throw std::runtime_error("Unknown TIFF entry type");
     }
   }
 
-  int getInt(const TiffImage::IFD& ifd, Tag tag) const
+  std::vector<int> getIntVec(const TiffImage::IFD& ifd, Tag tag) const
   {
     auto it = ifd.entries().find(tag);
     if (it != ifd.entries().end()) {
-      return getAsInt(it->second);
+      return getAsIntVec(it->second);
     }
     throw std::runtime_error("Tag not found: " + std::to_string(static_cast<int>(tag)));
   }
 
-  int getInt(const TiffImage::IFD& ifd, Tag tag, int defaultValue) const
+  int getAsInt(const TiffImage::IFD::Entry& entry) const
+  {
+    auto v = getAsIntVec(entry);
+    if (v.size() != 1) {
+      throw std::runtime_error("Expected a single value for integer tag");
+    }
+    return v[0];
+  }
+
+  int getInt(const TiffImage::IFD& ifd, Tag tag,
+    std::optional<int> defaultValue = std::nullopt) const
   {
     auto it = ifd.entries().find(tag);
     if (it != ifd.entries().end()) {
       return getAsInt(it->second);
     }
-    return defaultValue;
+    if (defaultValue.has_value()) {
+      return defaultValue.value();
+    }
+    throw std::runtime_error("Tag not found: " + std::to_string(static_cast<int>(tag)));
   }
 
   void operator()(const TiffImage::IFD& ifd, TiffImage::ImageData imageData)
@@ -130,86 +167,136 @@ public:
     const int height = getInt(ifd, Tag::ImageLength);
     const int compression = getInt(ifd, Tag::Compression, 1);
     const int photometricInterpretation = getInt(ifd, Tag::PhotometricInterpretation);
-    const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1); // this needs to be a vector
     const int samplesPerPixel = getInt(ifd, Tag::SamplesPerPixel, 1);
-
-    // TODO: I could check samplesPerPixel first to see if is a single channel
-    // image and get the bitsPerSample afterwards depending on that.
 
     //TODO check if image is striped or tiled
     // try cramps-tile.tif
 
-    // handle bilevel images  (1-bit per pixel)
-    if (bitsPerSample == 1) {
-      if (compression != 1) {
-        throw std::runtime_error("Unsupported compression for bilevel image");
-      }
-
-      const int fillOrder = getInt(ifd, Tag::FillOrder, 1);
-      if (fillOrder != 1) {
-        throw std::runtime_error("Unsupported fill order for bilevel image");
-      }
-
-      uint8_t zero = 0x00, one = 0xff; // BlackIsZero
-      if (photometricInterpretation == 0) { // WhiteIsZero
-        std::swap(zero, one);
-      }
-
-      image_ = Image::makeGray8(width, height);
-      auto* data = image_.getData<uint8_t>();
-      int row = 0, col = 0;
-      for (const auto& rowStrip : imageData) {
-        for (auto byte : rowStrip) {
-          for (int i = 0; i < 8; ++i) {
-            *data++ = (static_cast<uint8_t>(byte) & (1 << (7 - i))) ? one : zero;
-            ++col;
-            if (col >= width) {
-              col = 0;
-              ++row;
-              break;
-            }
-          }
-          if (row >= height) { break; }
-        }
-        if (row >= height) { break; }
-      }
-
-      return;
+    if (compression != 1) {
+      throw std::runtime_error("Compression is not supported");
     }
 
-    // handle grayscale images  (8-bit per pixel)
-    if (bitsPerSample == 8) {
-      if (compression != 1) {
-        throw std::runtime_error("Unsupported compression for grayscale image");
-      }
+    if (samplesPerPixel == 1) {
+      // single channel images:
+      // - bilevel image
+      // - grayscale image
+      // - palette-color image
+      const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
 
-      image_ = Image::makeGray8(width, height);
-      { // copy the pixel data
-        auto* data = image_.getData<std::byte>();
+      // handle bilevel images  (1-bit per pixel)
+      if (bitsPerSample == 1) {
+
+        const int fillOrder = getInt(ifd, Tag::FillOrder, 1);
+        if (fillOrder != 1) {
+          throw std::runtime_error("Unsupported fill order for bilevel image");
+        }
+
+        uint8_t zero = 0x00, one = 0xff; // BlackIsZero
+        if (photometricInterpretation == 0) { // WhiteIsZero
+          std::swap(zero, one);
+        }
+
+        image_ = Image::makeGray8(width, height);
+        auto* data = image_.getData<uint8_t>();
         int row = 0, col = 0;
         for (const auto& rowStrip : imageData) {
           for (auto byte : rowStrip) {
-            *data++ = byte;
-            ++col;
-            if (col >= width) {
-              col = 0;
-              ++row;
-              if (row >= height) { break; }
+            for (int i = 0; i < 8; ++i) {
+              *data++ = (static_cast<uint8_t>(byte) & (1 << (7 - i))) ? one : zero;
+              ++col;
+              if (col >= width) {
+                col = 0;
+                ++row;
+                break;
+              }
             }
+            if (row >= height) { break; }
           }
           if (row >= height) { break; }
         }
+
+        return;
       }
 
-      if (photometricInterpretation == 0) { // WhiteIsZero
-        // Invert the image
-        uint8_t* data = image_.getData<uint8_t>();
-        for (size_t i = 0; i < image_.data.size(); ++i) {
-          data[i] = ~data[i];
+      // handle grayscale images  (8-bit per pixel)
+      if (bitsPerSample == 8) {
+
+        image_ = Image::makeGray8(width, height);
+        { // copy the pixel data
+          auto* data = image_.getData<std::byte>();
+          int row = 0, col = 0;
+          for (const auto& rowStrip : imageData) {
+            for (auto byte : rowStrip) {
+              *data++ = byte;
+              ++col;
+              if (col >= width) {
+                col = 0;
+                ++row;
+                if (row >= height) { break; }
+              }
+            }
+            if (row >= height) { break; }
+          }
         }
+
+        if (photometricInterpretation == 0) { // WhiteIsZero
+          // Invert the image
+          uint8_t* data = image_.getData<uint8_t>();
+          for (size_t i = 0; i < image_.data.size(); ++i) {
+            data[i] = ~data[i];
+          }
+        }
+
+        return;
+      }
+    } // if (samplesPerPixel == 1)
+
+    if (samplesPerPixel >= 3)
+    {
+      const auto bitsPerSample = getIntVec(ifd, Tag::BitsPerSample);
+
+      if (bitsPerSample.size() != static_cast<size_t>(samplesPerPixel)) {
+        throw std::runtime_error("Bits per sample count does not match samples per pixel");
       }
 
-      return;
+      if (std::any_of(bitsPerSample.cbegin(), bitsPerSample.cend(),
+          [](int b) { return b != 8; })) {
+        // Ensure that all bits per sample are 8
+        throw std::runtime_error("Unsupported bits per sample");
+      }
+
+      // handle RGB images
+      if (photometricInterpretation == 2) {
+        // NOTE: We ignore alpha channel if present for now
+
+        struct Pixel
+        {
+          uint8_t r, g, b;
+        };
+        static_assert(sizeof(Pixel) == 3, "Pixel size must be 3 bytes");
+
+        image_ = Image::makeRGB8(width, height);
+        { // copy the pixel data
+          auto* dst = image_.getData<Pixel>();
+          int row = 0, col = 0;
+          for (const auto& rowStrip : imageData) {
+            const auto* src = reinterpret_cast<const Pixel*>(rowStrip.data());
+            const size_t rowStripSize = rowStrip.size() / sizeof(Pixel);
+            for (size_t i = 0; i < rowStripSize; ++i) {
+              *dst++ = *src++;
+              ++col;
+              if (col >= width) {
+                col = 0;
+                ++row;
+                if (row >= height) { break; }
+              }
+            }
+            if (row >= height) { break; }
+          }
+        }
+
+        return;
+      }
     }
 
     // otherwise image format is not supported
