@@ -52,15 +52,21 @@ namespace std {
 
 namespace TiffCraft {
 
-  struct Rational {
-    uint32_t numerator;
-    uint32_t denominator;
+  template <typename T>
+  struct RationalT {
+    T numerator;
+    T denominator;
 
-    bool operator==(const Rational& other) const {
+    bool operator==(const RationalT& other) const {
       return numerator == other.numerator && denominator == other.denominator;
     }
   };
+
+  using Rational = RationalT<uint32_t>;
   static_assert(sizeof(Rational) == 8, "Rational must be 8 bytes");
+
+  using SRational = RationalT<int32_t>;
+  static_assert(sizeof(SRational) == 8, "SRational must be 8 bytes");
 
   // TIFF data types
   // ===============
@@ -105,7 +111,7 @@ namespace TiffCraft {
   template <> struct TypeTraits<Type::UNDEFINED> { using type = std::byte; };
   template <> struct TypeTraits<Type::SSHORT> { using type = int16_t; };
   template <> struct TypeTraits<Type::SLONG> { using type = int32_t; };
-  template <> struct TypeTraits<Type::SRATIONAL> { using type = Rational; }; // TODO: correctly handled signed rational
+  template <> struct TypeTraits<Type::SRATIONAL> { using type = SRational; };
   template <> struct TypeTraits<Type::FLOAT> { using type = float; };
   template <> struct TypeTraits<Type::DOUBLE> { using type = double; };
 
@@ -160,12 +166,12 @@ namespace TiffCraft {
   template <typename DstType>
   void copyVector(Type type, const std::byte* src, size_t count, std::vector<DstType>& dest) {
     switch (type) {
-      case Type::BYTE:     copyVector_safe<Type::BYTE, DstType>(src, count, dest); break;
-      case Type::ASCII:    copyVector_safe<Type::ASCII, DstType>(src, count, dest); break;
-      case Type::SHORT:    copyVector_safe<Type::SHORT, DstType>(src, count, dest); break;
-      case Type::LONG:     copyVector_safe<Type::LONG, DstType>(src, count, dest); break;
-      case Type::RATIONAL: copyVector_safe<Type::RATIONAL, DstType>(src, count, dest); break;
-      case Type::SBYTE:    copyVector_safe<Type::SBYTE, DstType>(src, count, dest); break;
+      case Type::BYTE:      copyVector_safe<Type::BYTE, DstType>(src, count, dest); break;
+      case Type::ASCII:     copyVector_safe<Type::ASCII, DstType>(src, count, dest); break;
+      case Type::SHORT:     copyVector_safe<Type::SHORT, DstType>(src, count, dest); break;
+      case Type::LONG:      copyVector_safe<Type::LONG, DstType>(src, count, dest); break;
+      case Type::RATIONAL:  copyVector_safe<Type::RATIONAL, DstType>(src, count, dest); break;
+      case Type::SBYTE:     copyVector_safe<Type::SBYTE, DstType>(src, count, dest); break;
       case Type::UNDEFINED: copyVector_safe<Type::UNDEFINED, DstType>(src, count, dest); break;
       case Type::SSHORT:    copyVector_safe<Type::SSHORT, DstType>(src, count, dest); break;
       case Type::SLONG:     copyVector_safe<Type::SLONG, DstType>(src, count, dest); break;
@@ -189,39 +195,66 @@ namespace TiffCraft {
     inline uint16_t swap16(uint16_t val) { return std::byteswap(val); }
     inline uint32_t swap32(uint32_t val) { return std::byteswap(val); }
     inline uint64_t swap64(uint64_t val) { return std::byteswap(val); }
+    inline int16_t swap16(int16_t val) { return std::byteswap(val); }
+    inline int32_t swap32(int32_t val) { return std::byteswap(val); }
+    inline int64_t swap64(int64_t val) { return std::byteswap(val); }
   #else
     inline uint16_t swap16(uint16_t val) {
-        return (val << 8) | (val >> 8);
+      return (val << 8) | (val >> 8);
     }
     inline uint32_t swap32(uint32_t val) {
-        return ((val << 24) & 0xFF000000) |
-               ((val << 8)  & 0x00FF0000) |
-               ((val >> 8)  & 0x0000FF00) |
-               ((val >> 24) & 0x000000FF);
+      return ((val << 24) & 0xFF000000) |
+              ((val << 8)  & 0x00FF0000) |
+              ((val >> 8)  & 0x0000FF00) |
+              ((val >> 24) & 0x000000FF);
     }
     inline uint64_t swap64(uint64_t val) {
-        return ((val << 56) & 0xFF00000000000000ULL) |
-               ((val << 40) & 0x00FF000000000000ULL) |
-               ((val << 24) & 0x0000FF0000000000ULL) |
-               ((val << 8)  & 0x000000FF00000000ULL) |
-               ((val >> 8)  & 0x00000000FF000000ULL) |
-               ((val >> 24) & 0x0000000000FF0000ULL) |
-               ((val >> 40) & 0x000000000000FF00ULL) |
-               ((val >> 56) & 0x00000000000000FFULL);
+      return ((val << 56) & 0xFF00000000000000ULL) |
+              ((val << 40) & 0x00FF000000000000ULL) |
+              ((val << 24) & 0x0000FF0000000000ULL) |
+              ((val << 8)  & 0x000000FF00000000ULL) |
+              ((val >> 8)  & 0x00000000FF000000ULL) |
+              ((val >> 24) & 0x0000000000FF0000ULL) |
+              ((val >> 40) & 0x000000000000FF00ULL) |
+              ((val >> 56) & 0x00000000000000FFULL);
+    }
+    inline int16_t swap16(int16_t val) {
+      return static_cast<int16_t>(swap16(static_cast<uint16_t>(val)));
+    }
+    inline int32_t swap32(int32_t val) {
+      return static_cast<int32_t>(swap32(static_cast<uint32_t>(val)));
+    }
+    inline int64_t swap64(int64_t val) {
+      return static_cast<int64_t>(swap64(static_cast<uint64_t>(val)));
     }
   #endif // HAS_BYTESWAP
+  inline Type swap16(Type val) {
+    return static_cast<Type>(swap16(static_cast<uint16_t>(val)));
+  }
+  inline float swap32(float val) {
+    uint32_t u32;
+    std::memcpy(&u32, &val, sizeof(u32));
+    u32 = swap32(u32);
+    std::memcpy(&val, &u32, sizeof(val));
+    return val;
+  }
+  inline double swap64(double val) {
+    uint64_t u64;
+    std::memcpy(&u64, &val, sizeof(u64));
+    u64 = swap64(u64);
+    std::memcpy(&val, &u64, sizeof(val));
+    return val;
+  }
 
   template <typename T>
   inline T swap(T val) {
-    if constexpr (std::is_same_v<T, uint16_t> || std::is_same_v<T, int16_t>) {
+    if constexpr (std::is_same_v<T, uint16_t> || std::is_same_v<T, int16_t> || std::is_same_v<T, Type>) {
         return swap16(val);
-    } else if constexpr (std::is_same_v<T, uint32_t> || std::is_same_v<T, int32_t>) {
+    } else if constexpr (std::is_same_v<T, uint32_t> || std::is_same_v<T, int32_t> || std::is_same_v<T, float>) {
         return swap32(val);
-    } else if constexpr (std::is_same_v<T, uint64_t> || std::is_same_v<T, int64_t>) {
+    } else if constexpr (std::is_same_v<T, uint64_t> || std::is_same_v<T, int64_t> || std::is_same_v<T, double>) {
         return swap64(val);
-    } else if constexpr (std::is_same_v<T, Type>) {
-        return static_cast<Type>(swap16(static_cast<uint16_t>(val)));
-    } else if constexpr (std::is_same_v<T, Rational>) {
+    } else if constexpr (std::is_same_v<T, Rational> || std::is_same_v<T, SRational>) {
         return { swap32(val.numerator), swap32(val.denominator) };
     } else {
         return val; // No swap needed for other types
@@ -243,11 +276,25 @@ namespace TiffCraft {
         // No swap needed for BYTE or ASCII
         break;
       case Type::SHORT:
-        swapArray(reinterpret_cast<uint16_t*>(arr), count); break;
+        swapArray(reinterpret_cast<TypeTraits_t<Type::SHORT>*>(arr), count); break;
       case Type::LONG:
-        swapArray(reinterpret_cast<uint32_t*>(arr), count); break;
+        swapArray(reinterpret_cast<TypeTraits_t<Type::LONG>*>(arr), count); break;
       case Type::RATIONAL:
-        swapArray(reinterpret_cast<Rational*>(arr), count); break;
+        swapArray(reinterpret_cast<TypeTraits_t<Type::RATIONAL>*>(arr), count); break;
+      case Type::SBYTE:
+      case Type::UNDEFINED:
+        // No swap needed for SBYTE or UNDEFINED
+        break;
+      case Type::SSHORT:
+        swapArray(reinterpret_cast<TypeTraits_t<Type::SSHORT>*>(arr), count); break;
+      case Type::SLONG:
+        swapArray(reinterpret_cast<TypeTraits_t<Type::SLONG>*>(arr), count); break;
+      case Type::SRATIONAL:
+        swapArray(reinterpret_cast<TypeTraits_t<Type::SRATIONAL>*>(arr), count); break;
+      case Type::FLOAT:
+        swapArray(reinterpret_cast<TypeTraits_t<Type::FLOAT>*>(arr), count); break;
+      case Type::DOUBLE:
+        swapArray(reinterpret_cast<TypeTraits_t<Type::DOUBLE>*>(arr), count); break;
       default:
         throw std::runtime_error("Unknown TIFF entry type for swapping");
     }
@@ -720,53 +767,57 @@ std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::Header& h
 }
 
 std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::IFD::Entry& entry) {
+  using namespace TiffCraft;
   os << "Tag: " << entry.tag() << "; "
      << "Type: " << entry.type() << "; "
      << "Count: " << entry.count() << ": "
      << "Value:";
-  if (entry.type() == TiffCraft::Type::ASCII) {
+  if (entry.type() == Type::ASCII) {
     // For ASCII type, print as a string
     os << " " << std::string(reinterpret_cast<const char*>(entry.values()), entry.bytes() - 1);
   } else {
     for (int i = 0; i < entry.count(); ++i) {
       const std::byte* value = entry.values() + i * entry.valueBytes();
       switch (entry.type()) {
-        case TiffCraft::Type::BYTE:
-          os << " " << *reinterpret_cast<const uint8_t*>(value);;
+        case Type::BYTE:
+          os << " " << *reinterpret_cast<const TypeTraits_t<Type::BYTE>*>(value);
           break;
-        case TiffCraft::Type::SHORT:
-          os << " " << *reinterpret_cast<const uint16_t*>(value);
+        case Type::SHORT:
+          os << " " << *reinterpret_cast<const TypeTraits_t<Type::SHORT>*>(value);
           break;
-        case TiffCraft::Type::LONG:
-          os << " " << *reinterpret_cast<const uint32_t*>(value);
+        case Type::LONG:
+          os << " " << *reinterpret_cast<const TypeTraits_t<Type::LONG>*>(value);
           break;
-        case TiffCraft::Type::RATIONAL: {
-          const auto* rational = reinterpret_cast<const TiffCraft::Rational*>(value);
+        case Type::RATIONAL: {
+          const auto* rational = reinterpret_cast<const TypeTraits_t<Type::RATIONAL>*>(value);
           os << " " << rational->numerator << "/" << rational->denominator;
           break;
         }
-        case TiffCraft::Type::SBYTE:
-          os << " " << static_cast<int>(*reinterpret_cast<const int8_t*>(value));
+        case Type::SBYTE:
+          os << " " << static_cast<int>(*reinterpret_cast<const TypeTraits_t<Type::SBYTE>*>(value));
           break;
-        case TiffCraft::Type::UNDEFINED:
-          os << " " << *reinterpret_cast<const uint8_t*>(value);
+        case Type::UNDEFINED: {
+          const auto* undefined = reinterpret_cast<const TypeTraits_t<Type::UNDEFINED>*>(value);
+          os << " 0x" << std::hex << std::setw(2) << std::setfill('0')
+             << static_cast<int>(*undefined) << std::dec << std::setw(1) <<std::setfill(' ');
           break;
-        case TiffCraft::Type::SSHORT:
-          os << " " << *reinterpret_cast<const int16_t*>(value);
+        }
+        case Type::SSHORT:
+          os << " " << *reinterpret_cast<const TypeTraits_t<Type::SSHORT>*>(value);
           break;
-        case TiffCraft::Type::SLONG:
-          os << " " << *reinterpret_cast<const int32_t*>(value);
+        case Type::SLONG:
+          os << " " << *reinterpret_cast<const TypeTraits_t<Type::SLONG>*>(value);
           break;
-        case TiffCraft::Type::SRATIONAL: {
-          const auto* rational = reinterpret_cast<const TiffCraft::Rational*>(value);
+        case Type::SRATIONAL: {
+          const auto* rational = reinterpret_cast<const TypeTraits_t<Type::SRATIONAL>*>(value);
           os << " " << rational->numerator << "/" << rational->denominator;
           break;
         }
-        case TiffCraft::Type::FLOAT:
-          os << " " << *reinterpret_cast<const float*>(value);
+        case Type::FLOAT:
+          os << " " << *reinterpret_cast<const TypeTraits_t<Type::FLOAT>*>(value);
           break;
-        case TiffCraft::Type::DOUBLE:
-          os << " " << *reinterpret_cast<const double*>(value);
+        case Type::DOUBLE:
+          os << " " << *reinterpret_cast<const TypeTraits_t<Type::DOUBLE>*>(value);
           break;
         default:
           os << " <Unsupported Type>";

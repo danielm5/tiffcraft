@@ -88,7 +88,7 @@ public:
     std::vector<int> v(entry.count());
     const auto* values = reinterpret_cast<const T*>(entry.values());
     for (size_t i = 0; i < entry.count(); ++i) {
-      if constexpr (std::is_same_v<T, Rational>) {
+      if constexpr (std::is_same_v<T, Rational> || std::is_same_v<T, SRational>) {
         v[i] = static_cast<int>(values[i].numerator / values[i].denominator);
       }
       else {
