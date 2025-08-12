@@ -181,74 +181,134 @@ public:
       // - bilevel image
       // - grayscale image
       // - palette-color image
-      const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
 
-      // handle bilevel images  (1-bit per pixel)
-      if (bitsPerSample == 1) {
+      if (photometricInterpretation == 0 || photometricInterpretation == 1) {
+        // WhiteIsZero(0) or BlackIsZero(1): bilevel or grayscale image
+        const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
 
-        const int fillOrder = getInt(ifd, Tag::FillOrder, 1);
-        if (fillOrder != 1) {
-          throw std::runtime_error("Unsupported fill order for bilevel image");
-        }
+        // handle bilevel images  (1-bit per pixel)
+        if (bitsPerSample == 1) {
 
-        uint8_t zero = 0x00, one = 0xff; // BlackIsZero
-        if (photometricInterpretation == 0) { // WhiteIsZero
-          std::swap(zero, one);
-        }
-
-        image_ = Image::makeGray8(width, height);
-        auto* data = image_.getData<uint8_t>();
-        int row = 0, col = 0;
-        for (const auto& rowStrip : imageData) {
-          for (auto byte : rowStrip) {
-            for (int i = 0; i < 8; ++i) {
-              *data++ = (static_cast<uint8_t>(byte) & (1 << (7 - i))) ? one : zero;
-              ++col;
-              if (col >= width) {
-                col = 0;
-                ++row;
-                break;
-              }
-            }
-            if (row >= height) { break; }
+          const int fillOrder = getInt(ifd, Tag::FillOrder, 1);
+          if (fillOrder != 1) {
+            throw std::runtime_error("Unsupported fill order for bilevel image");
           }
-          if (row >= height) { break; }
-        }
 
-        return;
-      }
+          uint8_t zero = 0x00, one = 0xff; // BlackIsZero
+          if (photometricInterpretation == 0) { // WhiteIsZero
+            std::swap(zero, one);
+          }
 
-      // handle grayscale images  (8-bit per pixel)
-      if (bitsPerSample == 8) {
-
-        image_ = Image::makeGray8(width, height);
-        { // copy the pixel data
-          auto* data = image_.getData<std::byte>();
+          image_ = Image::makeGray8(width, height);
+          auto* data = image_.getData<uint8_t>();
           int row = 0, col = 0;
           for (const auto& rowStrip : imageData) {
             for (auto byte : rowStrip) {
-              *data++ = byte;
-              ++col;
-              if (col >= width) {
-                col = 0;
-                ++row;
-                if (row >= height) { break; }
+              for (int i = 0; i < 8; ++i) {
+                *data++ = (static_cast<uint8_t>(byte) & (1 << (7 - i))) ? one : zero;
+                ++col;
+                if (col >= width) {
+                  col = 0;
+                  ++row;
+                  break;
+                }
               }
+              if (row >= height) { break; }
             }
             if (row >= height) { break; }
           }
+
+          return;
         }
 
-        if (photometricInterpretation == 0) { // WhiteIsZero
-          // Invert the image
-          uint8_t* data = image_.getData<uint8_t>();
-          for (size_t i = 0; i < image_.data.size(); ++i) {
-            data[i] = ~data[i];
+        // handle grayscale images  (8-bit per pixel)
+        if (bitsPerSample == 8) {
+
+          image_ = Image::makeGray8(width, height);
+          { // copy the pixel data
+            auto* data = image_.getData<std::byte>();
+            int row = 0, col = 0;
+            for (const auto& rowStrip : imageData) {
+              for (auto byte : rowStrip) {
+                *data++ = byte;
+                ++col;
+                if (col >= width) {
+                  col = 0;
+                  ++row;
+                  if (row >= height) { break; }
+                }
+              }
+              if (row >= height) { break; }
+            }
           }
+
+          if (photometricInterpretation == 0) { // WhiteIsZero
+            // Invert the image
+            uint8_t* data = image_.getData<uint8_t>();
+            for (size_t i = 0; i < image_.data.size(); ++i) {
+              data[i] = ~data[i];
+            }
+          }
+
+          return;
+        }
+      }
+
+      if (photometricInterpretation == 3)
+      {
+        const auto bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
+        if (bitsPerSample < 2 || bitsPerSample > 8 || bitsPerSample % 2 != 0) {
+          throw std::runtime_error("Unsupported bits per sample for palette-color image");
         }
 
-        return;
+        const auto numColors = (1 << bitsPerSample);
+        const auto colorMap = getIntVec(ifd, Tag::ColorMap);
+        if (3 * numColors > colorMap.size()) {
+          throw std::runtime_error("Color map size does not match bits per sample");
+        }
+        const int red = numColors * 0;
+        const int green = numColors * 1;
+        const int blue = numColors * 2;
+
+        struct Pixel
+        {
+          uint8_t r, g, b;
+        };
+        static_assert(sizeof(Pixel) == 3, "Pixel size must be 3 bytes");
+
+        image_ = Image::makeRGB8(width, height);
+
+        { // copy the pixel data
+          const int mask = (1 << bitsPerSample) - 1;
+          const int pixelsPerByte = 8 / bitsPerSample;
+          auto* dst = image_.getData<Pixel>();
+          int row = 0, col = 0;
+          for (const auto& rowStrip : imageData) {
+            for (auto byte : rowStrip) {
+              const int value = static_cast<int>(byte);
+              for (int i = 0; i < pixelsPerByte; ++i) {
+                const int index = (value >> ((pixelsPerByte - i - 1) * bitsPerSample)) & mask;
+                dst->r = static_cast<uint8_t>(colorMap[red + index] / 257);
+                dst->g = static_cast<uint8_t>(colorMap[green + index] / 257);
+                dst->b = static_cast<uint8_t>(colorMap[blue + index] / 257);
+                ++dst;
+                ++col;
+                if (col >= width) {
+                  col = 0;
+                  ++row;
+                  break;
+                }
+              }
+              if (row >= height) { break; }
+            }
+            if (row >= height) { break; }
+          }
+
+          return;
+        }
+
       }
+
     } // if (samplesPerPixel == 1)
 
     if (samplesPerPixel >= 3)

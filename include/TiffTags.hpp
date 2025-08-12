@@ -25,6 +25,7 @@ namespace TiffCraft {
     PhotometricInterpretation = 0x0106,
     Thresholding = 0x0107,
     FillOrder = 0x010A,
+    DocumentName = 0x010D,
     ImageDescription = 0x010E,
     Make = 0x010F,
     Model = 0x0110,
@@ -43,8 +44,11 @@ namespace TiffCraft {
     Artist = 0x013B,
     ColorMap = 0x0140,
     HalftoneHints = 0x0141,
+    TileWidth = 0x0142,
+    TileLength = 0x0143,
+    TileOffsets = 0x0144,
+    TileByteCounts = 0x0145,
     SampleFormat = 0x0153,
-
   };
 
 }
@@ -69,6 +73,7 @@ std::ostream& operator<<(std::ostream& os, const TiffCraft::Tag& type) {
     case TiffCraft::Tag::PhotometricInterpretation: os << "PhotometricInterpretation"; break;
     case TiffCraft::Tag::Thresholding: os << "Thresholding"; break;
     case TiffCraft::Tag::FillOrder: os << "FillOrder"; break;
+    case TiffCraft::Tag::DocumentName: os << "DocumentName"; break;
     case TiffCraft::Tag::ImageDescription: os << "ImageDescription"; break;
     case TiffCraft::Tag::Make: os << "Make"; break;
     case TiffCraft::Tag::Model: os << "Model"; break;
@@ -85,8 +90,12 @@ std::ostream& operator<<(std::ostream& os, const TiffCraft::Tag& type) {
     case TiffCraft::Tag::Software: os << "Software"; break;
     case TiffCraft::Tag::DateTime: os << "DateTime"; break;
     case TiffCraft::Tag::Artist: os << "Artist"; break;
-    case TiffCraft::Tag::HalftoneHints: os << "HalftoneHints"; break;
     case TiffCraft::Tag::ColorMap: os << "ColorMap"; break;
+    case TiffCraft::Tag::HalftoneHints: os << "HalftoneHints"; break;
+    case TiffCraft::Tag::TileWidth: os << "TileWidth"; break;
+    case TiffCraft::Tag::TileLength: os << "TileLength"; break;
+    case TiffCraft::Tag::TileOffsets: os << "TileOffsets"; break;
+    case TiffCraft::Tag::TileByteCounts: os << "TileByteCounts"; break;
     case TiffCraft::Tag::SampleFormat: os << "SampleFormat"; break;
     default: os << "0x" << std::hex << std::setw(4) << std::setfill('0')
                 << static_cast<uint16_t>(type); break;
