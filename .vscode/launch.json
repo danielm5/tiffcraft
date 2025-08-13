@@ -17,7 +17,27 @@
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${command:cmake.launchTargetPath}",
-            "args": [],
+            "args": [
+                //"../../../tests/libtiffpic/jim___ah.tif" //1bit
+                //"../../../tests/libtiffpic/jim___cg.tif" //8bit
+                //"../../../tests/libtiffpic/pc260001.tif" //RGB
+
+                //"../../../tests/libtiffpic/depth/flower-palette-02.tif" //Palette 2bit
+                //"../../../tests/libtiffpic/depth/flower-palette-04.tif" //Palette 4bit
+                //"../../../tests/libtiffpic/depth/flower-palette-08.tif" //Palette 8bit
+                //"../../../tests/libtiffpic/depth/flower-palette-16.tif" //Palette 16bit
+
+                //"../../../tests/libtiffpic/depth/flower-minisblack-02.tif" //grayscale 2bit
+                //"../../../tests/libtiffpic/depth/flower-minisblack-04.tif" //grayscale 4bit
+                //"../../../tests/libtiffpic/depth/flower-minisblack-06.tif" //grayscale 6bit
+                //"../../../tests/libtiffpic/depth/flower-minisblack-08.tif" //grayscale 8bit
+                //"../../../tests/libtiffpic/depth/flower-minisblack-10.tif" //grayscale 10bit
+                //"../../../tests/libtiffpic/depth/flower-minisblack-12.tif" //grayscale 12bit
+                //"../../../tests/libtiffpic/depth/flower-minisblack-14.tif" //grayscale 14bit
+                "../../../tests/libtiffpic/depth/flower-minisblack-16.tif" //grayscale 16bit
+                //"../../../tests/libtiffpic/depth/flower-minisblack-24.tif" //grayscale 24bit
+                //"../../../tests/libtiffpic/depth/flower-minisblack-32.tif" //grayscale 32bit
+            ],
             "stopAtEntry": false,
             "cwd": "${command:cmake.launchTargetDirectory}",
             "environment": [],

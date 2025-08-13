@@ -186,29 +186,29 @@ public:
       // - palette-color image
 
       if (photometricInterpretation == 0 || photometricInterpretation == 1) {
+        const int fillOrder = getInt(ifd, Tag::FillOrder, 1);
+        if (fillOrder != 1) {
+          throw std::runtime_error("Unsupported fill order for bilevel image");
+        }
+
         // WhiteIsZero(0) or BlackIsZero(1): bilevel or grayscale image
         const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
 
-        // handle bilevel images  (1-bit per pixel)
-        if (bitsPerSample == 1) {
+        image_ = Image::makeGray8(width, height);
 
-          const int fillOrder = getInt(ifd, Tag::FillOrder, 1);
-          if (fillOrder != 1) {
-            throw std::runtime_error("Unsupported fill order for bilevel image");
-          }
-
-          uint8_t zero = 0x00, one = 0xff; // BlackIsZero
-          if (photometricInterpretation == 0) { // WhiteIsZero
-            std::swap(zero, one);
-          }
-
-          image_ = Image::makeGray8(width, height);
+        // TODO: only works for 1, 2, 4, and 8; it doesn't for 6
+        if (bitsPerSample <= 8)
+        { // copy the pixel data
+          const int mask = (1 << bitsPerSample) - 1;
+          const int pixelsPerByte = 8 / bitsPerSample;
           auto* data = image_.getData<uint8_t>();
           int row = 0, col = 0;
           for (const auto& rowStrip : imageData) {
             for (auto byte : rowStrip) {
-              for (int i = 0; i < 8; ++i) {
-                *data++ = (static_cast<uint8_t>(byte) & (1 << (7 - i))) ? one : zero;
+              const uint8_t value = static_cast<uint8_t>(byte);
+              for (int i = 0; i < pixelsPerByte; ++i) {
+                const int shift = (pixelsPerByte - i - 1) * bitsPerSample;
+                *data++ = (((value >> shift) & mask) * 255) / mask;
                 ++col;
                 if (col >= width) {
                   col = 0;
@@ -221,30 +221,6 @@ public:
             if (row >= height) { break; }
           }
 
-          return;
-        }
-
-        // handle grayscale images  (8-bit per pixel)
-        if (bitsPerSample == 8) {
-
-          image_ = Image::makeGray8(width, height);
-          { // copy the pixel data
-            auto* data = image_.getData<std::byte>();
-            int row = 0, col = 0;
-            for (const auto& rowStrip : imageData) {
-              for (auto byte : rowStrip) {
-                *data++ = byte;
-                ++col;
-                if (col >= width) {
-                  col = 0;
-                  ++row;
-                  if (row >= height) { break; }
-                }
-              }
-              if (row >= height) { break; }
-            }
-          }
-
           if (photometricInterpretation == 0) { // WhiteIsZero
             // Invert the image
             uint8_t* data = image_.getData<uint8_t>();
@@ -255,6 +231,7 @@ public:
 
           return;
         }
+
       }
 
       if (photometricInterpretation == 3)
