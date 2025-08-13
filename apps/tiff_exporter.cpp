@@ -161,7 +161,10 @@ public:
     throw std::runtime_error("Tag not found: " + std::to_string(static_cast<int>(tag)));
   }
 
-  void operator()(const TiffImage::IFD& ifd, TiffImage::ImageData imageData)
+  void operator()(
+    const TiffImage::Header& header,
+    const TiffImage::IFD& ifd,
+    TiffImage::ImageData imageData)
   {
     const int width = getInt(ifd, Tag::ImageWidth);
     const int height = getInt(ifd, Tag::ImageLength);
@@ -257,7 +260,7 @@ public:
       if (photometricInterpretation == 3)
       {
         const auto bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
-        if (bitsPerSample < 2 || bitsPerSample > 8 || bitsPerSample % 2 != 0) {
+        if (bitsPerSample != 2 && bitsPerSample != 4 && bitsPerSample != 8 && bitsPerSample != 16) {
           throw std::runtime_error("Unsupported bits per sample for palette-color image");
         }
 
@@ -278,6 +281,7 @@ public:
 
         image_ = Image::makeRGB8(width, height);
 
+        if (bitsPerSample <= 8)
         { // copy the pixel data
           const int mask = (1 << bitsPerSample) - 1;
           const int pixelsPerByte = 8 / bitsPerSample;
@@ -288,6 +292,43 @@ public:
               const int value = static_cast<int>(byte);
               for (int i = 0; i < pixelsPerByte; ++i) {
                 const int index = (value >> ((pixelsPerByte - i - 1) * bitsPerSample)) & mask;
+                dst->r = static_cast<uint8_t>(colorMap[red + index] / 257);
+                dst->g = static_cast<uint8_t>(colorMap[green + index] / 257);
+                dst->b = static_cast<uint8_t>(colorMap[blue + index] / 257);
+                ++dst;
+                ++col;
+                if (col >= width) {
+                  col = 0;
+                  ++row;
+                  break;
+                }
+              }
+              if (row >= height) { break; }
+            }
+            if (row >= height) { break; }
+          }
+
+          return;
+        }
+
+        if (bitsPerSample <= 16)
+        { // copy the pixel data
+          const int mask = (1 << bitsPerSample) - 1;
+          const int pixelsPerShort = 16 / bitsPerSample;
+          auto* dst = image_.getData<Pixel>();
+          int row = 0, col = 0;
+          for (auto& rowStrip : imageData) {
+            assert(rowStrip.size() % 2 == 0);
+            auto rowStripSize = rowStrip.size() / 2;
+            auto* rowStripData = reinterpret_cast<uint16_t*>(rowStrip.data());
+            if (!header.equalsHostByteOrder())
+            {
+              swapArray(rowStripData, rowStripSize);
+            }
+            for (size_t j = 0; j < rowStripSize; ++j) {
+              const int value = static_cast<int>(rowStripData[j]);
+              for (int i = 0; i < pixelsPerShort; ++i) {
+                const int index = (value >> ((pixelsPerShort - i - 1) * bitsPerSample)) & mask;
                 dst->r = static_cast<uint8_t>(colorMap[red + index] / 257);
                 dst->g = static_cast<uint8_t>(colorMap[green + index] / 257);
                 dst->b = static_cast<uint8_t>(colorMap[blue + index] / 257);

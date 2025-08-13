@@ -709,11 +709,13 @@ namespace TiffCraft {
     std::optional<uint16_t> ifdIndex; // Optional IFD index to load
   };
 
-  using LoadCallback = std::function<void(const TiffImage::IFD&, TiffImage::ImageData)>;
+  using LoadCallback = std::function<void(
+    const TiffImage::Header&, const TiffImage::IFD&, TiffImage::ImageData)>;
 
   void load(std::istream& stream, LoadCallback&& callback, const LoadParams& params = {}) {
     // Read the TIFF image from the stream
     TiffImage image = TiffImage::read(stream);
+    const auto& header = image.header();
 
     if (params.ifdIndex && params.ifdIndex.value() >= image.ifds().size()) {
       throw std::runtime_error("Requested IFD index is out of bounds");
@@ -724,7 +726,7 @@ namespace TiffCraft {
         // If a specific IFD index is requested, only process that IFD
         // Otherwise, process all IFDs
         const auto& ifd = image.ifds()[i];
-        callback(ifd, TiffImage::readImageData(stream, ifd));
+        callback(header, ifd, TiffImage::readImageData(stream, ifd));
       }
     }
   }

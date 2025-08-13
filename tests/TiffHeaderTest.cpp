@@ -393,7 +393,7 @@ TEST_CASE("TiffImage class", "[tiff_image]") {
     const std::string test_file = "jim___ah.tif";
     std::cout << "Test file path: " << getTestFilePath(test_file) << std::endl;
     load(getTestFilePath(test_file),
-      [](const TiffImage::IFD& ifd, TiffImage::ImageData imageData) {
+      [](const TiffImage::Header& header, const TiffImage::IFD& ifd, TiffImage::ImageData imageData) {
         std::cout << "Loaded IFD with " << ifd.entries().size() << " entries." << std::endl;
         std::cout << "Image data size: " << imageData.size() << std::endl;
 
