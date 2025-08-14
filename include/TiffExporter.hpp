@@ -134,36 +134,46 @@ namespace TiffCraft {
     }
 
     template <typename Comp = std::equal_to<>>
+    static int require(
+      const TiffImage::IFD& ifd, Tag tag, std::optional<int> defaultValue,
+      int requiredValue, Comp&& comp = {})
+    {
+      const int samplesPerPixel = getInt(ifd, tag, defaultValue);
+      if (!comp(samplesPerPixel, requiredValue)) {
+        throw std::runtime_error(
+          "Unsupported " + std::to_string(static_cast<int>(tag)) +
+          " value: " + std::to_string(samplesPerPixel) +
+          ", expected: " + std::to_string(requiredValue));
+      }
+      return samplesPerPixel;
+    }
+
+    template <typename Comp = std::equal_to<>>
     static int requireSamplesPerPixel(
       const TiffImage::IFD& ifd, int requiredValue, Comp&& comp = {})
     {
-      const int samplesPerPixel = getInt(ifd, Tag::SamplesPerPixel, 1);
-      if (!comp(samplesPerPixel, requiredValue)) {
-        throw std::runtime_error("Unsupported samples per pixel");
-      }
-      return samplesPerPixel;
+      return require(ifd, Tag::SamplesPerPixel, 1, requiredValue, comp);
     }
 
     template <typename Comp = std::equal_to<>>
     static int requirePhotometricInterpretation(
       const TiffImage::IFD& ifd, int requiredValue, Comp&& comp = {})
     {
-      const int photometricInterpretation = getInt(ifd, Tag::PhotometricInterpretation);
-      if (!comp(photometricInterpretation, requiredValue)) {
-        throw std::runtime_error("Unsupported photometric interpretation");
-      }
-      return photometricInterpretation;
+      return require(ifd, Tag::PhotometricInterpretation, std::nullopt, requiredValue, comp);
     }
 
     template <typename Comp = std::equal_to<>>
     static int requireCompression(
       const TiffImage::IFD& ifd, int requiredValue, Comp&& comp = {})
     {
-      const int compression = getInt(ifd, Tag::Compression, 1);
-      if (!comp(compression, requiredValue)) {
-        throw std::runtime_error("Unsupported compression");
-      }
-      return compression;
+      return require(ifd, Tag::Compression, 1, requiredValue, comp);
+    }
+
+    template <typename Comp = std::equal_to<>>
+    static int requireBitsPerSample(
+      const TiffImage::IFD& ifd, int requiredValue, Comp&& comp = {})
+    {
+      return require(ifd, Tag::BitsPerSample, std::nullopt, requiredValue, comp);
     }
 
     template <typename Comp = std::equal_to<>>
@@ -176,6 +186,13 @@ namespace TiffCraft {
         throw std::runtime_error("Unsupported bits per sample");
       }
       return bitsPerSample;
+    }
+
+    template <typename Comp = std::equal_to<>>
+    static int requireFillOrder(
+      const TiffImage::IFD& ifd, int requiredValue, Comp&& comp = {})
+    {
+      return require(ifd, Tag::FillOrder, 1, requiredValue, comp);
     }
 
     static int getWidth(const TiffImage::IFD& ifd)
@@ -275,6 +292,42 @@ namespace TiffCraft {
     static Iterator end(TiffImage::ImageData& container) {
       return Iterator::end(container);
     }
+
+    static void copy(
+      const TiffImage::ImageData& imageData, std::vector<std::byte>& v)
+    {
+      auto it = v.begin();
+      for (const auto& strip : imageData) {
+        if (strip.empty()) continue; // Skip empty strips
+        if (it + strip.size() > v.end()) {
+          throw std::runtime_error("Not enough space in vector to copy image data");
+        }
+        std::copy(strip.begin(), strip.end(), it);
+        it += strip.size();
+      }
+    }
+  };
+
+  // TiffExporter implementation for Grayscale 8-bit images ------------------
+  class TiffExporterGray8 : public TiffExporter
+  {
+  public:
+    // Callback for TiffCraft::load() function
+    void operator()(
+      const TiffImage::Header& header,
+      const TiffImage::IFD& ifd,
+      TiffImage::ImageData imageData) override
+    {
+      const int samplesPerPixel = requireSamplesPerPixel(ifd, 1);
+      const int photometricInterpretation = requirePhotometricInterpretation(ifd, 1, std::less_equal<>());
+      const int compression = requireCompression(ifd, 1);
+      const auto bitsPerSample = requireBitsPerSample(ifd, std::vector<int>(samplesPerPixel, 8));
+      const int fillOrder = requireFillOrder(ifd, 1);
+
+      // create the image and copy the pixel data
+      image_ = Image::make<uint8_t, 1>(getWidth(ifd), getHeight(ifd));
+      copy(imageData, image_.data);
+    }
   };
 
   // TiffExporter implementation for RGB8 images -----------------------------
@@ -294,27 +347,27 @@ namespace TiffCraft {
 
       // NOTE: We ignore alpha channel if present for now
 
-      // create the image
-      const int width = getWidth(ifd);
-      const int height = getHeight(ifd);
-      image_ = Image::make<uint8_t, 3>(width, height);
-
-      // copy the pixel data
-      int row = 0, col = 0;
-      auto* dst = image_.dataPtr();
-      for (auto src = begin(imageData); src != end(imageData); /* empty */) {
-        *dst++ = *src++; // red
-        if (src == end(imageData)) { break; }
-        *dst++ = *src++; // green
-        if (src == end(imageData)) { break; }
-        *dst++ = *src++; // blue
-        if (++col >= width) { // advance column and row counters
-          col = 0; if (++row >= height) { break; }
-        }
-      }
-      if (row < height) {
-        throw std::runtime_error("Not enough pixel data for the image size");
-      }
+      // create the image and copy the pixel data
+      image_ = Image::make<uint8_t, 3>(getWidth(ifd), getHeight(ifd));
+      copy(imageData, image_.data);
     }
   };
+
+      // int row = 0, col = 0;
+      // auto* dst = image_.dataPtr();
+      // for (auto src = begin(imageData); src != end(imageData); /* empty */) {
+      //   *dst++ = *src++; // red
+      //   if (src == end(imageData)) { break; }
+      //   *dst++ = *src++; // green
+      //   if (src == end(imageData)) { break; }
+      //   *dst++ = *src++; // blue
+      //   if (++col >= width) { // advance column and row counters
+      //     col = 0; if (++row >= height) { break; }
+      //   }
+      // }
+      // if (row < height) {
+      //   throw std::runtime_error("Not enough pixel data for the image size");
+      // }
+
+
 }
