@@ -5,6 +5,7 @@
 
 #include "TiffCraft.hpp"
 
+#include <functional>
 #include <algorithm>
 #include <string>
 
@@ -74,7 +75,7 @@ namespace TiffCraft {
 
     // Copies the values from a TIFF entry to a vector of integers.
     template <typename T>
-    std::vector<int> makeIntVec(const TiffImage::IFD::Entry& entry) const
+    static std::vector<int> makeIntVec(const TiffImage::IFD::Entry& entry)
     {
       std::vector<int> v(entry.count());
       const auto* values = reinterpret_cast<const T*>(entry.values());
@@ -95,8 +96,8 @@ namespace TiffCraft {
     // \param defaultValue An optional default value to return if the tag is
     //                     not found.
     // \return A vector of integers containing the values from the TIFF entry.
-    std::vector<int> getIntVec(const TiffImage::IFD& ifd, Tag tag,
-      std::optional<std::vector<int>> defaultValue = std::nullopt) const
+    static std::vector<int> getIntVec(const TiffImage::IFD& ifd, Tag tag,
+      std::optional<std::vector<int>> defaultValue = std::nullopt)
     {
       auto it = ifd.entries().find(tag);
       if (it != ifd.entries().end()) {
@@ -118,8 +119,8 @@ namespace TiffCraft {
     //                     not found.
     // \return The integer value from the TIFF entry, or the default value if
     //         not found.
-    int getInt(const TiffImage::IFD& ifd, Tag tag,
-      std::optional<int> defaultValue = std::nullopt) const
+    static int getInt(const TiffImage::IFD& ifd, Tag tag,
+      std::optional<int> defaultValue = std::nullopt)
     {
       std::optional<std::vector<int>> defaultValueVec;
       if (defaultValue.has_value()) {
@@ -130,6 +131,61 @@ namespace TiffCraft {
         throw std::runtime_error("Expected a single value for integer tag");
       }
       return v[0];
+    }
+
+    template <typename Comp = std::equal_to<>>
+    static int requireSamplesPerPixel(
+      const TiffImage::IFD& ifd, int requiredValue, Comp&& comp = {})
+    {
+      const int samplesPerPixel = getInt(ifd, Tag::SamplesPerPixel, 1);
+      if (!comp(samplesPerPixel, requiredValue)) {
+        throw std::runtime_error("Unsupported samples per pixel");
+      }
+      return samplesPerPixel;
+    }
+
+    template <typename Comp = std::equal_to<>>
+    static int requirePhotometricInterpretation(
+      const TiffImage::IFD& ifd, int requiredValue, Comp&& comp = {})
+    {
+      const int photometricInterpretation = getInt(ifd, Tag::PhotometricInterpretation);
+      if (!comp(photometricInterpretation, requiredValue)) {
+        throw std::runtime_error("Unsupported photometric interpretation");
+      }
+      return photometricInterpretation;
+    }
+
+    template <typename Comp = std::equal_to<>>
+    static int requireCompression(
+      const TiffImage::IFD& ifd, int requiredValue, Comp&& comp = {})
+    {
+      const int compression = getInt(ifd, Tag::Compression, 1);
+      if (!comp(compression, requiredValue)) {
+        throw std::runtime_error("Unsupported compression");
+      }
+      return compression;
+    }
+
+    template <typename Comp = std::equal_to<>>
+    static std::vector<int> requireBitsPerSample(
+      const TiffImage::IFD& ifd, const std::vector<int>& requiredValue,
+      Comp&& comp = {})
+    {
+      auto bitsPerSample = getIntVec(ifd, Tag::BitsPerSample);
+      if (!comp(bitsPerSample, requiredValue)) {
+        throw std::runtime_error("Unsupported bits per sample");
+      }
+      return bitsPerSample;
+    }
+
+    static int getWidth(const TiffImage::IFD& ifd)
+    {
+      return getInt(ifd, Tag::ImageWidth);;
+    }
+
+    static int getHeight(const TiffImage::IFD& ifd)
+    {
+      return getInt(ifd, Tag::ImageLength);
     }
 
     // Iterator for TiffImage::ImageData
@@ -221,6 +277,7 @@ namespace TiffCraft {
     }
   };
 
+  // TiffExporter implementation for RGB8 images -----------------------------
   class TiffExporterRgb8 : public TiffExporter
   {
   public:
@@ -230,37 +287,16 @@ namespace TiffCraft {
       const TiffImage::IFD& ifd,
       TiffImage::ImageData imageData) override
     {
-      const int samplesPerPixel = getInt(ifd, Tag::SamplesPerPixel, 1);
-      if (samplesPerPixel < 3)
-      {
-        throw std::runtime_error("Unsupported samples per pixel");
-      }
-
-      const int photometricInterpretation = getInt(ifd, Tag::PhotometricInterpretation);
-      if (photometricInterpretation != 2) {
-        throw std::runtime_error("Unsupported photometric interpretation");
-      }
-
-      const int compression = getInt(ifd, Tag::Compression, 1);
-      if (compression != 1) {
-        throw std::runtime_error("Compression is not supported");
-      }
-
-      const auto bitsPerSample = getIntVec(ifd, Tag::BitsPerSample);
-      if (bitsPerSample.size() != static_cast<size_t>(samplesPerPixel)) {
-        throw std::runtime_error("Bits per sample count does not match samples per pixel");
-      }
-      if (std::any_of(bitsPerSample.cbegin(), bitsPerSample.cend(),
-          [](int b) { return b != 8; })) {
-        // Ensure that all bits per sample are 8
-        throw std::runtime_error("Unsupported bits per sample");
-      }
+      const int samplesPerPixel = requireSamplesPerPixel(ifd, 3, std::greater_equal<>());
+      const int photometricInterpretation = requirePhotometricInterpretation(ifd, 2);
+      const int compression = requireCompression(ifd, 1);
+      const auto bitsPerSample = requireBitsPerSample(ifd, std::vector<int>(samplesPerPixel, 8));
 
       // NOTE: We ignore alpha channel if present for now
 
       // create the image
-      const int width = getInt(ifd, Tag::ImageWidth);
-      const int height = getInt(ifd, Tag::ImageLength);
+      const int width = getWidth(ifd);
+      const int height = getHeight(ifd);
       image_ = Image::make<uint8_t, 3>(width, height);
 
       // copy the pixel data
@@ -272,11 +308,8 @@ namespace TiffCraft {
         *dst++ = *src++; // green
         if (src == end(imageData)) { break; }
         *dst++ = *src++; // blue
-        ++col;
-        if (col >= width) {
-          col = 0;
-          ++row;
-          if (row >= height) { break; }
+        if (++col >= width) { // advance column and row counters
+          col = 0; if (++row >= height) { break; }
         }
       }
       if (row < height) {
