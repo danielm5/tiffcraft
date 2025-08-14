@@ -34,7 +34,7 @@
                 //"../../../tests/libtiffpic/depth/flower-minisblack-10.tif" //grayscale 10bit
                 //"../../../tests/libtiffpic/depth/flower-minisblack-12.tif" //grayscale 12bit
                 //"../../../tests/libtiffpic/depth/flower-minisblack-14.tif" //grayscale 14bit
-                "../../../tests/libtiffpic/depth/flower-minisblack-16.tif" //grayscale 16bit
+                //"../../../tests/libtiffpic/depth/flower-minisblack-16.tif" //grayscale 16bit
                 //"../../../tests/libtiffpic/depth/flower-minisblack-24.tif" //grayscale 24bit
                 //"../../../tests/libtiffpic/depth/flower-minisblack-32.tif" //grayscale 32bit
             ],

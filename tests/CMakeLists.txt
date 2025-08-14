@@ -9,7 +9,8 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(Catch2)
 
-add_executable(tests
-  TiffHeaderTest.cpp
-)
-target_link_libraries(tests PRIVATE TiffCraft Catch2::Catch2WithMain)
+add_executable(tiffSimpleTest tiffSimpleTest.cpp)
+target_link_libraries(tiffSimpleTest PRIVATE TiffCraft Catch2::Catch2WithMain)
+
+add_executable(flowerImageTest flowerImageTest.cpp)
+target_link_libraries(flowerImageTest PRIVATE TiffCraft Catch2::Catch2WithMain)

@@ -62,6 +62,15 @@ namespace TiffCraft {
     }
   };
 
+  template <typename>
+  struct is_rational : std::false_type {};
+
+  template <typename U>
+  struct is_rational<RationalT<U>> : std::true_type {};
+
+  template <typename T>
+  constexpr bool is_rational_v = is_rational<T>::value;
+
   using Rational = RationalT<uint32_t>;
   static_assert(sizeof(Rational) == 8, "Rational must be 8 bytes");
 
@@ -116,6 +125,26 @@ namespace TiffCraft {
   template <> struct TypeTraits<Type::DOUBLE> { using type = double; };
 
   template <Type type> using TypeTraits_t = typename TypeTraits<type>::type;
+
+  template <typename F>
+  decltype(auto) dispatchType(Type type, F&& f) {
+      switch (type) {
+          case Type::BYTE:      return f.template operator()<TypeTraits_t<Type::BYTE>>();
+          case Type::ASCII:     return f.template operator()<TypeTraits_t<Type::ASCII>>();
+          case Type::SHORT:     return f.template operator()<TypeTraits_t<Type::SHORT>>();
+          case Type::LONG:      return f.template operator()<TypeTraits_t<Type::LONG>>();
+          case Type::RATIONAL:  return f.template operator()<TypeTraits_t<Type::RATIONAL>>();
+          case Type::SBYTE:     return f.template operator()<TypeTraits_t<Type::SBYTE>>();
+          case Type::UNDEFINED: return f.template operator()<TypeTraits_t<Type::UNDEFINED>>();
+          case Type::SSHORT:    return f.template operator()<TypeTraits_t<Type::SSHORT>>();
+          case Type::SLONG:     return f.template operator()<TypeTraits_t<Type::SLONG>>();
+          case Type::SRATIONAL: return f.template operator()<TypeTraits_t<Type::SRATIONAL>>();
+          case Type::FLOAT:     return f.template operator()<TypeTraits_t<Type::FLOAT>>();
+          case Type::DOUBLE:    return f.template operator()<TypeTraits_t<Type::DOUBLE>>();
+          default:
+              throw std::runtime_error("Unknown TIFF entry type");
+      }
+  }
 
   template <Type type>
   constexpr uint32_t typeBytes() {

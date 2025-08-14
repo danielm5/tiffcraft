@@ -88,7 +88,7 @@ public:
     std::vector<int> v(entry.count());
     const auto* values = reinterpret_cast<const T*>(entry.values());
     for (size_t i = 0; i < entry.count(); ++i) {
-      if constexpr (std::is_same_v<T, Rational> || std::is_same_v<T, SRational>) {
+      if constexpr (is_rational_v<T>) {
         v[i] = static_cast<int>(values[i].numerator / values[i].denominator);
       }
       else {
@@ -98,67 +98,34 @@ public:
     return v;
   }
 
-  std::vector<int> getAsIntVec(const TiffImage::IFD::Entry& entry) const
-  {
-    switch (entry.type()) {
-      case Type::BYTE:
-        return makeIntVec<TypeTraits_t<Type::BYTE>>(entry);
-      case Type::ASCII:
-        return makeIntVec<TypeTraits_t<Type::ASCII>>(entry);
-      case Type::SHORT:
-        return makeIntVec<TypeTraits_t<Type::SHORT>>(entry);
-      case Type::LONG:
-        return makeIntVec<TypeTraits_t<Type::LONG>>(entry);
-      case Type::RATIONAL:
-        return makeIntVec<TypeTraits_t<Type::RATIONAL>>(entry);
-      case Type::SBYTE:
-        return makeIntVec<TypeTraits_t<Type::SBYTE>>(entry);
-      case Type::UNDEFINED:
-        return makeIntVec<TypeTraits_t<Type::UNDEFINED>>(entry);
-      case Type::SSHORT:
-        return makeIntVec<TypeTraits_t<Type::SSHORT>>(entry);
-      case Type::SLONG:
-        return makeIntVec<TypeTraits_t<Type::SLONG>>(entry);
-      case Type::SRATIONAL:
-        return makeIntVec<TypeTraits_t<Type::SRATIONAL>>(entry);
-      case Type::FLOAT:
-        return makeIntVec<TypeTraits_t<Type::FLOAT>>(entry);
-      case Type::DOUBLE:
-        return makeIntVec<TypeTraits_t<Type::DOUBLE>>(entry);
-      default:
-        throw std::runtime_error("Unknown TIFF entry type");
-    }
-  }
-
-  std::vector<int> getIntVec(const TiffImage::IFD& ifd, Tag tag) const
+  std::vector<int> getIntVec(const TiffImage::IFD& ifd, Tag tag,
+    std::optional<std::vector<int>> defaultValue = std::nullopt) const
   {
     auto it = ifd.entries().find(tag);
     if (it != ifd.entries().end()) {
-      return getAsIntVec(it->second);
-    }
-    throw std::runtime_error("Tag not found: " + std::to_string(static_cast<int>(tag)));
-  }
-
-  int getAsInt(const TiffImage::IFD::Entry& entry) const
-  {
-    auto v = getAsIntVec(entry);
-    if (v.size() != 1) {
-      throw std::runtime_error("Expected a single value for integer tag");
-    }
-    return v[0];
-  }
-
-  int getInt(const TiffImage::IFD& ifd, Tag tag,
-    std::optional<int> defaultValue = std::nullopt) const
-  {
-    auto it = ifd.entries().find(tag);
-    if (it != ifd.entries().end()) {
-      return getAsInt(it->second);
+      const auto& entry = it->second;
+      return dispatchType(entry.type(), [&, entry]<typename ValueType>() {
+          return makeIntVec<ValueType>(entry);
+      });
     }
     if (defaultValue.has_value()) {
       return defaultValue.value();
     }
     throw std::runtime_error("Tag not found: " + std::to_string(static_cast<int>(tag)));
+  }
+
+  int getInt(const TiffImage::IFD& ifd, Tag tag,
+    std::optional<int> defaultValue = std::nullopt) const
+  {
+    std::optional<std::vector<int>> defaultValueVec;
+    if (defaultValue.has_value()) {
+      defaultValueVec = std::vector<int>{ defaultValue.value() };
+    }
+    auto v = getIntVec(ifd, tag, defaultValueVec);
+    if (v.size() != 1) {
+      throw std::runtime_error("Expected a single value for integer tag");
+    }
+    return v[0];
   }
 
   void operator()(
