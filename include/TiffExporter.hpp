@@ -296,6 +296,7 @@ namespace TiffCraft {
     static void copy(
       const TiffImage::ImageData& imageData, std::vector<std::byte>& v)
     {
+      size_t copied = 0;
       auto it = v.begin();
       for (const auto& strip : imageData) {
         if (strip.empty()) continue; // Skip empty strips
@@ -304,6 +305,17 @@ namespace TiffCraft {
         }
         std::copy(strip.begin(), strip.end(), it);
         it += strip.size();
+        copied += strip.size();
+      }
+      if (copied != v.size()) {
+        throw std::runtime_error("Not enough pixel data for the image size");
+      }
+    }
+
+    void invertColors() {
+      uint8_t* data = image_.dataPtr<uint8_t>();
+      for (size_t i = 0; i < image_.data.size(); ++i) {
+        data[i] = ~data[i];
       }
     }
   };
@@ -321,12 +333,76 @@ namespace TiffCraft {
       const int samplesPerPixel = requireSamplesPerPixel(ifd, 1);
       const int photometricInterpretation = requirePhotometricInterpretation(ifd, 1, std::less_equal<>());
       const int compression = requireCompression(ifd, 1);
-      const auto bitsPerSample = requireBitsPerSample(ifd, std::vector<int>(samplesPerPixel, 8));
+      const auto bitsPerSample = requireBitsPerSample(ifd, 8);
       const int fillOrder = requireFillOrder(ifd, 1);
 
       // create the image and copy the pixel data
       image_ = Image::make<uint8_t, 1>(getWidth(ifd), getHeight(ifd));
       copy(imageData, image_.data);
+
+      if (photometricInterpretation == 0) { // WhiteIsZero
+        invertColors();
+      }
+    }
+  };
+
+  // TiffExporter implementation for Grayscale 16-bit images ------------------
+  class TiffExporterGray16 : public TiffExporter
+  {
+  public:
+    // Callback for TiffCraft::load() function
+    void operator()(
+      const TiffImage::Header& header,
+      const TiffImage::IFD& ifd,
+      TiffImage::ImageData imageData) override
+    {
+      const int samplesPerPixel = requireSamplesPerPixel(ifd, 1);
+      const int photometricInterpretation = requirePhotometricInterpretation(ifd, 1, std::less_equal<>());
+      const int compression = requireCompression(ifd, 1);
+      const auto bitsPerSample = requireBitsPerSample(ifd, 16);
+      const int fillOrder = requireFillOrder(ifd, 1);
+
+      // create the image and copy the pixel data
+      image_ = Image::make<uint16_t, 1>(getWidth(ifd), getHeight(ifd));
+      copy(imageData, image_.data);
+
+      if (!header.equalsHostByteOrder()) {
+        swapArray(image_.dataPtr<uint16_t>(), image_.data.size() / sizeof(uint16_t));
+      }
+
+      if (photometricInterpretation == 0) { // WhiteIsZero
+        invertColors();
+      }
+    }
+  };
+
+    // TiffExporter implementation for Grayscale 32-bit images ------------------
+  class TiffExporterGray32 : public TiffExporter
+  {
+  public:
+    // Callback for TiffCraft::load() function
+    void operator()(
+      const TiffImage::Header& header,
+      const TiffImage::IFD& ifd,
+      TiffImage::ImageData imageData) override
+    {
+      const int samplesPerPixel = requireSamplesPerPixel(ifd, 1);
+      const int photometricInterpretation = requirePhotometricInterpretation(ifd, 1, std::less_equal<>());
+      const int compression = requireCompression(ifd, 1);
+      const auto bitsPerSample = requireBitsPerSample(ifd, 32);
+      const int fillOrder = requireFillOrder(ifd, 1);
+
+      // create the image and copy the pixel data
+      image_ = Image::make<uint32_t, 1>(getWidth(ifd), getHeight(ifd));
+      copy(imageData, image_.data);
+
+      if (!header.equalsHostByteOrder()) {
+        swapArray(image_.dataPtr<uint32_t>(), image_.data.size() / sizeof(uint32_t));
+      }
+
+      if (photometricInterpretation == 0) { // WhiteIsZero
+        invertColors();
+      }
     }
   };
 

@@ -21,23 +21,22 @@ std::string getTestFilePath(const std::string& filename) {
   return (test_dir / "libtiff-pics" / "depth" / filename).string();
 }
 
-TEST_CASE("FlowerImageGray8Test", "[flower_image][gray8]") {
-
-  const std::string filename = getTestFilePath("flower-minisblack-08.tif");
-
-  LoadParams loadParams;
-  loadParams.ifdIndex = 0; // Load the first IFD by default
-
-  TiffExporterGray8 exporter;
-
-  load(filename, std::ref(exporter), loadParams);
-
+void checkImageFields(const TiffExporter& exporter, int bitDepth, int channels) {
   REQUIRE(exporter.image().width == FlowerImage::width);
   REQUIRE(exporter.image().height == FlowerImage::height);
-  REQUIRE(exporter.image().channels == 1);
-  REQUIRE(exporter.image().bitDepth == 8);
-  REQUIRE(exporter.image().dataSize() == 1 * FlowerImage::numPixels);
+  REQUIRE(exporter.image().channels == channels);
+  REQUIRE(exporter.image().bitDepth == bitDepth);
+  REQUIRE(exporter.image().dataSize() == channels * FlowerImage::numPixels * (bitDepth / 8));
   REQUIRE(exporter.image().dataPtr() != nullptr);
+}
+
+TEST_CASE("FlowerImageGray8Test", "[flower_image][gray8]") {
+  LoadParams loadParams{ 0 };
+  TiffExporterGray8 exporter;
+  const std::string filename = getTestFilePath("flower-minisblack-08.tif");
+  load(filename, std::ref(exporter), loadParams);
+
+  checkImageFields(exporter, 8, 1);
 
   // compare pixel data
   const uint8_t* data1 = FlowerImage::data;
@@ -50,23 +49,51 @@ TEST_CASE("FlowerImageGray8Test", "[flower_image][gray8]") {
   }
 }
 
-TEST_CASE("FlowerImageRgb8Test", "[flower_image][rgb8]") {
-
-  const std::string filename = getTestFilePath("flower-rgb-contig-08.tif");
-
-  LoadParams loadParams;
-  loadParams.ifdIndex = 0; // Load the first IFD by default
-
-  TiffExporterRgb8 exporter;
-
+TEST_CASE("FlowerImageGray16Test", "[flower_image][gray16]") {
+  LoadParams loadParams{ 0 };
+  TiffExporterGray16 exporter;
+  const std::string filename = getTestFilePath("flower-minisblack-16.tif");
   load(filename, std::ref(exporter), loadParams);
 
-  REQUIRE(exporter.image().width == FlowerImage::width);
-  REQUIRE(exporter.image().height == FlowerImage::height);
-  REQUIRE(exporter.image().channels == 3);
-  REQUIRE(exporter.image().bitDepth == 8);
-  REQUIRE(exporter.image().dataSize() == 3 * FlowerImage::numPixels);
-  REQUIRE(exporter.image().dataPtr() != nullptr);
+  checkImageFields(exporter, 16, 1);
+
+  // compare pixel data
+  const uint8_t* data1 = FlowerImage::data;
+  const uint16_t* data2 = exporter.image().dataPtr<uint16_t>();
+  for (size_t i = 0; i < FlowerImage::numPixels; ++i) {
+    uint8_t pixel1[3];
+    FlowerImage::nextPixel(data1, pixel1);
+    uint8_t gray1 = static_cast<uint8_t>(0.299f * pixel1[0] + 0.587f * pixel1[1] + 0.114f * pixel1[2]);
+    REQUIRE(static_cast<double>(data2[i] >> 8) == Catch::Approx(gray1).margin(4));
+  }
+}
+
+TEST_CASE("FlowerImageGray16Test", "[flower_image][gray32]") {
+  LoadParams loadParams{ 0 };
+  TiffExporterGray32 exporter;
+  const std::string filename = getTestFilePath("flower-minisblack-32.tif");
+  load(filename, std::ref(exporter), loadParams);
+
+  checkImageFields(exporter, 32, 1);
+
+  // compare pixel data
+  const uint8_t* data1 = FlowerImage::data;
+  const uint32_t* data2 = exporter.image().dataPtr<uint32_t>();
+  for (size_t i = 0; i < FlowerImage::numPixels; ++i) {
+    uint8_t pixel1[3];
+    FlowerImage::nextPixel(data1, pixel1);
+    uint8_t gray1 = static_cast<uint8_t>(0.299f * pixel1[0] + 0.587f * pixel1[1] + 0.114f * pixel1[2]);
+    REQUIRE(static_cast<double>(data2[i] >> 24) == Catch::Approx(gray1).margin(4));
+  }
+}
+
+TEST_CASE("FlowerImageRgb8Test", "[flower_image][rgb8]") {
+  LoadParams loadParams{ 0 };
+  TiffExporterRgb8 exporter;
+  const std::string filename = getTestFilePath("flower-rgb-contig-08.tif");
+  load(filename, std::ref(exporter), loadParams);
+
+  checkImageFields(exporter, 8, 3);
 
   // compare pixel data
   const uint8_t* data1 = FlowerImage::data;
@@ -78,5 +105,4 @@ TEST_CASE("FlowerImageRgb8Test", "[flower_image][rgb8]") {
     REQUIRE(data2[i].g == pixel1[1]);
     REQUIRE(data2[i].b == pixel1[2]);
   }
-
 }
