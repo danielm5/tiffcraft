@@ -97,12 +97,52 @@ TEST_CASE("FlowerImageRgb8Test", "[flower_image][rgb8]") {
 
   // compare pixel data
   const uint8_t* data1 = FlowerImage::data;
-  const Rgb* data2 = exporter.image().dataPtr<Rgb>();
+  const Rgb8* data2 = exporter.image().dataPtr<Rgb8>();
   for (size_t i = 0; i < FlowerImage::numPixels; ++i) {
     uint8_t pixel1[3];
     FlowerImage::nextPixel(data1, pixel1);
     REQUIRE(data2[i].r == pixel1[0]);
     REQUIRE(data2[i].g == pixel1[1]);
     REQUIRE(data2[i].b == pixel1[2]);
+  }
+}
+
+TEST_CASE("FlowerImageRgb8Test", "[flower_image][rgb16]") {
+  LoadParams loadParams{ 0 };
+  TiffExporterRgb16 exporter;
+  const std::string filename = getTestFilePath("flower-rgb-contig-16.tif");
+  load(filename, std::ref(exporter), loadParams);
+
+  checkImageFields(exporter, 16, 3);
+
+  // compare pixel data
+  const uint8_t* data1 = FlowerImage::data;
+  const Rgb16* data2 = exporter.image().dataPtr<Rgb16>();
+  for (size_t i = 0; i < FlowerImage::numPixels; ++i) {
+    uint8_t pixel1[3];
+    FlowerImage::nextPixel(data1, pixel1);
+    REQUIRE(static_cast<double>(data2[i].r >> 8) == Catch::Approx(pixel1[0]).margin(2));
+    REQUIRE(static_cast<double>(data2[i].g >> 8) == Catch::Approx(pixel1[1]).margin(2));
+    REQUIRE(static_cast<double>(data2[i].b >> 8) == Catch::Approx(pixel1[2]).margin(2));
+  }
+}
+
+TEST_CASE("FlowerImageRgb8Test", "[flower_image][rgb32]") {
+  LoadParams loadParams{ 0 };
+  TiffExporterRgb32 exporter;
+  const std::string filename = getTestFilePath("flower-rgb-contig-32.tif");
+  load(filename, std::ref(exporter), loadParams);
+
+  checkImageFields(exporter, 32, 3);
+
+  // compare pixel data
+  const uint8_t* data1 = FlowerImage::data;
+  const Rgb32* data2 = exporter.image().dataPtr<Rgb32>();
+  for (size_t i = 0; i < FlowerImage::numPixels; ++i) {
+    uint8_t pixel1[3];
+    FlowerImage::nextPixel(data1, pixel1);
+    REQUIRE(static_cast<double>(data2[i].r >> 24) == Catch::Approx(pixel1[0]).margin(2));
+    REQUIRE(static_cast<double>(data2[i].g >> 24) == Catch::Approx(pixel1[1]).margin(2));
+    REQUIRE(static_cast<double>(data2[i].b >> 24) == Catch::Approx(pixel1[2]).margin(2));
   }
 }

@@ -48,11 +48,19 @@ namespace TiffCraft {
     const T* dataPtr() const { return reinterpret_cast<const T*>(data.data()); }
   };
 
+  template <typename PixelType>
   struct Rgb
   {
-    uint8_t r, g, b;
+    PixelType r, g, b;
   };
-  static_assert(sizeof(Rgb) == 3, "Rgb size must be 3 bytes");
+
+  using Rgb8 = Rgb<uint8_t>;
+  using Rgb16 = Rgb<uint16_t>;
+  using Rgb32 = Rgb<uint32_t>;
+
+  static_assert(sizeof(Rgb8) == 3, "Rgb8 size must be 3 bytes");
+  static_assert(sizeof(Rgb16) == 6, "Rgb16 size must be 6 bytes");
+  static_assert(sizeof(Rgb32) == 12, "Rgb32 size must be 12 bytes");
 
   // Base class for TIFF exporters
   class TiffExporter
@@ -355,8 +363,10 @@ namespace TiffCraft {
   using TiffExporterGray16 = TiffExporterGray<uint16_t>;
   using TiffExporterGray32 = TiffExporterGray<uint32_t>;
 
-  // TiffExporter implementation for RGB8 images -----------------------------
-  class TiffExporterRgb8 : public TiffExporter
+  // TiffExporter implementation for RGB images with individual samples aligned
+  // to word boundaries -------------------------------------------------------
+  template <typename PixelType>
+  class TiffExporterRgb : public TiffExporter
   {
   public:
     // Callback for TiffCraft::load() function
@@ -365,18 +375,24 @@ namespace TiffCraft {
       const TiffImage::IFD& ifd,
       TiffImage::ImageData imageData) override
     {
-      const int samplesPerPixel = requireSamplesPerPixel(ifd, 3, std::greater_equal<>());
+      const int samplesPerPixel = requireSamplesPerPixel(ifd, 3);
       const int photometricInterpretation = requirePhotometricInterpretation(ifd, 2);
       const int compression = requireCompression(ifd, 1);
-      const auto bitsPerSample = requireBitsPerSample(ifd, std::vector<int>(samplesPerPixel, 8));
-
-      // NOTE: We ignore alpha channel if present for now
+      const auto bitsPerSample = requireBitsPerSample(ifd, std::vector<int>(samplesPerPixel, 8 * sizeof(PixelType)));
 
       // create the image and copy the pixel data
-      image_ = Image::make<uint8_t, 3>(getWidth(ifd), getHeight(ifd));
+      image_ = Image::make<PixelType, 3>(getWidth(ifd), getHeight(ifd));
       copy(imageData, image_.data);
+
+      if (!header.equalsHostByteOrder()) {
+        swapArray(image_.dataPtr<PixelType>(), image_.data.size() / sizeof(PixelType));
+      }
     }
   };
+
+  using TiffExporterRgb8 = TiffExporterRgb<uint8_t>;
+  using TiffExporterRgb16 = TiffExporterRgb<uint16_t>;
+  using TiffExporterRgb32 = TiffExporterRgb<uint32_t>;
 
       // int row = 0, col = 0;
       // auto* dst = image_.dataPtr();
