@@ -87,6 +87,25 @@ TEST_CASE("FlowerImageGray16Test", "[flower_image][gray32]") {
   }
 }
 
+TEST_CASE("TiffExporterGrayUpTo8bitsTest", "[flower_image][gray-1-2-4-8-bits]") {
+  LoadParams loadParams{ 0 };
+  TiffExporterGrayUpTo8bits exporter;
+  const std::string filename = getTestFilePath("flower-minisblack-02.tif");
+  load(filename, std::ref(exporter), loadParams);
+
+  checkImageFields(exporter, 8, 1);
+
+  // compare pixel data
+  const uint8_t* data1 = FlowerImage::data;
+  const uint8_t* data2 = exporter.image().dataPtr<uint8_t>();
+  for (size_t i = 0; i < FlowerImage::numPixels; ++i) {
+    uint8_t pixel1[3];
+    FlowerImage::nextPixel(data1, pixel1);
+    uint8_t gray1 = static_cast<uint8_t>(0.299f * pixel1[0] + 0.587f * pixel1[1] + 0.114f * pixel1[2]);
+    REQUIRE(static_cast<double>(data2[i] >> 6) == Catch::Approx(gray1 >> 6).margin(1));
+  }
+}
+
 TEST_CASE("FlowerImageRgb8Test", "[flower_image][rgb8]") {
   LoadParams loadParams{ 0 };
   TiffExporterRgb8 exporter;
@@ -107,7 +126,7 @@ TEST_CASE("FlowerImageRgb8Test", "[flower_image][rgb8]") {
   }
 }
 
-TEST_CASE("FlowerImageRgb8Test", "[flower_image][rgb16]") {
+TEST_CASE("FlowerImageRgb16Test", "[flower_image][rgb16]") {
   LoadParams loadParams{ 0 };
   TiffExporterRgb16 exporter;
   const std::string filename = getTestFilePath("flower-rgb-contig-16.tif");
@@ -127,7 +146,7 @@ TEST_CASE("FlowerImageRgb8Test", "[flower_image][rgb16]") {
   }
 }
 
-TEST_CASE("FlowerImageRgb8Test", "[flower_image][rgb32]") {
+TEST_CASE("FlowerImageRgb32Test", "[flower_image][rgb32]") {
   LoadParams loadParams{ 0 };
   TiffExporterRgb32 exporter;
   const std::string filename = getTestFilePath("flower-rgb-contig-32.tif");

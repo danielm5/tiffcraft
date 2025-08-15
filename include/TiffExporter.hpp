@@ -363,6 +363,61 @@ namespace TiffCraft {
   using TiffExporterGray16 = TiffExporterGray<uint16_t>;
   using TiffExporterGray32 = TiffExporterGray<uint32_t>;
 
+  // TiffExporter implementation for Grayscale images with 1, 2, 4, and 8 bits
+  // per sample --------------------------------------------------------------
+  class TiffExporterGrayUpTo8bits : public TiffExporter
+  {
+  public:
+    // Callback for TiffCraft::load() function
+    void operator()(
+      const TiffImage::Header& header,
+      const TiffImage::IFD& ifd,
+      TiffImage::ImageData imageData) override
+    {
+      const int samplesPerPixel = requireSamplesPerPixel(ifd, 1);
+      const int photometricInterpretation = requirePhotometricInterpretation(ifd, 1, std::less_equal<>());
+      const int compression = requireCompression(ifd, 1);
+      const auto bitsPerSample = requireBitsPerSample(ifd, 0,
+        [](int bits, int required)
+        { //we ignore required
+          return bits == 1 || bits == 2 || bits == 4 || bits == 8;
+        });
+      const int fillOrder = requireFillOrder(ifd, 1);
+
+      // create the image and copy the pixel data
+      image_ = Image::make<uint8_t, 1>(getWidth(ifd), getHeight(ifd));
+      int row = 0, col = 0;
+      auto* dst = image_.dataPtr<uint8_t>();
+      const int mask = (1 << bitsPerSample) - 1;
+      const int pixelsPerByte = 8 / bitsPerSample;
+      for (auto src = begin(imageData); src != end(imageData); ++src) {
+        const uint8_t value = static_cast<uint8_t>(*src);
+        for (int i = 0; i < pixelsPerByte; ++i) {
+          const int shift = (pixelsPerByte - i - 1) * bitsPerSample;
+          *dst++ = (((value >> shift) & mask) * 255) / mask;
+          ++col;
+          if (col >= image_.width) {
+            col = 0;
+            ++row;
+            break;
+          }
+        }
+        if (row >= image_.height) { break; }
+      }
+      if (row < image_.height) {
+        throw std::runtime_error("Not enough pixel data for the image size");
+      }
+
+      if (!header.equalsHostByteOrder()) {
+        swapArray(image_.dataPtr<uint8_t>(), image_.data.size() / sizeof(uint8_t));
+      }
+
+      if (photometricInterpretation == 0) { // WhiteIsZero
+        invertColors();
+      }
+    }
+  };
+
   // TiffExporter implementation for RGB images with individual samples aligned
   // to word boundaries -------------------------------------------------------
   template <typename PixelType>
@@ -394,21 +449,7 @@ namespace TiffCraft {
   using TiffExporterRgb16 = TiffExporterRgb<uint16_t>;
   using TiffExporterRgb32 = TiffExporterRgb<uint32_t>;
 
-      // int row = 0, col = 0;
-      // auto* dst = image_.dataPtr();
-      // for (auto src = begin(imageData); src != end(imageData); /* empty */) {
-      //   *dst++ = *src++; // red
-      //   if (src == end(imageData)) { break; }
-      //   *dst++ = *src++; // green
-      //   if (src == end(imageData)) { break; }
-      //   *dst++ = *src++; // blue
-      //   if (++col >= width) { // advance column and row counters
-      //     col = 0; if (++row >= height) { break; }
-      //   }
-      // }
-      // if (row < height) {
-      //   throw std::runtime_error("Not enough pixel data for the image size");
-      // }
+
 
 
 }
