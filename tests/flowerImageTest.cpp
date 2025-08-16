@@ -106,6 +106,38 @@ TEST_CASE("TiffExporterGrayUpTo8bitsTest", "[flower_image][gray-1-2-4-8-bits]") 
   }
 }
 
+TEST_CASE("TiffExporterGrayBitsTest", "[flower_image][gray-bits]") {
+  LoadParams loadParams{ 0 };
+  TiffExporterGrayBits exporter;
+  std::vector<std::string> testFiles = {
+    "flower-minisblack-02.tif",
+    "flower-minisblack-04.tif",
+    "flower-minisblack-06.tif",
+    "flower-minisblack-08.tif"
+  };
+  for (auto& testFile : testFiles) {
+    std::cout << "Testing file: " << testFile << std::endl;
+    const std::string filename = getTestFilePath(testFile);
+    load(filename, std::ref(exporter), loadParams);
+
+    checkImageFields(exporter, 8, 1);
+
+    const int bitsPerPixel = std::stoi(testFile.substr(18, 2));
+    const int margin = (bitsPerPixel < 8 ? 1 : 3);
+
+    // compare pixel data
+    const uint8_t* data1 = FlowerImage::data;
+    const uint8_t* data2 = exporter.image().dataPtr<uint8_t>();
+    for (size_t i = 0; i < FlowerImage::numPixels; ++i) {
+      uint8_t pixel1[3];
+      FlowerImage::nextPixel(data1, pixel1);
+      uint8_t gray1 = static_cast<uint8_t>(0.299f * pixel1[0] + 0.587f * pixel1[1] + 0.114f * pixel1[2]);
+      REQUIRE(static_cast<double>(data2[i] >> (8 - bitsPerPixel))
+        == Catch::Approx(gray1 >> (8 - bitsPerPixel)).margin(margin));
+    }
+  }
+}
+
 TEST_CASE("FlowerImageRgb8Test", "[flower_image][rgb8]") {
   LoadParams loadParams{ 0 };
   TiffExporterRgb8 exporter;

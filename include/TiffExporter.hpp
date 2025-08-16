@@ -408,8 +408,73 @@ namespace TiffCraft {
         throw std::runtime_error("Not enough pixel data for the image size");
       }
 
-      if (!header.equalsHostByteOrder()) {
-        swapArray(image_.dataPtr<uint8_t>(), image_.data.size() / sizeof(uint8_t));
+      // if (!header.equalsHostByteOrder()) {
+      //   swapArray(image_.dataPtr<uint8_t>(), image_.data.size() / sizeof(uint8_t));
+      // }
+
+      if (photometricInterpretation == 0) { // WhiteIsZero
+        invertColors();
+      }
+    }
+  };
+
+  // TiffExporter implementation for Grayscale images with different bit lengths
+  // per sample --------------------------------------------------------------
+  class TiffExporterGrayBits : public TiffExporter
+  {
+  public:
+    // Callback for TiffCraft::load() function
+    void operator()(
+      const TiffImage::Header& header,
+      const TiffImage::IFD& ifd,
+      TiffImage::ImageData imageData) override
+    {
+      const int samplesPerPixel = requireSamplesPerPixel(ifd, 1);
+      const int photometricInterpretation = requirePhotometricInterpretation(ifd, 1, std::less_equal<>());
+      const int compression = requireCompression(ifd, 1);
+      const auto bitsPerSample = requireBitsPerSample(ifd, 8, std::less_equal<>());
+      const int fillOrder = requireFillOrder(ifd, 1);
+
+      // create the image and copy the pixel data
+      image_ = Image::make<uint8_t, 1>(getWidth(ifd), getHeight(ifd));
+      int countAvail = 0;
+      uint8_t bitsAvail = 0;
+      auto src = begin(imageData);
+      auto* dst = image_.dataPtr<uint8_t>();
+      for (int row = 0; row < image_.height; ++row) {
+        for (int col = 0; col < image_.width; ++col) {
+          int count = 0;
+          uint8_t value = 0;
+          while (count < bitsPerSample) {
+            // make sure we have some bits available
+            if (countAvail == 0) {
+              if (src == end(imageData)) {
+                throw std::runtime_error("No pixel data available");
+              }
+              bitsAvail = static_cast<uint8_t>(*src);
+              countAvail = 8;
+              src++;
+            }
+            // consume available bits
+            const int n = std::min(bitsPerSample - count, countAvail);
+            value <<= n;
+            value |= (bitsAvail >> (8 - n));
+            count += n;
+            // update available bits
+            countAvail -= n;
+            bitsAvail <<= n;
+          }
+          assert(count == bitsPerSample);
+          *dst++ = value << (8 - bitsPerSample);
+        }
+        // flush partial words when the row is complete
+        if (countAvail > 0 && countAvail < 8) {
+          countAvail = 0;
+          bitsAvail = 0;
+        }
+      }
+      if (src != end(imageData)) {
+        throw std::runtime_error("Not enough pixel data for the image size");
       }
 
       if (photometricInterpretation == 0) { // WhiteIsZero
