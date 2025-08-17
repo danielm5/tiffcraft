@@ -30,7 +30,23 @@ void checkImageFields(const TiffExporter& exporter, int bitDepth, int channels) 
   REQUIRE(exporter.image().dataPtr() != nullptr);
 }
 
-TEST_CASE("FlowerImageGray8Test", "[flower_image][gray8]") {
+template <typename DstType>
+void compareImageDataGray(const Image& image, int bitsPerPixel, int margin)
+{
+  const int pixelBits = 8 * sizeof(DstType);
+  const int shift = pixelBits > 8 ? pixelBits - 8 : 8 - bitsPerPixel;
+  const uint8_t* data1 = FlowerImage::data;
+  const DstType* data2 = image.dataPtr<DstType>();
+  for (size_t i = 0; i < FlowerImage::numPixels; ++i) {
+    uint8_t pixel1[3];
+    FlowerImage::nextPixel(data1, pixel1);
+    uint8_t gray1 = static_cast<uint8_t>(0.299f * pixel1[0] + 0.587f * pixel1[1] + 0.114f * pixel1[2]);
+    DstType value = static_cast<DstType>(gray1) << (8 * (sizeof(DstType) - 1));
+    REQUIRE(static_cast<double>(data2[i] >> shift) == Catch::Approx(value >> shift).margin(margin));
+  }
+}
+
+TEST_CASE("TiffExporterGray8Test", "[flower_image][gray8]") {
   LoadParams loadParams{ 0 };
   TiffExporterGray8 exporter;
   const std::string filename = getTestFilePath("flower-minisblack-08.tif");
@@ -38,18 +54,11 @@ TEST_CASE("FlowerImageGray8Test", "[flower_image][gray8]") {
 
   checkImageFields(exporter, 8, 1);
 
-  // compare pixel data
-  const uint8_t* data1 = FlowerImage::data;
-  const uint8_t* data2 = exporter.image().dataPtr<uint8_t>();
-  for (size_t i = 0; i < FlowerImage::numPixels; ++i) {
-    uint8_t pixel1[3];
-    FlowerImage::nextPixel(data1, pixel1);
-    uint8_t gray1 = static_cast<uint8_t>(0.299f * pixel1[0] + 0.587f * pixel1[1] + 0.114f * pixel1[2]);
-    REQUIRE(static_cast<double>(data2[i]) == Catch::Approx(gray1).margin(3));
-  }
+  INFO("Test file: " + filename);
+  compareImageDataGray<uint8_t>(exporter.image(), 8, 3);
 }
 
-TEST_CASE("FlowerImageGray16Test", "[flower_image][gray16]") {
+TEST_CASE("TiffExporterGray16Test", "[flower_image][gray16]") {
   LoadParams loadParams{ 0 };
   TiffExporterGray16 exporter;
   const std::string filename = getTestFilePath("flower-minisblack-16.tif");
@@ -57,18 +66,11 @@ TEST_CASE("FlowerImageGray16Test", "[flower_image][gray16]") {
 
   checkImageFields(exporter, 16, 1);
 
-  // compare pixel data
-  const uint8_t* data1 = FlowerImage::data;
-  const uint16_t* data2 = exporter.image().dataPtr<uint16_t>();
-  for (size_t i = 0; i < FlowerImage::numPixels; ++i) {
-    uint8_t pixel1[3];
-    FlowerImage::nextPixel(data1, pixel1);
-    uint8_t gray1 = static_cast<uint8_t>(0.299f * pixel1[0] + 0.587f * pixel1[1] + 0.114f * pixel1[2]);
-    REQUIRE(static_cast<double>(data2[i] >> 8) == Catch::Approx(gray1).margin(4));
-  }
+  INFO("Test file: " + filename);
+  compareImageDataGray<uint16_t>(exporter.image(), 16, 4);
 }
 
-TEST_CASE("FlowerImageGray16Test", "[flower_image][gray32]") {
+TEST_CASE("FlowerImageGray32Test", "[flower_image][gray32]") {
   LoadParams loadParams{ 0 };
   TiffExporterGray32 exporter;
   const std::string filename = getTestFilePath("flower-minisblack-32.tif");
@@ -76,15 +78,8 @@ TEST_CASE("FlowerImageGray16Test", "[flower_image][gray32]") {
 
   checkImageFields(exporter, 32, 1);
 
-  // compare pixel data
-  const uint8_t* data1 = FlowerImage::data;
-  const uint32_t* data2 = exporter.image().dataPtr<uint32_t>();
-  for (size_t i = 0; i < FlowerImage::numPixels; ++i) {
-    uint8_t pixel1[3];
-    FlowerImage::nextPixel(data1, pixel1);
-    uint8_t gray1 = static_cast<uint8_t>(0.299f * pixel1[0] + 0.587f * pixel1[1] + 0.114f * pixel1[2]);
-    REQUIRE(static_cast<double>(data2[i] >> 24) == Catch::Approx(gray1).margin(4));
-  }
+  INFO("Test file: " + filename);
+  compareImageDataGray<uint32_t>(exporter.image(), 32, 4);
 }
 
 template <typename DstType, typename SrcType = DstType>
@@ -111,18 +106,7 @@ void TiffExporterGrayBitsTest(
     checkImageFields(exporter, pixelBits, 1);
 
     INFO("Test file: " + testFile);
-
-    // compare pixel data
-    const int shift = pixelBits > 8 ? pixelBits - 8 : 8 - bitsPerPixel;
-    const uint8_t* data1 = FlowerImage::data;
-    const DstType* data2 = exporter.image().dataPtr<DstType>();
-    for (size_t i = 0; i < FlowerImage::numPixels; ++i) {
-      uint8_t pixel1[3];
-      FlowerImage::nextPixel(data1, pixel1);
-      uint8_t gray1 = static_cast<uint8_t>(0.299f * pixel1[0] + 0.587f * pixel1[1] + 0.114f * pixel1[2]);
-      DstType value = static_cast<DstType>(gray1) << (8 * (sizeof(DstType) - 1));
-      REQUIRE(static_cast<double>(data2[i] >> shift) == Catch::Approx(value >> shift).margin(margin));
-    }
+    compareImageDataGray<DstType>(exporter.image(), bitsPerPixel, margin);
   }
 }
 
@@ -169,7 +153,7 @@ TEST_CASE("TiffExporterGrayBitsTest", "[flower_image][gray-bits-32]") {
   TiffExporterGrayBitsTest<uint32_t>(testFiles, margins);
 }
 
-TEST_CASE("FlowerImageRgb8Test", "[flower_image][rgb8]") {
+TEST_CASE("TiffExporterRgb8Test", "[flower_image][rgb8]") {
   LoadParams loadParams{ 0 };
   TiffExporterRgb8 exporter;
   const std::string filename = getTestFilePath("flower-rgb-contig-08.tif");
@@ -189,7 +173,7 @@ TEST_CASE("FlowerImageRgb8Test", "[flower_image][rgb8]") {
   }
 }
 
-TEST_CASE("FlowerImageRgb16Test", "[flower_image][rgb16]") {
+TEST_CASE("TiffExporterRgb16Test", "[flower_image][rgb16]") {
   LoadParams loadParams{ 0 };
   TiffExporterRgb16 exporter;
   const std::string filename = getTestFilePath("flower-rgb-contig-16.tif");
@@ -209,7 +193,7 @@ TEST_CASE("FlowerImageRgb16Test", "[flower_image][rgb16]") {
   }
 }
 
-TEST_CASE("FlowerImageRgb32Test", "[flower_image][rgb32]") {
+TEST_CASE("TiffExporterRgb32Test", "[flower_image][rgb32]") {
   LoadParams loadParams{ 0 };
   TiffExporterRgb32 exporter;
   const std::string filename = getTestFilePath("flower-rgb-contig-32.tif");

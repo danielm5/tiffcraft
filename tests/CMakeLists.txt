@@ -12,5 +12,5 @@ FetchContent_MakeAvailable(Catch2)
 add_executable(tiffSimpleTest tiffSimpleTest.cpp)
 target_link_libraries(tiffSimpleTest PRIVATE TiffCraft Catch2::Catch2WithMain)
 
-add_executable(flowerImageTest flowerImageTest.cpp)
-target_link_libraries(flowerImageTest PRIVATE TiffCraft Catch2::Catch2WithMain)
+add_executable(tiffExporterTest tiffExporterTest.cpp)
+target_link_libraries(tiffExporterTest PRIVATE TiffCraft Catch2::Catch2WithMain)
