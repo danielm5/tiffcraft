@@ -373,7 +373,7 @@ namespace TiffCraft {
 
   // TiffExporter implementation for Grayscale images with different bit lengths
   // per sample --------------------------------------------------------------
-  template <typename PixelType>
+  template <typename DstType, typename SrcType = DstType>
   class TiffExporterGrayBits : public TiffExporter
   {
   public:
@@ -383,53 +383,53 @@ namespace TiffCraft {
       const TiffImage::IFD& ifd,
       TiffImage::ImageData imageData) override
     {
-      constexpr int bitsPerPixel = 8 * sizeof(PixelType);
       const int samplesPerPixel = requireSamplesPerPixel(ifd, 1);
       const int photometricInterpretation = requirePhotometricInterpretation(ifd, 1, std::less_equal<>());
       const int compression = requireCompression(ifd, 1);
-      const auto bitsPerSample = requireBitsPerSample(ifd, bitsPerPixel,
-        [](int value, int requiredValue) {
-          return value <= requiredValue && value > (requiredValue / 16) * 8;
-        });
       const int fillOrder = requireFillOrder(ifd, 1);
 
+      const int bitsPerSample = getInt(ifd, Tag::BitsPerSample);
+
+      constexpr int bitsPerDstPixel = 8 * sizeof(DstType);
+      constexpr int bitsPerSrcPixel = 8 * sizeof(SrcType);
+
       // create the image and copy the pixel data
-      image_ = Image::make<PixelType, 1>(getWidth(ifd), getHeight(ifd));
+      image_ = Image::make<DstType, 1>(getWidth(ifd), getHeight(ifd));
       int countAvail = 0;
-      PixelType bitsAvail = 0;
+      SrcType bitsAvail = 0;
       auto src = begin(imageData);
-      auto* dst = image_.dataPtr<PixelType>();
+      auto* dst = image_.dataPtr<DstType>();
       for (int row = 0; row < image_.height; ++row) {
         for (int col = 0; col < image_.width; ++col) {
           int count = 0;
-          PixelType value = 0;
+          DstType value = 0;
           while (count < bitsPerSample) {
             // make sure we have some bits available
             if (countAvail == 0) {
               if (src == end(imageData)) {
                 throw std::runtime_error("No pixel data available");
               }
-              bitsAvail = static_cast<PixelType>(*src);
+              bitsAvail = static_cast<SrcType>(*src);
               if (!header.equalsHostByteOrder()) {
                 bitsAvail = swap(bitsAvail);
               }
-              countAvail = bitsPerPixel;
-              src += sizeof(PixelType);
+              countAvail = bitsPerSrcPixel;
+              src += sizeof(SrcType);
             }
             // consume available bits
             const int n = std::min(bitsPerSample - count, countAvail);
             value <<= n;
-            value |= (bitsAvail >> (bitsPerPixel - n));
+            value |= (bitsAvail >> (bitsPerSrcPixel - n));
             count += n;
             // update available bits
             countAvail -= n;
             bitsAvail <<= n;
           }
           assert(count == bitsPerSample);
-          *dst++ = value << (bitsPerPixel - bitsPerSample);
+          *dst++ = value << (bitsPerDstPixel - bitsPerSample);
         }
         // flush partial words when the row is complete
-        if (countAvail > 0 && countAvail < bitsPerPixel) {
+        if (countAvail > 0 && countAvail < bitsPerDstPixel) {
           countAvail = 0;
           bitsAvail = 0;
         }
@@ -443,10 +443,6 @@ namespace TiffCraft {
       }
     }
   };
-
-  using TiffExporterGrayBits8 = TiffExporterGrayBits<uint8_t>;
-  using TiffExporterGrayBits16 = TiffExporterGrayBits<uint16_t>;
-  using TiffExporterGrayBits32 = TiffExporterGrayBits<uint32_t>;
 
   // TiffExporter implementation for RGB images with individual samples aligned
   // to word boundaries -------------------------------------------------------
