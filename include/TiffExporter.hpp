@@ -75,6 +75,9 @@ namespace TiffCraft {
     // Accessor for the exported image
     const Image& image() const { return image_; }
 
+    // Accessor for the exported image
+    [[nodiscard]] Image takeImage() const { return std::move(image_); }
+
     // Callback for TiffCraft::load() function
     virtual void operator()(
       const TiffImage::Header& header,
@@ -388,7 +391,7 @@ namespace TiffCraft {
       const int compression = requireCompression(ifd, 1);
       const int fillOrder = requireFillOrder(ifd, 1);
 
-      const int bitsPerSample = getInt(ifd, Tag::BitsPerSample);
+      const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
 
       constexpr int bitsPerDstPixel = 8 * sizeof(DstType);
       constexpr int bitsPerSrcPixel = 8 * sizeof(SrcType);
@@ -427,6 +430,92 @@ namespace TiffCraft {
           }
           assert(count == bitsPerSample);
           *dst++ = value << (bitsPerDstPixel - bitsPerSample);
+        }
+        // flush partial words when the row is complete
+        if (countAvail > 0 && countAvail < bitsPerDstPixel) {
+          countAvail = 0;
+          bitsAvail = 0;
+        }
+      }
+      if (src != end(imageData)) {
+        throw std::runtime_error("Not enough pixel data for the image size");
+      }
+
+      if (photometricInterpretation == 0) { // WhiteIsZero
+        invertColors();
+      }
+    }
+  };
+
+  // TiffExporter implementation for Palette-color images with different -----
+  // bit lengths per sample --------------------------------------------------
+  template <typename DstType, typename SrcType = DstType>
+  class TiffExporterPaletteBits : public TiffExporter
+  {
+  public:
+    // Callback for TiffCraft::load() function
+    void operator()(
+      const TiffImage::Header& header,
+      const TiffImage::IFD& ifd,
+      TiffImage::ImageData imageData) override
+    {
+      const int samplesPerPixel = requireSamplesPerPixel(ifd, 1);
+      const int photometricInterpretation = requirePhotometricInterpretation(ifd, 3);
+      const int compression = requireCompression(ifd, 1);
+      const int fillOrder = requireFillOrder(ifd, 1);
+
+      const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
+
+      const auto numColors = (1 << bitsPerSample);
+      const auto colorMap = getIntVec(ifd, Tag::ColorMap);
+      if (3 * numColors > colorMap.size()) {
+        throw std::runtime_error("Color map size does not match bits per sample");
+      }
+      const int red = numColors * 0;
+      const int green = numColors * 1;
+      const int blue = numColors * 2;
+
+      constexpr int bitsPerDstPixel = 8 * sizeof(DstType);
+      constexpr int bitsPerSrcPixel = 8 * sizeof(SrcType);
+      constexpr int maxDstValue = (1 << bitsPerDstPixel) - 1;
+
+      // create the image and copy the pixel data
+      image_ = Image::make<DstType, 3>(getWidth(ifd), getHeight(ifd));
+      int countAvail = 0;
+      SrcType bitsAvail = 0;
+      auto src = begin(imageData);
+      auto* dst = image_.dataPtr<Rgb<DstType>>();
+      for (int row = 0; row < image_.height; ++row) {
+        for (int col = 0; col < image_.width; ++col) {
+          int count = 0;
+          DstType value = 0;
+          while (count < bitsPerSample) {
+            // make sure we have some bits available
+            if (countAvail == 0) {
+              if (src == end(imageData)) {
+                throw std::runtime_error("No pixel data available");
+              }
+              bitsAvail = static_cast<SrcType>(*src);
+              if (!header.equalsHostByteOrder()) {
+                bitsAvail = swap(bitsAvail);
+              }
+              countAvail = bitsPerSrcPixel;
+              src += sizeof(SrcType);
+            }
+            // consume available bits
+            const int n = std::min(bitsPerSample - count, countAvail);
+            value <<= n;
+            value |= (bitsAvail >> (bitsPerSrcPixel - n));
+            count += n;
+            // update available bits
+            countAvail -= n;
+            bitsAvail <<= n;
+          }
+          assert(count == bitsPerSample);
+          dst->r = static_cast<DstType>(colorMap[red + value] * maxDstValue / 65535);
+          dst->g = static_cast<DstType>(colorMap[green + value] * maxDstValue / 65535);
+          dst->b = static_cast<DstType>(colorMap[blue + value] * maxDstValue / 65535);
+          ++dst;
         }
         // flush partial words when the row is complete
         if (countAvail > 0 && countAvail < bitsPerDstPixel) {
