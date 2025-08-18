@@ -1,0 +1,1 @@
+magick flower-palette-08.tif -compress none PPM:flower-palette-08.ppm

@@ -29,13 +29,17 @@ std::string getTestFilePath(const std::string& filename) {
   return (test_dir / "libtiff-pics" / "depth" / filename).string();
 }
 
+void checkImageFields(const Image& image, int bitDepth, int channels) {
+  REQUIRE(image.width == FlowerImage::width);
+  REQUIRE(image.height == FlowerImage::height);
+  REQUIRE(image.channels == channels);
+  REQUIRE(image.bitDepth == bitDepth);
+  REQUIRE(image.dataSize() == channels * FlowerImage::numPixels * (bitDepth / 8));
+  REQUIRE(image.dataPtr() != nullptr);
+}
+
 void checkImageFields(const TiffExporter& exporter, int bitDepth, int channels) {
-  REQUIRE(exporter.image().width == FlowerImage::width);
-  REQUIRE(exporter.image().height == FlowerImage::height);
-  REQUIRE(exporter.image().channels == channels);
-  REQUIRE(exporter.image().bitDepth == bitDepth);
-  REQUIRE(exporter.image().dataSize() == channels * FlowerImage::numPixels * (bitDepth / 8));
-  REQUIRE(exporter.image().dataPtr() != nullptr);
+  checkImageFields(exporter.image(), bitDepth, channels); //TMP
 }
 
 template <typename DstType>
@@ -88,6 +92,31 @@ void compareImageDataRgb(const Image& image, int bitsPerPixel, int margin)
   }
 }
 
+template <typename PixelType>
+void compareToReference(
+  const Image& image,
+  const std::filesystem::path& refFilePath,
+  int margin = 0)
+{
+  auto refImg = netpbm::read<PixelType>(refFilePath.string());
+  const int channels = netpbm::is_rgb_v<PixelType> ? 3 : 1;
+  const int pixelBits = 8 * sizeof(PixelType) / channels;
+  checkImageFields(image, pixelBits, channels);
+  REQUIRE(refImg.width == image.width);
+  REQUIRE(refImg.height == image.height);
+  REQUIRE(refImg.pixels.size() == image.dataSize<PixelType>());
+  const auto* pixels = image.dataPtr<PixelType>();
+  for (size_t i = 0; i < refImg.pixels.size(); ++i) {
+    if constexpr (netpbm::is_rgb_v<PixelType>) {
+      REQUIRE(double(refImg.pixels[i].r) == Catch::Approx(pixels[i].r).margin(margin));
+      REQUIRE(double(refImg.pixels[i].g) == Catch::Approx(pixels[i].g).margin(margin));
+      REQUIRE(double(refImg.pixels[i].b) == Catch::Approx(pixels[i].b).margin(margin));
+    } else {
+       REQUIRE(double(refImg.pixels[i]) == Catch::Approx(pixels[i]).margin(margin));
+    }
+  }
+}
+
 // This function takes an exporter as template parameter and a list of files.
 // The list of files must be set in pairs: first a TIFF file to test, then a
 // PPM, PGM, or PBM file to compare against.
@@ -108,83 +137,60 @@ void TestExporter(const std::vector<std::string>& testFiles)
 
     const auto& image = exporter.image();
 
-    try {
-      auto refImg = netpbm::readPPM<uint8_t>(refFilePath.string());
-      const int pixelBits = 8 * sizeof(uint8_t);
-      checkImageFields(exporter, pixelBits, 3);
-      REQUIRE(refImg.width == image.width);
-      REQUIRE(refImg.height == image.height);
-      REQUIRE(refImg.pixels.size() == image.dataSize<Rgb8>());
-      const auto* pixels = image.dataPtr<Rgb8>();
-      constexpr int margin = 1;
-      for (size_t i = 0; i < refImg.pixels.size(); ++i) {
-        REQUIRE(int(refImg.pixels[i].r) == Catch::Approx(pixels[i].r).margin(margin));
-        REQUIRE(int(refImg.pixels[i].g) == Catch::Approx(pixels[i].g).margin(margin));
-        REQUIRE(int(refImg.pixels[i].b) == Catch::Approx(pixels[i].b).margin(margin));
-      }
+    try { // Gray 8bits
+      compareToReference<uint8_t>(image, refFilePath);
       return;
-    }
-    catch (const std::exception& ex) {
-      // ignore
-    }
+    } catch (const std::exception& ex) { /* ignore */ }
 
-    try {
-      auto refImg = netpbm::readPPM<uint16_t>(refFilePath.string());
-      const int pixelBits = 8 * sizeof(uint16_t);
-      checkImageFields(exporter, pixelBits, 3);
-      REQUIRE(refImg.width == image.width);
-      REQUIRE(refImg.height == image.height);
-      REQUIRE(refImg.pixels.size() == image.dataSize<Rgb16>());
-      const auto* pixels = image.dataPtr<Rgb16>();
-      for (size_t i = 0; i < refImg.pixels.size(); ++i) {
-        REQUIRE(refImg.pixels[i].r == pixels[i].r);
-        REQUIRE(refImg.pixels[i].g == pixels[i].g);
-        REQUIRE(refImg.pixels[i].b == pixels[i].b);
-      }
+    try { // Gray 16bits
+      compareToReference<uint16_t>(image, refFilePath);
       return;
-    }
-    catch (const std::exception& ex) {
-      // ignore
-    }
+    } catch (const std::exception& ex) { /* ignore */ }
+
+    try { // Gray 32bits
+      compareToReference<uint32_t>(image, refFilePath);
+      return;
+    } catch (const std::exception& ex) { /* ignore */ }
+
+    try { // RGB 8bits
+      compareToReference<netpbm::RGB8>(image, refFilePath, 1);
+      return;
+    } catch (const std::exception& ex) { /* ignore */ }
+
+    try { // RGB 16bits
+      compareToReference<netpbm::RGB16>(image, refFilePath);
+      return;
+    } catch (const std::exception& ex) { /* ignore */ }
 
     FAIL("Unsupported reference file format: " + refFilePath.string());
   }
 }
 
 TEST_CASE("TiffExporterGray8Test", "[flower_image][gray8]") {
-  LoadParams loadParams{ 0 };
-  TiffExporterGray8 exporter;
-  const std::string filename = getTestFilePath("flower-minisblack-08.tif");
-  load(filename, std::ref(exporter), loadParams);
-
-  checkImageFields(exporter, 8, 1);
-
-  INFO("Test file: " + filename);
-  compareImageDataGray<uint8_t>(exporter.image(), 8, 3);
+  std::vector<std::string> testFiles = {
+    "libtiff-pics/depth/flower-minisblack-08.tif",
+    "reference_images/flower-minisblack-08.pgm"
+  };
+  using Exporter = TiffExporterGray8;
+  TestExporter<Exporter>(testFiles);
 }
 
 TEST_CASE("TiffExporterGray16Test", "[flower_image][gray16]") {
-  LoadParams loadParams{ 0 };
-  TiffExporterGray16 exporter;
-  const std::string filename = getTestFilePath("flower-minisblack-16.tif");
-  load(filename, std::ref(exporter), loadParams);
-
-  checkImageFields(exporter, 16, 1);
-
-  INFO("Test file: " + filename);
-  compareImageDataGray<uint16_t>(exporter.image(), 16, 4);
+  std::vector<std::string> testFiles = {
+    "libtiff-pics/depth/flower-minisblack-16.tif",
+    "reference_images/flower-minisblack-16.pgm"
+  };
+  using Exporter = TiffExporterGray16;
+  TestExporter<Exporter>(testFiles);
 }
 
 TEST_CASE("FlowerImageGray32Test", "[flower_image][gray32]") {
-  LoadParams loadParams{ 0 };
-  TiffExporterGray32 exporter;
-  const std::string filename = getTestFilePath("flower-minisblack-32.tif");
-  load(filename, std::ref(exporter), loadParams);
-
-  checkImageFields(exporter, 32, 1);
-
-  INFO("Test file: " + filename);
-  compareImageDataGray<uint32_t>(exporter.image(), 32, 4);
+  std::vector<std::string> testFiles = {
+    "libtiff-pics/depth/flower-minisblack-32.tif",
+    "reference_images/flower-minisblack-32.pgm"
+  };
+  using Exporter = TiffExporterGray32;
+  TestExporter<Exporter>(testFiles);
 }
 
 template <typename DstType, typename SrcType = DstType>
