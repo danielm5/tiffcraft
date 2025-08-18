@@ -284,6 +284,24 @@ void TiffExporterPaletteBitsTest(
   }
 }
 
+TEST_CASE("TiffExporterPaletteTest", "[flower_image][palette8]") {
+  std::vector<std::string> testFiles = {
+    "libtiff-pics/depth/flower-palette-08.tif",
+    "reference_images/flower-palette-08.ppm"
+  };
+  using Exporter = TiffExporterPalette<uint8_t>;
+  TestExporter<Exporter>(testFiles);
+}
+
+TEST_CASE("TiffExporterPaletteTest", "[flower_image][palette16]") {
+  std::vector<std::string> testFiles = {
+    "libtiff-pics/depth/flower-palette-16.tif",
+    "reference_images/flower-palette-16.ppm"
+  };
+  using Exporter = TiffExporterPalette<uint16_t>;
+  TestExporter<Exporter>(testFiles);
+}
+
 TEST_CASE("TiffExporterPaletteBitsTest", "[flower_image][palette-bits-up-to-8]") {
   std::vector<std::string> testFiles = {
     "libtiff-pics/depth/flower-palette-02.tif",

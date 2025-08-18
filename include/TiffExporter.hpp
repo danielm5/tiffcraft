@@ -342,6 +342,28 @@ namespace TiffCraft {
       }
     }
 
+    template <typename SrcType, typename DstType, typename UnaryOp>
+    void transform(
+      const TiffImage::ImageData& imageData, std::vector<std::byte>& v, UnaryOp&& op)
+    {
+      size_t copied = 0;
+      const size_t dstCount = v.size() / sizeof(DstType);
+      DstType* dst = reinterpret_cast<DstType*>(v.data());
+      for (const auto& strip : imageData) {
+        if (strip.empty()) continue; // Skip empty strips
+        const size_t srcCount = strip.size() / sizeof(SrcType);
+        if (copied + srcCount > dstCount) {
+          throw std::runtime_error("Not enough space in vector to copy image data");
+        }
+        const SrcType* src = reinterpret_cast<const SrcType*>(strip.data());
+        std::transform(src, src + srcCount, dst + copied, std::forward<UnaryOp>(op));
+        copied += srcCount;
+      }
+      if (copied != dstCount) {
+        throw std::runtime_error("Not enough pixel data for the image size");
+      }
+    }
+
     void invertColors() {
       uint8_t* data = image_.dataPtr<uint8_t>();
       for (size_t i = 0; i < image_.data.size(); ++i) {
@@ -458,6 +480,53 @@ namespace TiffCraft {
     }
   };
 
+  // TiffExporter implementation for Palette-color images on word size boundaries
+  template <typename DstType, typename SrcType = DstType>
+  class TiffExporterPalette : public TiffExporter
+  {
+  public:
+    // Callback for TiffCraft::load() function
+    void operator()(
+      const TiffImage::Header& header,
+      const TiffImage::IFD& ifd,
+      TiffImage::ImageData imageData) override
+    {
+      const int samplesPerPixel = requireSamplesPerPixel(ifd, 1);
+      const int photometricInterpretation = requirePhotometricInterpretation(ifd, 3);
+      const int compression = requireCompression(ifd, 1);
+      const int fillOrder = requireFillOrder(ifd, 1);
+
+      const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
+
+      const auto numColors = (1 << bitsPerSample);
+      const auto colorMap = getIntVec(ifd, Tag::ColorMap);
+      if (3 * numColors > colorMap.size()) {
+        throw std::runtime_error("Color map size does not match bits per sample");
+      }
+      const int red = numColors * 0;
+      const int green = numColors * 1;
+      const int blue = numColors * 2;
+
+      constexpr int bitsPerDstPixel = 8 * sizeof(DstType);
+
+      // create the image and copy the pixel data
+      image_ = Image::make<DstType, 3>(getWidth(ifd), getHeight(ifd));
+
+      using UnaryOp = std::function<Rgb<DstType>(SrcType)>;
+      transform<SrcType, Rgb<DstType>, UnaryOp>(imageData, image_.data,
+        [=](SrcType value) -> Rgb<DstType> {
+          if (!header.equalsHostByteOrder()) {
+            value = swap(value);
+          }
+          Rgb<DstType> rgb;
+          rgb.r = static_cast<DstType>(colorMap[red + value] >> (16 - bitsPerDstPixel));
+          rgb.g = static_cast<DstType>(colorMap[green + value] >> (16 - bitsPerDstPixel));
+          rgb.b = static_cast<DstType>(colorMap[blue + value] >> (16 - bitsPerDstPixel));
+          return rgb;
+        });
+    }
+  };
+
   // TiffExporter implementation for Palette-color images with different -----
   // bit lengths per sample --------------------------------------------------
   template <typename DstType, typename SrcType = DstType>
@@ -535,10 +604,6 @@ namespace TiffCraft {
       }
       if (src != end(imageData)) {
         throw std::runtime_error("Not enough pixel data for the image size");
-      }
-
-      if (photometricInterpretation == 0) { // WhiteIsZero
-        invertColors();
       }
     }
   };
