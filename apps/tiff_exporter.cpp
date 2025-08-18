@@ -60,7 +60,7 @@ public:
     TiffImage::ImageData imageData)
   {
     try {
-      TiffExporterPaletteBits<uint8_t> exporter;
+      TiffExporterPaletteBits<uint16_t> exporter;
       exporter(header, ifd, imageData);
       image_ = exporter.takeImage();
       return;

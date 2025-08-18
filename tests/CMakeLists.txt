@@ -9,7 +9,10 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(Catch2)
 
-add_executable(tiffSimpleTest tiffSimpleTest.cpp)
+add_executable(tiffSimpleTest
+  netpbm.hpp
+  tiffSimpleTest.cpp
+)
 target_link_libraries(tiffSimpleTest PRIVATE TiffCraft Catch2::Catch2WithMain)
 
 add_executable(tiffExporterTest tiffExporterTest.cpp)

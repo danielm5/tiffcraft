@@ -11,9 +11,17 @@
 #include <filesystem>
 #include <iostream>
 
+#include "netpbm.hpp"
+
 #include "flower-rgb-contig-08.h"
 
 using namespace TiffCraft;
+
+std::filesystem::path getFilePath(std::filesystem::path relativePath) {
+  std::filesystem::path test_file_path(__FILE__);
+  std::filesystem::path test_dir = test_file_path.parent_path();
+  return test_dir / relativePath;
+}
 
 std::string getTestFilePath(const std::string& filename) {
   std::filesystem::path test_file_path(__FILE__);
@@ -77,6 +85,69 @@ void compareImageDataRgb(const Image& image, int bitsPerPixel, int margin)
     REQUIRE(static_cast<double>(data2[i].r >> shift) == Catch::Approx(r >> shift).margin(margin));
     REQUIRE(static_cast<double>(data2[i].g >> shift) == Catch::Approx(g >> shift).margin(margin));
     REQUIRE(static_cast<double>(data2[i].b >> shift) == Catch::Approx(b >> shift).margin(margin));
+  }
+}
+
+// This function takes an exporter as template parameter and a list of files.
+// The list of files must be set in pairs: first a TIFF file to test, then a
+// PPM, PGM, or PBM file to compare against.
+template <typename Exporter>
+void TestExporter(const std::vector<std::string>& testFiles)
+{
+  if (testFiles.size() % 2 != 0) {
+    throw std::runtime_error("Test files must be in pairs.");
+  }
+  LoadParams loadParams{ 0 };
+  Exporter exporter;
+  for (size_t i = 0; i < testFiles.size() / 2; ++i) {
+    const auto tiffFilePath = getFilePath(testFiles[2*i + 0]);
+    const auto refFilePath = getFilePath(testFiles[2*i + 1]);
+    INFO("Test file: " + tiffFilePath.string());
+    INFO("Reference file: " + refFilePath.string());
+    load(tiffFilePath.string(), std::ref(exporter), loadParams);
+
+    const auto& image = exporter.image();
+
+    try {
+      auto refImg = netpbm::readPPM<uint8_t>(refFilePath.string());
+      const int pixelBits = 8 * sizeof(uint8_t);
+      checkImageFields(exporter, pixelBits, 3);
+      REQUIRE(refImg.width == image.width);
+      REQUIRE(refImg.height == image.height);
+      REQUIRE(refImg.pixels.size() == image.dataSize<Rgb8>());
+      const auto* pixels = image.dataPtr<Rgb8>();
+      constexpr int margin = 1;
+      for (size_t i = 0; i < refImg.pixels.size(); ++i) {
+        REQUIRE(int(refImg.pixels[i].r) == Catch::Approx(pixels[i].r).margin(margin));
+        REQUIRE(int(refImg.pixels[i].g) == Catch::Approx(pixels[i].g).margin(margin));
+        REQUIRE(int(refImg.pixels[i].b) == Catch::Approx(pixels[i].b).margin(margin));
+      }
+      return;
+    }
+    catch (const std::exception& ex) {
+      // ignore
+    }
+
+    try {
+      auto refImg = netpbm::readPPM<uint16_t>(refFilePath.string());
+      const int pixelBits = 8 * sizeof(uint16_t);
+      checkImageFields(exporter, pixelBits, 3);
+      REQUIRE(refImg.width == image.width);
+      REQUIRE(refImg.height == image.height);
+      REQUIRE(refImg.pixels.size() == image.dataSize<Rgb16>());
+      const auto* pixels = image.dataPtr<Rgb16>();
+      for (size_t i = 0; i < refImg.pixels.size(); ++i) {
+        REQUIRE(refImg.pixels[i].r == pixels[i].r);
+        REQUIRE(refImg.pixels[i].g == pixels[i].g);
+        REQUIRE(refImg.pixels[i].b == pixels[i].b);
+      }
+      return;
+    }
+    catch (const std::exception& ex) {
+      // ignore
+    }
+
+    FAIL("Unsupported reference file format: " + refFilePath.string());
   }
 }
 
@@ -215,18 +286,24 @@ void TiffExporterPaletteBitsTest(
 
 TEST_CASE("TiffExporterPaletteBitsTest", "[flower_image][palette-bits-up-to-8]") {
   std::vector<std::string> testFiles = {
-    "flower-palette-02.tif",
-    "flower-palette-04.tif",
-    "flower-palette-08.tif"
+    "libtiff-pics/depth/flower-palette-02.tif",
+    "reference_images/flower-palette-02.ppm",
+    "libtiff-pics/depth/flower-palette-04.tif",
+    "reference_images/flower-palette-04.ppm",
+    "libtiff-pics/depth/flower-palette-08.tif",
+    "reference_images/flower-palette-08.ppm"
   };
-  std::vector<int> margins = { 2, 30, 30 };
-  TiffExporterPaletteBitsTest<uint8_t>(testFiles, margins);
+  using Exporter = TiffExporterPaletteBits<uint8_t>;
+  TestExporter<Exporter>(testFiles);
 }
 
-TEST_CASE("TiffExporterPaletteBitsTest", "[flower_image][gray-bits-16]") {
-  std::vector<std::string> testFiles = { "flower-palette-16.tif" };
-  std::vector<int> margins = { 150 };  // TODO: verify the image because compare fails
-  TiffExporterPaletteBitsTest<uint16_t>(testFiles, margins);
+TEST_CASE("TiffExporterPaletteBitsTest", "[flower_image][palette-bits-16]") {
+  std::vector<std::string> testFiles = {
+    "libtiff-pics/depth/flower-palette-16.tif",
+    "reference_images/flower-palette-16.ppm"
+  };
+  using Exporter = TiffExporterPaletteBits<uint16_t>;
+  TestExporter<Exporter>(testFiles);
 }
 
 TEST_CASE("TiffExporterRgb8Test", "[flower_image][rgb8]") {

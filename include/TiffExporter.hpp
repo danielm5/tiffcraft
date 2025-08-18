@@ -42,6 +42,9 @@ namespace TiffCraft {
     const std::byte* dataPtr() const { return data.data(); }
 
     template <typename T>
+    size_t dataSize() const { return data.size() / sizeof(T); }
+
+    template <typename T>
     T* dataPtr() { return reinterpret_cast<T*>(data.data()); }
 
     template <typename T>
@@ -237,6 +240,14 @@ namespace TiffCraft {
       reference operator*() const { return *iter2_; }
       pointer operator->() const { return &(*iter2_); }
 
+      // Get the current value as a specific type
+      template <typename T>
+      T& getAs() const { return *reinterpret_cast<T*>(&(*iter2_)); }
+
+      // Advance the iterator to the next element of type T
+      template <typename T>
+      Iterator next() { return (*this += sizeof(T)); }
+
       // Prefix increment
       Iterator& operator++() {
         ++iter2_;
@@ -412,12 +423,12 @@ namespace TiffCraft {
               if (src == end(imageData)) {
                 throw std::runtime_error("No pixel data available");
               }
-              bitsAvail = static_cast<SrcType>(*src);
+              bitsAvail = src.getAs<SrcType>();
               if (!header.equalsHostByteOrder()) {
                 bitsAvail = swap(bitsAvail);
               }
               countAvail = bitsPerSrcPixel;
-              src += sizeof(SrcType);
+              src.next<SrcType>();
             }
             // consume available bits
             const int n = std::min(bitsPerSample - count, countAvail);
@@ -477,7 +488,6 @@ namespace TiffCraft {
 
       constexpr int bitsPerDstPixel = 8 * sizeof(DstType);
       constexpr int bitsPerSrcPixel = 8 * sizeof(SrcType);
-      constexpr int maxDstValue = (1 << bitsPerDstPixel) - 1;
 
       // create the image and copy the pixel data
       image_ = Image::make<DstType, 3>(getWidth(ifd), getHeight(ifd));
@@ -495,12 +505,12 @@ namespace TiffCraft {
               if (src == end(imageData)) {
                 throw std::runtime_error("No pixel data available");
               }
-              bitsAvail = static_cast<SrcType>(*src);
+              bitsAvail = src.getAs<SrcType>();
               if (!header.equalsHostByteOrder()) {
                 bitsAvail = swap(bitsAvail);
               }
               countAvail = bitsPerSrcPixel;
-              src += sizeof(SrcType);
+              src.next<SrcType>();
             }
             // consume available bits
             const int n = std::min(bitsPerSample - count, countAvail);
@@ -512,9 +522,9 @@ namespace TiffCraft {
             bitsAvail <<= n;
           }
           assert(count == bitsPerSample);
-          dst->r = static_cast<DstType>(colorMap[red + value] * maxDstValue / 65535);
-          dst->g = static_cast<DstType>(colorMap[green + value] * maxDstValue / 65535);
-          dst->b = static_cast<DstType>(colorMap[blue + value] * maxDstValue / 65535);
+          dst->r = static_cast<DstType>(colorMap[red + value] >> (16 - bitsPerDstPixel));
+          dst->g = static_cast<DstType>(colorMap[green + value] >> (16 - bitsPerDstPixel));
+          dst->b = static_cast<DstType>(colorMap[blue + value] >> (16 - bitsPerDstPixel));
           ++dst;
         }
         // flush partial words when the row is complete
