@@ -7,6 +7,7 @@
 
 #include <functional>
 #include <algorithm>
+#include <numeric>
 #include <string>
 
 namespace TiffCraft {
@@ -426,8 +427,11 @@ namespace TiffCraft {
 
       const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
 
-      constexpr int bitsPerDstPixel = 8 * sizeof(DstType);
-      constexpr int bitsPerSrcPixel = 8 * sizeof(SrcType);
+      constexpr size_t bitsPerDstPixel = 8 * sizeof(DstType);
+      constexpr size_t bitsPerSrcPixel = 8 * sizeof(SrcType);
+      constexpr size_t maxDstValue = std::numeric_limits<DstType>::max();
+      const size_t maxSrcValue = bitsPerSample < sizeof(size_t) * 8
+        ? (size_t(1) << bitsPerSample) - 1 : std::numeric_limits<size_t>::max();
 
       // create the image and copy the pixel data
       image_ = Image::make<DstType, 1>(getWidth(ifd), getHeight(ifd));
@@ -462,7 +466,7 @@ namespace TiffCraft {
             bitsAvail <<= n;
           }
           assert(count == bitsPerSample);
-          *dst++ = value << (bitsPerDstPixel - bitsPerSample);
+          *dst++ = (value * maxDstValue) / maxSrcValue;
         }
         // flush partial words when the row is complete
         if (countAvail > 0 && countAvail < bitsPerDstPixel) {
