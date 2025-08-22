@@ -90,7 +90,7 @@ void TestExporter(const std::vector<std::string>& testFiles)
     } catch (const std::exception& ex) { /* ignore */ }
 
     try { // RGB 16bits
-      compareToReference<netpbm::RGB16>(image, refFilePath);
+      compareToReference<netpbm::RGB16>(image, refFilePath, 1);
       return;
     } catch (const std::exception& ex) { /* ignore */ }
 
@@ -103,151 +103,129 @@ void TestExporter(const std::vector<std::string>& testFiles)
   }
 }
 
-TEST_CASE("TiffExporterGray8Test", "[flower_image][gray8]") {
-  std::vector<std::string> testFiles = {
-    "libtiff-pics/depth/flower-minisblack-08.tif",
-    "reference_images/flower-minisblack-08.pgm",
-  };
-  using Exporter = TiffExporterGray8;
-  TestExporter<Exporter>(testFiles);
+TEST_CASE("TiffExporterGrayTest", "[flower_image][flower_grayscale]") {
+  { // up to 8 bits
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-minisblack-02.tif",
+      "reference_images/flower-minisblack-02.pgm",
+      "libtiff-pics/depth/flower-minisblack-04.tif",
+      "reference_images/flower-minisblack-04.pgm",
+      "libtiff-pics/depth/flower-minisblack-06.tif",
+      "reference_images/flower-minisblack-06.pgm",
+      "libtiff-pics/depth/flower-minisblack-08.tif",
+      "reference_images/flower-minisblack-08.pgm",
+    };
+    using Exporter = TiffExporterGray<uint8_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+  { // 9 to 15 bits
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-minisblack-10.tif",
+      "reference_images/flower-minisblack-10.pgm",
+      "libtiff-pics/depth/flower-minisblack-12.tif",
+      "reference_images/flower-minisblack-12.pgm",
+      "libtiff-pics/depth/flower-minisblack-14.tif",
+      "reference_images/flower-minisblack-14.pgm",
+    };
+    using Exporter = TiffExporterGray<uint16_t,uint8_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+  { // 16 bits
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-minisblack-16.tif",
+      "reference_images/flower-minisblack-16.pgm",
+    };
+    using Exporter = TiffExporterGray<uint16_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+  { // 24 bits
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-minisblack-24.tif",
+      "reference_images/flower-minisblack-24.pgm",
+    };
+    using Exporter = TiffExporterGray<uint32_t,uint8_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+  {
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-minisblack-32.tif",
+      "reference_images/flower-minisblack-32.pgm",
+    };
+    using Exporter = TiffExporterGray<uint32_t>;
+    TestExporter<Exporter>(testFiles);
+  }
 }
 
-TEST_CASE("TiffExporterGray16Test", "[flower_image][gray16]") {
-  std::vector<std::string> testFiles = {
-    "libtiff-pics/depth/flower-minisblack-16.tif",
-    "reference_images/flower-minisblack-16.pgm",
-  };
-  using Exporter = TiffExporterGray16;
-  TestExporter<Exporter>(testFiles);
+TEST_CASE("TiffExporterPaletteTest", "[flower_image][flower_palette]") {
+  { // up to 8 bits
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-palette-02.tif",
+      "reference_images/flower-palette-02.ppm",
+      "libtiff-pics/depth/flower-palette-04.tif",
+      "reference_images/flower-palette-04.ppm",
+      "libtiff-pics/depth/flower-palette-08.tif",
+      "reference_images/flower-palette-08.ppm"
+    };
+    using Exporter = TiffExporterPalette<uint8_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+  { // 16 bits
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-palette-16.tif",
+      "reference_images/flower-palette-16.ppm"
+    };
+    using Exporter = TiffExporterPalette<uint16_t>;
+    TestExporter<Exporter>(testFiles);
+  }
 }
 
-TEST_CASE("FlowerImageGray32Test", "[flower_image][gray32]") {
-  std::vector<std::string> testFiles = {
-    "libtiff-pics/depth/flower-minisblack-32.tif",
-    "reference_images/flower-minisblack-32.pgm",
-  };
-  using Exporter = TiffExporterGray32;
-  TestExporter<Exporter>(testFiles);
-}
-
-TEST_CASE("TiffExporterGrayBitsTest", "[flower_image][gray-bits-up-to-8]") {
-  std::vector<std::string> testFiles = {
-    "libtiff-pics/depth/flower-minisblack-02.tif",
-    "reference_images/flower-minisblack-02.pgm",
-    "libtiff-pics/depth/flower-minisblack-04.tif",
-    "reference_images/flower-minisblack-04.pgm",
-    "libtiff-pics/depth/flower-minisblack-06.tif",
-    "reference_images/flower-minisblack-06.pgm",
-    "libtiff-pics/depth/flower-minisblack-08.tif",
-    "reference_images/flower-minisblack-08.pgm",
-  };
-  using Exporter = TiffExporterGrayBits<uint8_t>;
-  TestExporter<Exporter>(testFiles);
-}
-
-TEST_CASE("TiffExporterGrayBitsTest", "[flower_image][gray-bits-9-to-15]") {
-  std::vector<std::string> testFiles = {
-    "libtiff-pics/depth/flower-minisblack-10.tif",
-    "reference_images/flower-minisblack-10.pgm",
-    "libtiff-pics/depth/flower-minisblack-12.tif",
-    "reference_images/flower-minisblack-12.pgm",
-    "libtiff-pics/depth/flower-minisblack-14.tif",
-    "reference_images/flower-minisblack-14.pgm",
-  };
-  using Exporter = TiffExporterGrayBits<uint16_t,uint8_t>;
-  TestExporter<Exporter>(testFiles);
-}
-
-TEST_CASE("TiffExporterGrayBitsTest", "[flower_image][gray-bits-16]") {
-  std::vector<std::string> testFiles = {
-    "libtiff-pics/depth/flower-minisblack-16.tif",
-    "reference_images/flower-minisblack-16.pgm",
-  };
-  using Exporter = TiffExporterGrayBits<uint16_t>;
-  TestExporter<Exporter>(testFiles);
-}
-
-TEST_CASE("TiffExporterGrayBitsTest", "[flower_image][gray-bits-24]") {
-  std::vector<std::string> testFiles = {
-    "libtiff-pics/depth/flower-minisblack-24.tif",
-    "reference_images/flower-minisblack-24.pgm",
-  };
-  using Exporter = TiffExporterGrayBits<uint32_t,uint8_t>;
-  TestExporter<Exporter>(testFiles);
-}
-
-TEST_CASE("TiffExporterGrayBitsTest", "[flower_image][gray-bits-32]") {
-  std::vector<std::string> testFiles = {
-    "libtiff-pics/depth/flower-minisblack-32.tif",
-    "reference_images/flower-minisblack-32.pgm",
-  };
-  using Exporter = TiffExporterGrayBits<uint32_t>;
-  TestExporter<Exporter>(testFiles);
-}
-
-TEST_CASE("TiffExporterPaletteTest", "[flower_image][palette8]") {
-  std::vector<std::string> testFiles = {
-    "libtiff-pics/depth/flower-palette-08.tif",
-    "reference_images/flower-palette-08.ppm"
-  };
-  using Exporter = TiffExporterPalette<uint8_t>;
-  TestExporter<Exporter>(testFiles);
-}
-
-TEST_CASE("TiffExporterPaletteTest", "[flower_image][palette16]") {
-  std::vector<std::string> testFiles = {
-    "libtiff-pics/depth/flower-palette-16.tif",
-    "reference_images/flower-palette-16.ppm"
-  };
-  using Exporter = TiffExporterPalette<uint16_t>;
-  TestExporter<Exporter>(testFiles);
-}
-
-TEST_CASE("TiffExporterPaletteBitsTest", "[flower_image][palette-bits-up-to-8]") {
-  std::vector<std::string> testFiles = {
-    "libtiff-pics/depth/flower-palette-02.tif",
-    "reference_images/flower-palette-02.ppm",
-    "libtiff-pics/depth/flower-palette-04.tif",
-    "reference_images/flower-palette-04.ppm",
-    "libtiff-pics/depth/flower-palette-08.tif",
-    "reference_images/flower-palette-08.ppm"
-  };
-  using Exporter = TiffExporterPaletteBits<uint8_t>;
-  TestExporter<Exporter>(testFiles);
-}
-
-TEST_CASE("TiffExporterPaletteBitsTest", "[flower_image][palette-bits-16]") {
-  std::vector<std::string> testFiles = {
-    "libtiff-pics/depth/flower-palette-16.tif",
-    "reference_images/flower-palette-16.ppm"
-  };
-  using Exporter = TiffExporterPaletteBits<uint16_t>;
-  TestExporter<Exporter>(testFiles);
-}
-
-TEST_CASE("TiffExporterRgb8Test", "[flower_image][rgb8]") {
-  std::vector<std::string> testFiles = {
-    "libtiff-pics/depth/flower-rgb-contig-08.tif",
-    "reference_images/flower-rgb-contig-08.ppm"
-  };
-  using Exporter = TiffExporterRgb8;
-  TestExporter<Exporter>(testFiles);
-}
-
-TEST_CASE("TiffExporterRgb16Test", "[flower_image][rgb16]") {
-  std::vector<std::string> testFiles = {
-    "libtiff-pics/depth/flower-rgb-contig-16.tif",
-    "reference_images/flower-rgb-contig-16.ppm"
-  };
-  using Exporter = TiffExporterRgb16;
-  TestExporter<Exporter>(testFiles);
-}
-
-TEST_CASE("TiffExporterRgb32Test", "[flower_image][rgb32]") {
-  std::vector<std::string> testFiles = {
-    "libtiff-pics/depth/flower-rgb-contig-32.tif",
-    "reference_images/flower-rgb-contig-32.ppm"
-  };
-  using Exporter = TiffExporterRgb32;
-  TestExporter<Exporter>(testFiles);
+TEST_CASE("TiffExporterRgbTest", "[flower_image][flower_rgb_contiguous]") {
+  { // up to 8 bits
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-rgb-contig-02.tif",
+      "reference_images/flower-rgb-contig-02.ppm",
+      "libtiff-pics/depth/flower-rgb-contig-04.tif",
+      "reference_images/flower-rgb-contig-04.ppm",
+      "libtiff-pics/depth/flower-rgb-contig-08.tif",
+      "reference_images/flower-rgb-contig-08.ppm"
+    };
+    using Exporter = TiffExporterRgb<uint8_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+  { // 9 to 15 bits
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-rgb-contig-10.tif",
+      "reference_images/flower-rgb-contig-10.ppm",
+      "libtiff-pics/depth/flower-rgb-contig-12.tif",
+      "reference_images/flower-rgb-contig-12.ppm",
+      "libtiff-pics/depth/flower-rgb-contig-14.tif",
+      "reference_images/flower-rgb-contig-14.ppm",
+    };
+    using Exporter = TiffExporterRgb<uint16_t,uint8_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+  { // 16 bits
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-rgb-contig-16.tif",
+      "reference_images/flower-rgb-contig-16.ppm",
+    };
+    using Exporter = TiffExporterRgb<uint16_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+  { // 24 bits
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-rgb-contig-24.tif",
+      "reference_images/flower-rgb-contig-24.ppm",
+    };
+    using Exporter = TiffExporterRgb<uint32_t,uint8_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+  { // 32 bits
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-rgb-contig-32.tif",
+      "reference_images/flower-rgb-contig-32.ppm",
+    };
+    using Exporter = TiffExporterRgb<uint32_t>;
+    TestExporter<Exporter>(testFiles);
+  }
 }

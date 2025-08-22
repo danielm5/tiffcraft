@@ -306,6 +306,16 @@ namespace TiffCraft {
         return Iterator(&container, container.end(), Iter2());
       }
 
+      // Create an const iterator to the beginning
+      static Iterator begin(const Container& container) {
+        return begin(const_cast<Container&>(container));
+      }
+
+      // Create an const iterator to the end
+      static Iterator end(const Container& container) {
+        return end(const_cast<Container&>(container));
+      }
+
     private:
       Container* container_ = nullptr;
       Iter1 iter1_;
@@ -324,43 +334,105 @@ namespace TiffCraft {
       return Iterator::end(container);
     }
 
-    static void copy(
-      const TiffImage::ImageData& imageData, std::vector<std::byte>& v)
-    {
-      size_t copied = 0;
-      auto it = v.begin();
-      for (const auto& strip : imageData) {
-        if (strip.empty()) continue; // Skip empty strips
-        if (it + strip.size() > v.end()) {
-          throw std::runtime_error("Not enough space in vector to copy image data");
-        }
-        std::copy(strip.begin(), strip.end(), it);
-        it += strip.size();
-        copied += strip.size();
-      }
-      if (copied != v.size()) {
-        throw std::runtime_error("Not enough pixel data for the image size");
-      }
+    static Iterator begin(const TiffImage::ImageData& container) {
+      return Iterator::begin(container);
     }
 
+    static Iterator end(const TiffImage::ImageData& container) {
+      return Iterator::end(container);
+    }
+
+    // static void copy(
+    //   const TiffImage::ImageData& imageData, std::vector<std::byte>& v)
+    // {
+    //   size_t copied = 0;
+    //   auto it = v.begin();
+    //   for (const auto& strip : imageData) {
+    //     if (strip.empty()) continue; // Skip empty strips
+    //     if (it + strip.size() > v.end()) {
+    //       throw std::runtime_error("Not enough space in vector to copy image data");
+    //     }
+    //     std::copy(strip.begin(), strip.end(), it);
+    //     it += strip.size();
+    //     copied += strip.size();
+    //   }
+    //   if (copied != v.size()) {
+    //     throw std::runtime_error("Not enough pixel data for the image size");
+    //   }
+    // }
+
     template <typename SrcType, typename DstType, typename UnaryOp>
-    void transform(
-      const TiffImage::ImageData& imageData, std::vector<std::byte>& v, UnaryOp&& op)
+    void copyPixels(
+      const TiffImage::ImageData& imageData,  // source pixel data
+      size_t width,                           // source image width
+      size_t height,                          // source image height
+      size_t channels,                        // source image channels
+      size_t bitsPerSample,                   // source bits per sample
+      bool equalsHostByteOrder,               // source data byte order
+      UnaryOp&& op)
     {
-      size_t copied = 0;
-      const size_t dstCount = v.size() / sizeof(DstType);
-      DstType* dst = reinterpret_cast<DstType*>(v.data());
-      for (const auto& strip : imageData) {
-        if (strip.empty()) continue; // Skip empty strips
-        const size_t srcCount = strip.size() / sizeof(SrcType);
-        if (copied + srcCount > dstCount) {
-          throw std::runtime_error("Not enough space in vector to copy image data");
+      constexpr size_t bitsPerSrcPixel = 8 * sizeof(SrcType);
+      auto src = begin(imageData);
+      if (bitsPerSample == bitsPerSrcPixel) {
+        // Fast path: bits per sample matches source pixel size
+        for (int row = 0; row < height; ++row) {
+          for (int col = 0; col < width; ++col) {
+            for (int chan = 0; chan < channels; ++chan) {
+              if (src == end(imageData)) {
+                throw std::runtime_error("No pixel data available");
+              }
+              DstType value = src.getAs<SrcType>();
+              src.next<SrcType>();
+              if (!equalsHostByteOrder) {
+                value = swap(value);
+              }
+              std::invoke(op, value); // Apply the unary operation
+            }
+          }
         }
-        const SrcType* src = reinterpret_cast<const SrcType*>(strip.data());
-        std::transform(src, src + srcCount, dst + copied, std::forward<UnaryOp>(op));
-        copied += srcCount;
+      } else {
+        // Slow path: bits per sample does not match source pixel size
+        size_t countAvail = 0;
+        SrcType bitsAvail = 0;
+        for (int row = 0; row < height; ++row) {
+          for (int col = 0; col < width; ++col) {
+            for (int chan = 0; chan < channels; ++chan) {
+              size_t count = 0;
+              DstType value = 0;
+              while (count < bitsPerSample) {
+                // make sure we have some bits available
+                if (countAvail == 0) {
+                  if (src == end(imageData)) {
+                    throw std::runtime_error("No pixel data available");
+                  }
+                  bitsAvail = src.getAs<SrcType>();
+                  src.next<SrcType>();
+                  if (!equalsHostByteOrder) {
+                    bitsAvail = swap(bitsAvail);
+                  }
+                  countAvail = bitsPerSrcPixel;
+                }
+                // consume available bits
+                const size_t n = std::min(bitsPerSample - count, countAvail);
+                value <<= n;
+                value |= (bitsAvail >> (bitsPerSrcPixel - n));
+                count += n;
+                // update available bits
+                countAvail -= n;
+                bitsAvail <<= n;
+              }
+              assert(count == bitsPerSample);
+              std::invoke(op, value); // Apply the unary operation
+            }
+          }
+          // flush partial words when the row is complete
+          if (countAvail > 0) {
+            countAvail = 0;
+            bitsAvail = 0;
+          }
+        }
       }
-      if (copied != dstCount) {
+      if (src != end(imageData)) {
         throw std::runtime_error("Not enough pixel data for the image size");
       }
     }
@@ -373,45 +445,9 @@ namespace TiffCraft {
     }
   };
 
-  // TiffExporter implementation for Grayscale images on word boundaries -----
-  template <typename PixelType>
-  class TiffExporterGray : public TiffExporter
-  {
-  public:
-    // Callback for TiffCraft::load() function
-    void operator()(
-      const TiffImage::Header& header,
-      const TiffImage::IFD& ifd,
-      TiffImage::ImageData imageData) override
-    {
-      const int samplesPerPixel = requireSamplesPerPixel(ifd, 1);
-      const int photometricInterpretation = requirePhotometricInterpretation(ifd, 1, std::less_equal<>());
-      const int compression = requireCompression(ifd, 1);
-      const auto bitsPerSample = requireBitsPerSample(ifd, 8 * sizeof(PixelType));
-      const int fillOrder = requireFillOrder(ifd, 1);
-
-      // create the image and copy the pixel data
-      image_ = Image::make<PixelType, 1>(getWidth(ifd), getHeight(ifd));
-      copy(imageData, image_.data);
-
-      if (!header.equalsHostByteOrder()) {
-        swapArray(image_.dataPtr<PixelType>(), image_.data.size() / sizeof(PixelType));
-      }
-
-      if (photometricInterpretation == 0) { // WhiteIsZero
-        invertColors();
-      }
-    }
-  };
-
-  using TiffExporterGray8 = TiffExporterGray<uint8_t>;
-  using TiffExporterGray16 = TiffExporterGray<uint16_t>;
-  using TiffExporterGray32 = TiffExporterGray<uint32_t>;
-
-  // TiffExporter implementation for Grayscale images with different bit lengths
-  // per sample --------------------------------------------------------------
+  // TiffExporter implementation for Grayscale images ------------------------
   template <typename DstType, typename SrcType = DstType>
-  class TiffExporterGrayBits : public TiffExporter
+  class TiffExporterGray : public TiffExporter
   {
   public:
     // Callback for TiffCraft::load() function
@@ -427,56 +463,25 @@ namespace TiffCraft {
 
       const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
 
-      constexpr size_t bitsPerDstPixel = 8 * sizeof(DstType);
-      constexpr size_t bitsPerSrcPixel = 8 * sizeof(SrcType);
       constexpr size_t maxDstValue = std::numeric_limits<DstType>::max();
       const size_t maxSrcValue = bitsPerSample < sizeof(size_t) * 8
         ? (size_t(1) << bitsPerSample) - 1 : std::numeric_limits<size_t>::max();
 
       // create the image and copy the pixel data
       image_ = Image::make<DstType, 1>(getWidth(ifd), getHeight(ifd));
-      int countAvail = 0;
-      SrcType bitsAvail = 0;
-      auto src = begin(imageData);
       auto* dst = image_.dataPtr<DstType>();
-      for (int row = 0; row < image_.height; ++row) {
-        for (int col = 0; col < image_.width; ++col) {
-          int count = 0;
-          DstType value = 0;
-          while (count < bitsPerSample) {
-            // make sure we have some bits available
-            if (countAvail == 0) {
-              if (src == end(imageData)) {
-                throw std::runtime_error("No pixel data available");
-              }
-              bitsAvail = src.getAs<SrcType>();
-              if (!header.equalsHostByteOrder()) {
-                bitsAvail = swap(bitsAvail);
-              }
-              countAvail = bitsPerSrcPixel;
-              src.next<SrcType>();
-            }
-            // consume available bits
-            const int n = std::min(bitsPerSample - count, countAvail);
-            value <<= n;
-            value |= (bitsAvail >> (bitsPerSrcPixel - n));
-            count += n;
-            // update available bits
-            countAvail -= n;
-            bitsAvail <<= n;
-          }
-          assert(count == bitsPerSample);
+      using UnaryOp = std::function<void(DstType)>;
+      copyPixels<SrcType,DstType,UnaryOp>(
+        imageData, // source pixel data
+        image_.width, // source image width
+        image_.height, // source image height
+        1, // source image channels
+        bitsPerSample, // source bits per sample
+        header.equalsHostByteOrder(), // source data byte order
+        [&](DstType value) {
           *dst++ = (value * maxDstValue) / maxSrcValue;
         }
-        // flush partial words when the row is complete
-        if (countAvail > 0 && countAvail < bitsPerDstPixel) {
-          countAvail = 0;
-          bitsAvail = 0;
-        }
-      }
-      if (src != end(imageData)) {
-        throw std::runtime_error("Not enough pixel data for the image size");
-      }
+      );
 
       if (photometricInterpretation == 0) { // WhiteIsZero
         invertColors();
@@ -484,7 +489,7 @@ namespace TiffCraft {
     }
   };
 
-  // TiffExporter implementation for Palette-color images on word size boundaries
+  // TiffExporter implementation for Palette-color images --------------------
   template <typename DstType, typename SrcType = DstType>
   class TiffExporterPalette : public TiffExporter
   {
@@ -515,106 +520,27 @@ namespace TiffCraft {
 
       // create the image and copy the pixel data
       image_ = Image::make<DstType, 3>(getWidth(ifd), getHeight(ifd));
-
-      using UnaryOp = std::function<Rgb<DstType>(SrcType)>;
-      transform<SrcType, Rgb<DstType>, UnaryOp>(imageData, image_.data,
-        [=](SrcType value) -> Rgb<DstType> {
-          if (!header.equalsHostByteOrder()) {
-            value = swap(value);
-          }
-          Rgb<DstType> rgb;
-          rgb.r = static_cast<DstType>(colorMap[red + value] >> (16 - bitsPerDstPixel));
-          rgb.g = static_cast<DstType>(colorMap[green + value] >> (16 - bitsPerDstPixel));
-          rgb.b = static_cast<DstType>(colorMap[blue + value] >> (16 - bitsPerDstPixel));
-          return rgb;
-        });
-    }
-  };
-
-  // TiffExporter implementation for Palette-color images with different -----
-  // bit lengths per sample --------------------------------------------------
-  template <typename DstType, typename SrcType = DstType>
-  class TiffExporterPaletteBits : public TiffExporter
-  {
-  public:
-    // Callback for TiffCraft::load() function
-    void operator()(
-      const TiffImage::Header& header,
-      const TiffImage::IFD& ifd,
-      TiffImage::ImageData imageData) override
-    {
-      const int samplesPerPixel = requireSamplesPerPixel(ifd, 1);
-      const int photometricInterpretation = requirePhotometricInterpretation(ifd, 3);
-      const int compression = requireCompression(ifd, 1);
-      const int fillOrder = requireFillOrder(ifd, 1);
-
-      const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
-
-      const auto numColors = (1 << bitsPerSample);
-      const auto colorMap = getIntVec(ifd, Tag::ColorMap);
-      if (3 * numColors > colorMap.size()) {
-        throw std::runtime_error("Color map size does not match bits per sample");
-      }
-      const int red = numColors * 0;
-      const int green = numColors * 1;
-      const int blue = numColors * 2;
-
-      constexpr int bitsPerDstPixel = 8 * sizeof(DstType);
-      constexpr int bitsPerSrcPixel = 8 * sizeof(SrcType);
-
-      // create the image and copy the pixel data
-      image_ = Image::make<DstType, 3>(getWidth(ifd), getHeight(ifd));
-      int countAvail = 0;
-      SrcType bitsAvail = 0;
-      auto src = begin(imageData);
       auto* dst = image_.dataPtr<Rgb<DstType>>();
-      for (int row = 0; row < image_.height; ++row) {
-        for (int col = 0; col < image_.width; ++col) {
-          int count = 0;
-          DstType value = 0;
-          while (count < bitsPerSample) {
-            // make sure we have some bits available
-            if (countAvail == 0) {
-              if (src == end(imageData)) {
-                throw std::runtime_error("No pixel data available");
-              }
-              bitsAvail = src.getAs<SrcType>();
-              if (!header.equalsHostByteOrder()) {
-                bitsAvail = swap(bitsAvail);
-              }
-              countAvail = bitsPerSrcPixel;
-              src.next<SrcType>();
-            }
-            // consume available bits
-            const int n = std::min(bitsPerSample - count, countAvail);
-            value <<= n;
-            value |= (bitsAvail >> (bitsPerSrcPixel - n));
-            count += n;
-            // update available bits
-            countAvail -= n;
-            bitsAvail <<= n;
-          }
-          assert(count == bitsPerSample);
+      using UnaryOp = std::function<void(DstType)>;
+      copyPixels<SrcType,DstType,UnaryOp>(
+        imageData, // source pixel data
+        image_.width, // source image width
+        image_.height, // source image height
+        1, // source image channels
+        bitsPerSample, // source bits per sample
+        header.equalsHostByteOrder(), // source data byte order
+        [&](DstType value) {
           dst->r = static_cast<DstType>(colorMap[red + value] >> (16 - bitsPerDstPixel));
           dst->g = static_cast<DstType>(colorMap[green + value] >> (16 - bitsPerDstPixel));
           dst->b = static_cast<DstType>(colorMap[blue + value] >> (16 - bitsPerDstPixel));
           ++dst;
         }
-        // flush partial words when the row is complete
-        if (countAvail > 0 && countAvail < bitsPerDstPixel) {
-          countAvail = 0;
-          bitsAvail = 0;
-        }
-      }
-      if (src != end(imageData)) {
-        throw std::runtime_error("Not enough pixel data for the image size");
-      }
+      );
     }
   };
 
-  // TiffExporter implementation for RGB images with individual samples aligned
-  // to word boundaries -------------------------------------------------------
-  template <typename PixelType>
+  // TiffExporter implementation for RGB images ------------------------------
+  template <typename DstType, typename SrcType = DstType>
   class TiffExporterRgb : public TiffExporter
   {
   public:
@@ -627,19 +553,38 @@ namespace TiffCraft {
       const int samplesPerPixel = requireSamplesPerPixel(ifd, 3);
       const int photometricInterpretation = requirePhotometricInterpretation(ifd, 2);
       const int compression = requireCompression(ifd, 1);
-      const auto bitsPerSample = requireBitsPerSample(ifd, std::vector<int>(samplesPerPixel, 8 * sizeof(PixelType)));
+
+      const auto bitsPerSampleVec = getIntVec(ifd, Tag::BitsPerSample);
+      if (bitsPerSampleVec.size() != 3) {
+        throw std::runtime_error("Expected 3 bits per sample for RGB image");
+      }
+
+      const int bitsPerSample = bitsPerSampleVec.front();
+      for (auto bits : bitsPerSampleVec) {
+        if (bits != bitsPerSample) {
+          throw std::runtime_error("Unsupported bits per sample for RGB image");
+        }
+      }
+
+      constexpr size_t maxDstValue = std::numeric_limits<DstType>::max();
+      const size_t maxSrcValue = bitsPerSample < sizeof(size_t) * 8
+        ? (size_t(1) << bitsPerSample) - 1 : std::numeric_limits<size_t>::max();
 
       // create the image and copy the pixel data
-      image_ = Image::make<PixelType, 3>(getWidth(ifd), getHeight(ifd));
-      copy(imageData, image_.data);
-
-      if (!header.equalsHostByteOrder()) {
-        swapArray(image_.dataPtr<PixelType>(), image_.data.size() / sizeof(PixelType));
-      }
+      image_ = Image::make<DstType, 3>(getWidth(ifd), getHeight(ifd));
+      auto* dst = image_.dataPtr<DstType>();
+      using UnaryOp = std::function<void(DstType)>;
+      copyPixels<SrcType,DstType,UnaryOp>(
+        imageData, // source pixel data
+        image_.width, // source image width
+        image_.height, // source image height
+        3, // source image channels
+        bitsPerSample, // source bits per sample
+        header.equalsHostByteOrder(), // source data byte order
+        [&](DstType value) {
+          *dst++ = (value * maxDstValue) / maxSrcValue;
+        }
+      );
     }
   };
-
-  using TiffExporterRgb8 = TiffExporterRgb<uint8_t>;
-  using TiffExporterRgb16 = TiffExporterRgb<uint16_t>;
-  using TiffExporterRgb32 = TiffExporterRgb<uint32_t>;
 }
