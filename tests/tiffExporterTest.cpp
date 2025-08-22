@@ -187,7 +187,9 @@ TEST_CASE("TiffExporterRgbTest", "[flower_image][flower_rgb_contiguous]") {
       "libtiff-pics/depth/flower-rgb-contig-04.tif",
       "reference_images/flower-rgb-contig-04.ppm",
       "libtiff-pics/depth/flower-rgb-contig-08.tif",
-      "reference_images/flower-rgb-contig-08.ppm"
+      "reference_images/flower-rgb-contig-08.ppm",
+      "libtiffpic/depth/flower-separated-contig-08.tif",
+      "reference_images/flower-separated-contig-08.ppm"
     };
     using Exporter = TiffExporterRgb<uint8_t>;
     TestExporter<Exporter>(testFiles);
