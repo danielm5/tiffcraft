@@ -25,9 +25,17 @@ namespace TiffCraft {
     std::vector<std::byte> data;  // Raw pixel data
 
     template <typename T, int N = 1>
-    static Image make(int width, int height)
+    static Image make(int width, int height, bool isPlanar = false)
     {
       constexpr int sT = static_cast<int>(sizeof(T));
+      if (isPlanar) {
+        return Image{
+          width, height, N,                     // width, height, channels
+          width * sT,  sT, width * height * sT, // strides: row, column, channel
+          sT * 8,                               // bit depth
+          std::is_floating_point_v<T>,          // is float
+          std::vector<std::byte>(width * height * N * sT) };
+      }
       return Image{
         width, height, N,             // width, height, channels
         width * N * sT,  N * sT, sT,  // strides: row, column, channel
@@ -153,14 +161,14 @@ namespace TiffCraft {
       const TiffImage::IFD& ifd, Tag tag, std::optional<int> defaultValue,
       int requiredValue, Comp&& comp = {})
     {
-      const int samplesPerPixel = getInt(ifd, tag, defaultValue);
-      if (!comp(samplesPerPixel, requiredValue)) {
+      const int value = getInt(ifd, tag, defaultValue);
+      if (!comp(value, requiredValue)) {
         throw std::runtime_error(
           "Unsupported " + std::to_string(static_cast<int>(tag)) +
-          " value: " + std::to_string(samplesPerPixel) +
+          " value: " + std::to_string(value) +
           ", expected: " + std::to_string(requiredValue));
       }
-      return samplesPerPixel;
+      return value;
     }
 
     template <typename Comp = std::equal_to<>>
@@ -208,6 +216,13 @@ namespace TiffCraft {
       const TiffImage::IFD& ifd, int requiredValue, Comp&& comp = {})
     {
       return require(ifd, Tag::FillOrder, 1, requiredValue, comp);
+    }
+
+    template <typename Comp = std::equal_to<>>
+    static int requirePlanarConfiguration(
+      const TiffImage::IFD& ifd, int requiredValue, Comp&& comp = {})
+    {
+      return require(ifd, Tag::PlanarConfiguration, 1, requiredValue, comp);
     }
 
     static int getWidth(const TiffImage::IFD& ifd)
@@ -368,60 +383,21 @@ namespace TiffCraft {
       size_t height,                          // source image height
       size_t channels,                        // source image channels
       size_t bitsPerSample,                   // source bits per sample
+      bool isPlanar,                          // source is planar
       bool equalsHostByteOrder,               // source data byte order
       UnaryOp&& op)
     {
       constexpr size_t bitsPerSrcPixel = 8 * sizeof(SrcType);
       auto src = begin(imageData);
-      if (bitsPerSample == bitsPerSrcPixel) {
-        // Fast path: bits per sample matches source pixel size
+
+      size_t countAvail = 0;
+      SrcType bitsAvail = 0;
+
+      auto loop_by_row_col_chan = [&](auto processor) {
         for (int row = 0; row < height; ++row) {
           for (int col = 0; col < width; ++col) {
             for (int chan = 0; chan < channels; ++chan) {
-              if (src == end(imageData)) {
-                throw std::runtime_error("No pixel data available");
-              }
-              DstType value = src.getAs<SrcType>();
-              src.next<SrcType>();
-              if (!equalsHostByteOrder) {
-                value = swap(value);
-              }
-              std::invoke(op, value); // Apply the unary operation
-            }
-          }
-        }
-      } else {
-        // Slow path: bits per sample does not match source pixel size
-        size_t countAvail = 0;
-        SrcType bitsAvail = 0;
-        for (int row = 0; row < height; ++row) {
-          for (int col = 0; col < width; ++col) {
-            for (int chan = 0; chan < channels; ++chan) {
-              size_t count = 0;
-              DstType value = 0;
-              while (count < bitsPerSample) {
-                // make sure we have some bits available
-                if (countAvail == 0) {
-                  if (src == end(imageData)) {
-                    throw std::runtime_error("No pixel data available");
-                  }
-                  bitsAvail = src.getAs<SrcType>();
-                  src.next<SrcType>();
-                  if (!equalsHostByteOrder) {
-                    bitsAvail = swap(bitsAvail);
-                  }
-                  countAvail = bitsPerSrcPixel;
-                }
-                // consume available bits
-                const size_t n = std::min(bitsPerSample - count, countAvail);
-                value <<= n;
-                value |= (bitsAvail >> (bitsPerSrcPixel - n));
-                count += n;
-                // update available bits
-                countAvail -= n;
-                bitsAvail <<= n;
-              }
-              assert(count == bitsPerSample);
+              DstType value = processor();
               std::invoke(op, value); // Apply the unary operation
             }
           }
@@ -431,6 +407,77 @@ namespace TiffCraft {
             bitsAvail = 0;
           }
         }
+      };
+
+      auto loop_by_chan_row_col = [&](auto processor) {
+        for (int chan = 0; chan < channels; ++chan) {
+          for (int row = 0; row < height; ++row) {
+            for (int col = 0; col < width; ++col) {
+              DstType value = processor();
+              std::invoke(op, value); // Apply the unary operation
+            }
+            // flush partial words when the row is complete
+            if (countAvail > 0) {
+              countAvail = 0;
+              bitsAvail = 0;
+            }
+          }
+        }
+      };
+
+      auto process_word = [&]() -> DstType {
+        if (src == end(imageData)) {
+          throw std::runtime_error("No pixel data available");
+        }
+        DstType value = src.getAs<SrcType>();
+        src.next<SrcType>();
+        if (!equalsHostByteOrder) {
+          value = swap(value);
+        }
+        return value;
+      };
+
+      auto process_bits = [&]() -> DstType {
+        size_t count = 0;
+        DstType value = 0;
+        while (count < bitsPerSample) {
+          // make sure we have some bits available
+          if (countAvail == 0) {
+            if (src == end(imageData)) {
+              throw std::runtime_error("No pixel data available");
+            }
+            bitsAvail = src.getAs<SrcType>();
+            src.next<SrcType>();
+            if (!equalsHostByteOrder) {
+              bitsAvail = swap(bitsAvail);
+            }
+            countAvail = bitsPerSrcPixel;
+          }
+          // consume available bits
+          const size_t n = std::min(bitsPerSample - count, countAvail);
+          value <<= n;
+          value |= (bitsAvail >> (bitsPerSrcPixel - n));
+          count += n;
+          // update available bits
+          countAvail -= n;
+          bitsAvail <<= n;
+        }
+        assert(count == bitsPerSample);
+        return value;
+      };
+
+      if (bitsPerSample == bitsPerSrcPixel) {
+        // Fast path: bits per sample matches source pixel size
+        if (isPlanar)
+          loop_by_chan_row_col(process_word);
+        else
+          loop_by_row_col_chan(process_word);
+      } else {
+        // Slow path: bits per sample does not match source pixel size
+        if (isPlanar)
+          loop_by_chan_row_col(process_bits);
+        else
+          loop_by_row_col_chan(process_bits);
       }
       if (src != end(imageData)) {
         throw std::runtime_error("Not enough pixel data for the image size");
@@ -477,6 +524,7 @@ namespace TiffCraft {
         image_.height, // source image height
         1, // source image channels
         bitsPerSample, // source bits per sample
+        false, // source is planar
         header.equalsHostByteOrder(), // source data byte order
         [&](DstType value) {
           *dst++ = (value * maxDstValue) / maxSrcValue;
@@ -528,6 +576,7 @@ namespace TiffCraft {
         image_.height, // source image height
         1, // source image channels
         bitsPerSample, // source bits per sample
+        false, // source is planar
         header.equalsHostByteOrder(), // source data byte order
         [&](DstType value) {
           dst->r = static_cast<DstType>(colorMap[red + value] >> (16 - bitsPerDstPixel));
@@ -554,6 +603,12 @@ namespace TiffCraft {
       const int photometricInterpretation = requirePhotometricInterpretation(ifd, 2);
       const int compression = requireCompression(ifd, 1);
 
+      const int planarConfiguration = requirePlanarConfiguration(ifd, -1,
+        [](int value, int requiredValue) {
+          return value == 1 || value == 2; // 1 for Contiguous, 2 for Planar
+        });
+      const bool isPlanar = planarConfiguration == 2;
+
       const auto bitsPerSampleVec = getIntVec(ifd, Tag::BitsPerSample);
       if (bitsPerSampleVec.size() != 3) {
         throw std::runtime_error("Expected 3 bits per sample for RGB image");
@@ -571,7 +626,7 @@ namespace TiffCraft {
         ? (size_t(1) << bitsPerSample) - 1 : std::numeric_limits<size_t>::max();
 
       // create the image and copy the pixel data
-      image_ = Image::make<DstType, 3>(getWidth(ifd), getHeight(ifd));
+      image_ = Image::make<DstType, 3>(getWidth(ifd), getHeight(ifd), isPlanar);
       auto* dst = image_.dataPtr<DstType>();
       using UnaryOp = std::function<void(DstType)>;
       copyPixels<SrcType,DstType,UnaryOp>(
@@ -580,6 +635,7 @@ namespace TiffCraft {
         image_.height, // source image height
         3, // source image channels
         bitsPerSample, // source bits per sample
+        isPlanar, // source is planar
         header.equalsHostByteOrder(), // source data byte order
         [&](DstType value) {
           *dst++ = (value * maxDstValue) / maxSrcValue;

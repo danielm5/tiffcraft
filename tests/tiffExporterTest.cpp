@@ -21,6 +21,7 @@ std::filesystem::path getFilePath(std::filesystem::path relativePath) {
   return test_dir / relativePath;
 }
 
+#if 0
 template <typename PixelType>
 void compareToReference(
   const Image& image,
@@ -48,6 +49,56 @@ void compareToReference(
     }
   }
 }
+#else
+template <typename PixelType>
+void compareToReference(
+  const Image& image,
+  const std::filesystem::path& refFilePath,
+  int margin = 0)
+{
+  auto refImg = netpbm::read<PixelType>(refFilePath.string());
+  const int channels = netpbm::is_rgb_v<PixelType> ? 3 : 1;
+  const int bitDepth = 8 * sizeof(PixelType) / channels;
+  REQUIRE(image.width == refImg.width);
+  REQUIRE(image.height == refImg.height);
+  REQUIRE(image.channels == channels);
+  REQUIRE(image.bitDepth == bitDepth);
+  REQUIRE(image.dataSize() == channels * refImg.width * refImg.height * (bitDepth / 8));
+  REQUIRE(image.dataSize<PixelType>() == refImg.pixels.size());
+  REQUIRE(image.dataPtr() != nullptr);
+  if constexpr (netpbm::is_rgb_v<PixelType>) {
+    using T = typename PixelType::value_type;
+    const auto* pixels = image.dataPtr<T>();
+    const auto* refPixels = refImg.pixels.data();
+    for (size_t h = 0; h < image.height; ++h) {
+      const auto* row = pixels + h * image.rowStride / sizeof(T);
+      const auto* refRow = refPixels + h * refImg.width;
+      for (size_t col = 0; col < image.width; ++col) {
+        const auto* pixel = row + col * image.colStride / sizeof(T);
+        const auto red = pixel[0 * image.chanStride / sizeof(T)];
+        const auto green = pixel[1 * image.chanStride / sizeof(T)];
+        const auto blue = pixel[2 * image.chanStride / sizeof(T)];
+        REQUIRE(double(refRow[col].r) == Catch::Approx(red).margin(margin));
+        REQUIRE(double(refRow[col].g) == Catch::Approx(green).margin(margin));
+        REQUIRE(double(refRow[col].b) == Catch::Approx(blue).margin(margin));
+      }
+    }
+  } else {
+    using T = PixelType;
+    const auto* pixels = image.dataPtr<T>();
+    const auto* refPixels = refImg.pixels.data();
+    for (size_t h = 0; h < image.height; ++h) {
+      const auto* row = pixels + h * image.rowStride / sizeof(T);
+      const auto* refRow = refPixels + h * refImg.width;
+      for (size_t col = 0; col < image.width; ++col) {
+        const auto* pixel = row + col * image.colStride / sizeof(T);
+        const auto value = *pixel;
+        REQUIRE(double(refRow[col]) == Catch::Approx(value).margin(margin));
+      }
+    }
+  }
+}
+#endif
 
 // This function takes an exporter as template parameter and a list of files.
 // The list of files must be set in pairs: first a TIFF file to test, then a
@@ -188,7 +239,7 @@ TEST_CASE("TiffExporterRgbTest", "[flower_image][flower_rgb_contiguous]") {
       "reference_images/flower-rgb-contig-04.ppm",
       "libtiff-pics/depth/flower-rgb-contig-08.tif",
       "reference_images/flower-rgb-contig-08.ppm",
-      "libtiffpic/depth/flower-separated-contig-08.tif",
+      "libtiff-pics/depth/flower-separated-contig-08.tif",
       "reference_images/flower-separated-contig-08.ppm"
     };
     using Exporter = TiffExporterRgb<uint8_t>;
@@ -226,6 +277,59 @@ TEST_CASE("TiffExporterRgbTest", "[flower_image][flower_rgb_contiguous]") {
     std::vector<std::string> testFiles = {
       "libtiff-pics/depth/flower-rgb-contig-32.tif",
       "reference_images/flower-rgb-contig-32.ppm",
+    };
+    using Exporter = TiffExporterRgb<uint32_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+}
+
+TEST_CASE("TiffExporterRgbTest", "[flower_image][flower_rgb_planar]") {
+  { // up to 8 bits
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-rgb-planar-02.tif",
+      "reference_images/flower-rgb-planar-02.ppm",
+      "libtiff-pics/depth/flower-rgb-planar-04.tif",
+      "reference_images/flower-rgb-planar-04.ppm",
+      "libtiff-pics/depth/flower-rgb-planar-08.tif",
+      "reference_images/flower-rgb-planar-08.ppm",
+      "libtiff-pics/depth/flower-separated-planar-08.tif",
+      "reference_images/flower-separated-planar-08.ppm"
+    };
+    using Exporter = TiffExporterRgb<uint8_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+  { // 9 to 15 bits
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-rgb-planar-10.tif",
+      "reference_images/flower-rgb-planar-10.ppm",
+      "libtiff-pics/depth/flower-rgb-planar-12.tif",
+      "reference_images/flower-rgb-planar-12.ppm",
+      "libtiff-pics/depth/flower-rgb-planar-14.tif",
+      "reference_images/flower-rgb-planar-14.ppm",
+    };
+    using Exporter = TiffExporterRgb<uint16_t,uint8_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+  { // 16 bits
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-rgb-planar-16.tif",
+      "reference_images/flower-rgb-planar-16.ppm",
+    };
+    using Exporter = TiffExporterRgb<uint16_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+  { // 24 bits
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-rgb-planar-24.tif",
+      "reference_images/flower-rgb-planar-24.ppm",
+    };
+    using Exporter = TiffExporterRgb<uint32_t,uint8_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+  { // 32 bits
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-rgb-planar-32.tif",
+      "reference_images/flower-rgb-planar-32.ppm",
     };
     using Exporter = TiffExporterRgb<uint32_t>;
     TestExporter<Exporter>(testFiles);
