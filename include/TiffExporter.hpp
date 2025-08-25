@@ -125,8 +125,8 @@ namespace TiffCraft {
       auto it = ifd.entries().find(tag);
       if (it != ifd.entries().end()) {
         const auto& entry = it->second;
-        return dispatchType(entry.type(), [&, entry]<typename ValueType>() {
-            return makeIntVec<ValueType>(entry);
+        return dispatchType(entry.type(), [&, entry]<Type type>() {
+            return makeIntVec<TypeTraits_t<type>>(entry);
         });
       }
       if (defaultValue.has_value()) {

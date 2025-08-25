@@ -14,6 +14,9 @@
 
 using namespace TiffCraft;
 
+constexpr bool isHostLittleEndian() { return (std::endian::native == std::endian::little); }
+constexpr bool isHostBigEndian() { return (std::endian::native == std::endian::big); }
+
 #ifdef HAS_SPAN
   template <typename T>
   bool operator==(const std::span<const T>& lhs, const std::span<const T>& rhs) {
@@ -152,8 +155,8 @@ TEST_CASE("TiffImage Header class", "[tiff_header]") {
       HeaderBytes(uint16_t bo = 0x4949, uint16_t mn = 42, uint32_t ifdOffset = 8)
           : byteOrder(bo), magicNumber(mn), firstIFDOffset(ifdOffset)
       {
-        if (isHostLittleEndian() && bo == 0x4D4D // "MM" big-endian
-            || isHostBigEndian() && bo == 0x4949) { // "II" little-endian
+        if (std::endian::native == std::endian::little && bo == 0x4D4D // "MM" big-endian
+            || std::endian::native == std::endian::big && bo == 0x4949) { // "II" little-endian
           magicNumber = swap16(magicNumber);
           firstIFDOffset = swap32(firstIFDOffset);
         }
@@ -178,8 +181,7 @@ TEST_CASE("TiffImage Header class", "[tiff_header]") {
     headerBytes.write(stream);
 
     TiffImage::Header header = TiffImage::Header::read(stream);
-    REQUIRE(header.isLittleEndian() == true);
-    REQUIRE(header.isBigEndian() == false);
+    REQUIRE(header.byteOrder() == std::endian::little);
     REQUIRE(header.equalsHostByteOrder() == isHostLittleEndian());
   }
 
@@ -189,8 +191,7 @@ TEST_CASE("TiffImage Header class", "[tiff_header]") {
     headerBytes.write(stream);
 
     TiffImage::Header header = TiffImage::Header::read(stream);
-    REQUIRE(header.isLittleEndian() == false);
-    REQUIRE(header.isBigEndian() == true);
+    REQUIRE(header.byteOrder() == std::endian::big);
     REQUIRE(header.equalsHostByteOrder() == isHostBigEndian());
   }
 

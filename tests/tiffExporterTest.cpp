@@ -21,35 +21,6 @@ std::filesystem::path getFilePath(std::filesystem::path relativePath) {
   return test_dir / relativePath;
 }
 
-#if 0
-template <typename PixelType>
-void compareToReference(
-  const Image& image,
-  const std::filesystem::path& refFilePath,
-  int margin = 0)
-{
-  auto refImg = netpbm::read<PixelType>(refFilePath.string());
-  const int channels = netpbm::is_rgb_v<PixelType> ? 3 : 1;
-  const int bitDepth = 8 * sizeof(PixelType) / channels;
-  REQUIRE(image.width == refImg.width);
-  REQUIRE(image.height == refImg.height);
-  REQUIRE(image.channels == channels);
-  REQUIRE(image.bitDepth == bitDepth);
-  REQUIRE(image.dataSize() == channels * refImg.width * refImg.height * (bitDepth / 8));
-  REQUIRE(image.dataSize<PixelType>() == refImg.pixels.size());
-  REQUIRE(image.dataPtr() != nullptr);
-  const auto* pixels = image.dataPtr<PixelType>();
-  for (size_t i = 0; i < refImg.pixels.size(); ++i) {
-    if constexpr (netpbm::is_rgb_v<PixelType>) {
-      REQUIRE(double(refImg.pixels[i].r) == Catch::Approx(pixels[i].r).margin(margin));
-      REQUIRE(double(refImg.pixels[i].g) == Catch::Approx(pixels[i].g).margin(margin));
-      REQUIRE(double(refImg.pixels[i].b) == Catch::Approx(pixels[i].b).margin(margin));
-    } else {
-       REQUIRE(double(refImg.pixels[i]) == Catch::Approx(pixels[i]).margin(margin));
-    }
-  }
-}
-#else
 template <typename PixelType>
 void compareToReference(
   const Image& image,
@@ -92,13 +63,11 @@ void compareToReference(
       const auto* refRow = refPixels + h * refImg.width;
       for (size_t col = 0; col < image.width; ++col) {
         const auto* pixel = row + col * image.colStride / sizeof(T);
-        const auto value = *pixel;
-        REQUIRE(double(refRow[col]) == Catch::Approx(value).margin(margin));
+        REQUIRE(double(refRow[col]) == Catch::Approx(pixel[0]).margin(margin));
       }
     }
   }
 }
-#endif
 
 // This function takes an exporter as template parameter and a list of files.
 // The list of files must be set in pairs: first a TIFF file to test, then a

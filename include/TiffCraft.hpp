@@ -129,45 +129,27 @@ namespace TiffCraft {
   template <typename F>
   decltype(auto) dispatchType(Type type, F&& f) {
       switch (type) {
-          case Type::BYTE:      return f.template operator()<TypeTraits_t<Type::BYTE>>();
-          case Type::ASCII:     return f.template operator()<TypeTraits_t<Type::ASCII>>();
-          case Type::SHORT:     return f.template operator()<TypeTraits_t<Type::SHORT>>();
-          case Type::LONG:      return f.template operator()<TypeTraits_t<Type::LONG>>();
-          case Type::RATIONAL:  return f.template operator()<TypeTraits_t<Type::RATIONAL>>();
-          case Type::SBYTE:     return f.template operator()<TypeTraits_t<Type::SBYTE>>();
-          case Type::UNDEFINED: return f.template operator()<TypeTraits_t<Type::UNDEFINED>>();
-          case Type::SSHORT:    return f.template operator()<TypeTraits_t<Type::SSHORT>>();
-          case Type::SLONG:     return f.template operator()<TypeTraits_t<Type::SLONG>>();
-          case Type::SRATIONAL: return f.template operator()<TypeTraits_t<Type::SRATIONAL>>();
-          case Type::FLOAT:     return f.template operator()<TypeTraits_t<Type::FLOAT>>();
-          case Type::DOUBLE:    return f.template operator()<TypeTraits_t<Type::DOUBLE>>();
+          case Type::BYTE:      return f.template operator()<Type::BYTE>();
+          case Type::ASCII:     return f.template operator()<Type::ASCII>();
+          case Type::SHORT:     return f.template operator()<Type::SHORT>();
+          case Type::LONG:      return f.template operator()<Type::LONG>();
+          case Type::RATIONAL:  return f.template operator()<Type::RATIONAL>();
+          case Type::SBYTE:     return f.template operator()<Type::SBYTE>();
+          case Type::UNDEFINED: return f.template operator()<Type::UNDEFINED>();
+          case Type::SSHORT:    return f.template operator()<Type::SSHORT>();
+          case Type::SLONG:     return f.template operator()<Type::SLONG>();
+          case Type::SRATIONAL: return f.template operator()<Type::SRATIONAL>();
+          case Type::FLOAT:     return f.template operator()<Type::FLOAT>();
+          case Type::DOUBLE:    return f.template operator()<Type::DOUBLE>();
           default:
               throw std::runtime_error("Unknown TIFF entry type");
       }
   }
 
-  template <Type type>
-  constexpr uint32_t typeBytes() {
-    return sizeof(TypeTraits_t<type>);
-  }
-
   inline uint32_t typeBytes(Type type) {
-    switch (type) {
-      case Type::BYTE:      return typeBytes<Type::BYTE>();
-      case Type::ASCII:     return typeBytes<Type::ASCII>();
-      case Type::SHORT:     return typeBytes<Type::SHORT>();
-      case Type::LONG:      return typeBytes<Type::LONG>();
-      case Type::RATIONAL:  return typeBytes<Type::RATIONAL>();
-      case Type::SBYTE:     return typeBytes<Type::SBYTE>();
-      case Type::UNDEFINED: return typeBytes<Type::UNDEFINED>();
-      case Type::SSHORT:    return typeBytes<Type::SSHORT>();
-      case Type::SLONG:     return typeBytes<Type::SLONG>();
-      case Type::SRATIONAL: return typeBytes<Type::SRATIONAL>();
-      case Type::FLOAT:     return typeBytes<Type::FLOAT>();
-      case Type::DOUBLE:    return typeBytes<Type::DOUBLE>();
-      default:
-        throw std::runtime_error("Unknown TIFF entry type");
-    }
+    return dispatchType(type, []<Type type>() -> uint32_t {
+      return sizeof(TypeTraits_t<type>);
+    });
   }
 
   template <typename SrcType, typename DstType>
@@ -182,9 +164,8 @@ namespace TiffCraft {
     }
   }
 
-  template <Type type, typename DstType>
+  template <typename SrcType, typename DstType>
   void copyVector_safe(const std::byte* src, size_t count, std::vector<DstType>& dest) {
-    using SrcType = TypeTraits_t<type>;
     if constexpr (!std::is_convertible_v<SrcType, DstType>) {
       throw std::runtime_error("Source type is not convertible to destination type");
     } else {
@@ -194,22 +175,9 @@ namespace TiffCraft {
 
   template <typename DstType>
   void copyVector(Type type, const std::byte* src, size_t count, std::vector<DstType>& dest) {
-    switch (type) {
-      case Type::BYTE:      copyVector_safe<Type::BYTE, DstType>(src, count, dest); break;
-      case Type::ASCII:     copyVector_safe<Type::ASCII, DstType>(src, count, dest); break;
-      case Type::SHORT:     copyVector_safe<Type::SHORT, DstType>(src, count, dest); break;
-      case Type::LONG:      copyVector_safe<Type::LONG, DstType>(src, count, dest); break;
-      case Type::RATIONAL:  copyVector_safe<Type::RATIONAL, DstType>(src, count, dest); break;
-      case Type::SBYTE:     copyVector_safe<Type::SBYTE, DstType>(src, count, dest); break;
-      case Type::UNDEFINED: copyVector_safe<Type::UNDEFINED, DstType>(src, count, dest); break;
-      case Type::SSHORT:    copyVector_safe<Type::SSHORT, DstType>(src, count, dest); break;
-      case Type::SLONG:     copyVector_safe<Type::SLONG, DstType>(src, count, dest); break;
-      case Type::SRATIONAL: copyVector_safe<Type::SRATIONAL, DstType>(src, count, dest); break;
-      case Type::FLOAT:     copyVector_safe<Type::FLOAT, DstType>(src, count, dest); break;
-      case Type::DOUBLE:    copyVector_safe<Type::DOUBLE, DstType>(src, count, dest); break;
-      default:
-        throw std::runtime_error("Unknown TIFF entry type");
-    }
+    dispatchType(type, [&]<Type type>() {
+      copyVector_safe<TypeTraits_t<type>, DstType>(src, count, dest);
+    });
   }
 
   template <typename DstType>
@@ -299,42 +267,9 @@ namespace TiffCraft {
 
   inline void swapArray(std::byte* arr, Type type, size_t count) {
     if (!arr || count == 0) { return; } // No work to do
-    switch(type) {
-      case Type::BYTE:
-      case Type::ASCII:
-        // No swap needed for BYTE or ASCII
-        break;
-      case Type::SHORT:
-        swapArray(reinterpret_cast<TypeTraits_t<Type::SHORT>*>(arr), count); break;
-      case Type::LONG:
-        swapArray(reinterpret_cast<TypeTraits_t<Type::LONG>*>(arr), count); break;
-      case Type::RATIONAL:
-        swapArray(reinterpret_cast<TypeTraits_t<Type::RATIONAL>*>(arr), count); break;
-      case Type::SBYTE:
-      case Type::UNDEFINED:
-        // No swap needed for SBYTE or UNDEFINED
-        break;
-      case Type::SSHORT:
-        swapArray(reinterpret_cast<TypeTraits_t<Type::SSHORT>*>(arr), count); break;
-      case Type::SLONG:
-        swapArray(reinterpret_cast<TypeTraits_t<Type::SLONG>*>(arr), count); break;
-      case Type::SRATIONAL:
-        swapArray(reinterpret_cast<TypeTraits_t<Type::SRATIONAL>*>(arr), count); break;
-      case Type::FLOAT:
-        swapArray(reinterpret_cast<TypeTraits_t<Type::FLOAT>*>(arr), count); break;
-      case Type::DOUBLE:
-        swapArray(reinterpret_cast<TypeTraits_t<Type::DOUBLE>*>(arr), count); break;
-      default:
-        throw std::runtime_error("Unknown TIFF entry type for swapping");
-    }
-  }
-
-  // Detect if the system is little-endian or big-endian
-  constexpr inline bool isHostLittleEndian() {
-    return std::endian::native == std::endian::little;
-  }
-  constexpr inline bool isHostBigEndian() {
-    return std::endian::native == std::endian::big;
+    dispatchType(type, [&]<Type type>() {
+      swapArray(reinterpret_cast<TypeTraits_t<type>*>(arr), count);
+    });
   }
 
   // Helper functions for working with streams
@@ -451,12 +386,10 @@ namespace TiffCraft {
       std::endian byteOrder_;
       uint32_t firstIFDOffset_;
     public:
-      bool isBigEndian() const { return byteOrder_ == std::endian::big; }
-      bool isLittleEndian() const { return byteOrder_ == std::endian::little; }
+      std::endian byteOrder() const { return byteOrder_; }
 
       bool equalsHostByteOrder() const {
-        return (isHostLittleEndian() && isLittleEndian()) ||
-               (isHostBigEndian() && isBigEndian());
+        return std::endian::native == byteOrder_;
       }
 
       uint32_t firstIFDOffset() const { return firstIFDOffset_; }
@@ -791,7 +724,7 @@ std::ostream& operator<<(std::ostream& os, const TiffCraft::Type& type) {
 
 std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::Header& header) {
   os << "TIFF Header:\n"
-     << " - Byte Order: " << (header.isLittleEndian() ? "Little Endian" : "Big Endian") << "\n"
+     << " - Byte Order: " << (header.byteOrder() == std::endian::little ? "Little Endian" : "Big Endian") << "\n"
      << " - First IFD Offset: " << header.firstIFDOffset() << "\n"
      << " - Equals Host Byte Order: " << (header.equalsHostByteOrder() ? "Yes" : "No") << "\n";
   return os;
