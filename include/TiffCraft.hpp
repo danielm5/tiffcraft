@@ -154,37 +154,25 @@ namespace TiffCraft {
 
   template <typename SrcType, typename DstType>
   void copyVector(const std::byte* src, size_t count, std::vector<DstType>& dest) {
-    if (sizeof(DstType) < sizeof(SrcType)) {
-      throw std::runtime_error("Destination type size is smaller than source type size");
-    }
-    dest.resize(count);
-    const SrcType* srcPtr = reinterpret_cast<const SrcType*>(src);
-    for (size_t i = 0; i < count; ++i) {
-      dest[i] = static_cast<DstType>(srcPtr[i]);
-    }
-  }
-
-  template <typename SrcType, typename DstType>
-  void copyVector_safe(const std::byte* src, size_t count, std::vector<DstType>& dest) {
-    if constexpr (!std::is_convertible_v<SrcType, DstType>) {
-      throw std::runtime_error("Source type is not convertible to destination type");
+    if constexpr (std::is_convertible_v<SrcType, DstType>) {
+      if (sizeof(DstType) < sizeof(SrcType)) {
+        throw std::runtime_error("Destination type size is smaller than source type size");
+      }
+      dest.resize(count);
+      const SrcType* srcPtr = reinterpret_cast<const SrcType*>(src);
+      for (size_t i = 0; i < count; ++i) {
+        dest[i] = static_cast<DstType>(srcPtr[i]);
+      }
     } else {
-      copyVector<SrcType, DstType>(src, count, dest);
+      throw std::runtime_error("Source type is not convertible to destination type");
     }
   }
 
   template <typename DstType>
   void copyVector(Type type, const std::byte* src, size_t count, std::vector<DstType>& dest) {
     dispatchType(type, [&]<Type type>() {
-      copyVector_safe<TypeTraits_t<type>, DstType>(src, count, dest);
+      copyVector<TypeTraits_t<type>, DstType>(src, count, dest);
     });
-  }
-
-  template <typename DstType>
-  std::vector<DstType> toVector(Type type, const std::byte* src, size_t count) {
-    std::vector<DstType> dest;
-    copyVector(type, src, count, dest);
-    return dest;
   }
 
   // Utility functions for byte order conversion
@@ -483,16 +471,14 @@ namespace TiffCraft {
 #ifdef HAS_SPAN
         template <typename T>
         std::span<const T> values() const {
-          if (sizeof(T) != valueBytes()) {
+          if (sizeof(T) != TiffCraft::typeBytes(type_)) {
             throw std::runtime_error("Invalid type size for values span");
           }
           return std::span<const T>(reinterpret_cast<const T*>(values_.data()), count());
         }
 #endif // HAS_SPAN
 
-        uint32_t valueBytes() const { return TiffCraft::typeBytes(type_); }
-        uint32_t bytes() const { return count() * valueBytes(); }
-        void swapValues() { swapArray(values_.data(), type_, count_); }
+        uint32_t bytes() const { return count() * TiffCraft::typeBytes(type_); }
 
         static Entry read(std::istream& stream, bool mustSwap = false) {
           Entry entry;
@@ -524,7 +510,7 @@ namespace TiffCraft {
           // This is necessary to ensure that the values are correctly
           // interpreted according to their type.
           if (mustSwap) {
-            entry.swapValues();
+            swapArray(entry.values_.data(), entry.type_, entry.count_);
           }
 
           if (entry.type_ == Type::ASCII) {
@@ -741,7 +727,7 @@ std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::IFD::Entr
     os << " " << std::string(reinterpret_cast<const char*>(entry.values()), entry.bytes() - 1);
   } else {
     for (int i = 0; i < entry.count(); ++i) {
-      const std::byte* value = entry.values() + i * entry.valueBytes();
+      const std::byte* value = entry.values() + i * TiffCraft::typeBytes(entry.type());
       switch (entry.type()) {
         case Type::BYTE:
           os << " " << *reinterpret_cast<const TypeTraits_t<Type::BYTE>*>(value);

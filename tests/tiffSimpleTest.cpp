@@ -256,8 +256,7 @@ TEST_CASE("TiffImage IFD::Entry class", "[tiff_IDF_entry]") {
     REQUIRE(entry.tag() == tag);
     REQUIRE(entry.type() == type);
     REQUIRE(entry.count() == count);
-    REQUIRE(entry.valueBytes() == typeBytes(type));
-    REQUIRE(entry.bytes() == count * entry.valueBytes());
+    REQUIRE(entry.bytes() == count * TiffCraft::typeBytes(type));
     REQUIRE(entry.values() != nullptr);
 
     const std::byte* valuePtr = entry.values();
