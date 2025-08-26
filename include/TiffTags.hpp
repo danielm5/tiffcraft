@@ -1,14 +1,9 @@
 // Copyright (c) 2025 Daniel Moreno
 // All rights reserved.
 
-// This file is part is intended to be included only by `TiffCraft.hpp`.
+#pragma once
 
-#ifndef TIFF_TAGS_HPP_0A7E2B2C_8F8B_4E6A_9B2E_7D3C1A2F4B5C
-# pragma error "This file should not be included directly. Include TiffCraft.hpp instead."
-#else
-# undef TIFF_TAGS_HPP_0A7E2B2C_8F8B_4E6A_9B2E_7D3C1A2F4B5C
-#endif // TIFF_TAGS_HPP_0A7E2B2C_8F8B_4E6A_9B2E_7D3C1A2F4B5C
-
+#include <string>
 #include <cstdint>
 
 namespace TiffCraft {
@@ -51,54 +46,47 @@ namespace TiffCraft {
     SampleFormat = 0x0153,
   };
 
-}
-
-std::ostream& operator<<(std::ostream& os, const TiffCraft::Tag& type) {
-  struct AutoRestore {
-    char fill_;
-    std::ios_base::fmtflags flags_;
-    std::ostream& os_;
-    AutoRestore(std::ostream& os) : os_(os), flags_(os.flags()), fill_(os.fill()) {}
-    ~AutoRestore() { os_.flags(flags_); os_.fill(fill_); }
-  } autoRestore(os);
-
-  switch (type) {
-    case TiffCraft::Tag::Null: os << "Null"; break;
-    case TiffCraft::Tag::NewSubfileType: os << "NewSubfileType"; break;
-    case TiffCraft::Tag::SubfileType: os << "SubfileType"; break;
-    case TiffCraft::Tag::ImageWidth: os << "ImageWidth"; break;
-    case TiffCraft::Tag::ImageLength: os << "ImageLength"; break;
-    case TiffCraft::Tag::BitsPerSample: os << "BitsPerSample"; break;
-    case TiffCraft::Tag::Compression: os << "Compression"; break;
-    case TiffCraft::Tag::PhotometricInterpretation: os << "PhotometricInterpretation"; break;
-    case TiffCraft::Tag::Thresholding: os << "Thresholding"; break;
-    case TiffCraft::Tag::FillOrder: os << "FillOrder"; break;
-    case TiffCraft::Tag::DocumentName: os << "DocumentName"; break;
-    case TiffCraft::Tag::ImageDescription: os << "ImageDescription"; break;
-    case TiffCraft::Tag::Make: os << "Make"; break;
-    case TiffCraft::Tag::Model: os << "Model"; break;
-    case TiffCraft::Tag::StripOffsets: os << "StripOffsets"; break;
-    case TiffCraft::Tag::Orientation: os << "Orientation"; break;
-    case TiffCraft::Tag::SamplesPerPixel: os << "SamplesPerPixel"; break;
-    case TiffCraft::Tag::RowsPerStrip: os << "RowsPerStrip"; break;
-    case TiffCraft::Tag::StripByteCounts: os << "StripByteCounts"; break;
-    case TiffCraft::Tag::XResolution: os << "XResolution"; break;
-    case TiffCraft::Tag::YResolution: os << "YResolution"; break;
-    case TiffCraft::Tag::PlanarConfiguration: os << "PlanarConfiguration"; break;
-    case TiffCraft::Tag::ResolutionUnit: os << "ResolutionUnit"; break;
-    case TiffCraft::Tag::PageName: os << "PageName"; break;
-    case TiffCraft::Tag::Software: os << "Software"; break;
-    case TiffCraft::Tag::DateTime: os << "DateTime"; break;
-    case TiffCraft::Tag::Artist: os << "Artist"; break;
-    case TiffCraft::Tag::ColorMap: os << "ColorMap"; break;
-    case TiffCraft::Tag::HalftoneHints: os << "HalftoneHints"; break;
-    case TiffCraft::Tag::TileWidth: os << "TileWidth"; break;
-    case TiffCraft::Tag::TileLength: os << "TileLength"; break;
-    case TiffCraft::Tag::TileOffsets: os << "TileOffsets"; break;
-    case TiffCraft::Tag::TileByteCounts: os << "TileByteCounts"; break;
-    case TiffCraft::Tag::SampleFormat: os << "SampleFormat"; break;
-    default: os << "0x" << std::hex << std::setw(4) << std::setfill('0')
-                << static_cast<uint16_t>(type); break;
+  inline std::string toString(Tag tag)
+  {
+    switch (tag) {
+      case TiffCraft::Tag::Null: return "Null";
+      case TiffCraft::Tag::NewSubfileType: return "NewSubfileType";
+      case TiffCraft::Tag::SubfileType: return "SubfileType";
+      case TiffCraft::Tag::ImageWidth: return "ImageWidth";
+      case TiffCraft::Tag::ImageLength: return "ImageLength";
+      case TiffCraft::Tag::BitsPerSample: return "BitsPerSample";
+      case TiffCraft::Tag::Compression: return "Compression";
+      case TiffCraft::Tag::PhotometricInterpretation: return "PhotometricInterpretation";
+      case TiffCraft::Tag::Thresholding: return "Thresholding";
+      case TiffCraft::Tag::FillOrder: return "FillOrder";
+      case TiffCraft::Tag::DocumentName: return "DocumentName";
+      case TiffCraft::Tag::ImageDescription: return "ImageDescription";
+      case TiffCraft::Tag::Make: return "Make";
+      case TiffCraft::Tag::Model: return "Model";
+      case TiffCraft::Tag::StripOffsets: return "StripOffsets";
+      case TiffCraft::Tag::Orientation: return "Orientation";
+      case TiffCraft::Tag::SamplesPerPixel: return "SamplesPerPixel";
+      case TiffCraft::Tag::RowsPerStrip: return "RowsPerStrip";
+      case TiffCraft::Tag::StripByteCounts: return "StripByteCounts";
+      case TiffCraft::Tag::XResolution: return "XResolution";
+      case TiffCraft::Tag::YResolution: return "YResolution";
+      case TiffCraft::Tag::PlanarConfiguration: return "PlanarConfiguration";
+      case TiffCraft::Tag::ResolutionUnit: return "ResolutionUnit";
+      case TiffCraft::Tag::PageName: return "PageName";
+      case TiffCraft::Tag::Software: return "Software";
+      case TiffCraft::Tag::DateTime: return "DateTime";
+      case TiffCraft::Tag::Artist: return "Artist";
+      case TiffCraft::Tag::ColorMap: return "ColorMap";
+      case TiffCraft::Tag::HalftoneHints: return "HalftoneHints";
+      case TiffCraft::Tag::TileWidth: return "TileWidth";
+      case TiffCraft::Tag::TileLength: return "TileLength";
+      case TiffCraft::Tag::TileOffsets: return "TileOffsets";
+      case TiffCraft::Tag::TileByteCounts: return "TileByteCounts";
+      case TiffCraft::Tag::SampleFormat: return "SampleFormat";
+      default: /* unknown tag */ break;
+    }
+    char buf[8] = "0x0000";
+    std::snprintf(buf, sizeof(buf), "0x%04X", static_cast<uint16_t>(tag));
+    return buf;
   }
-  return os;
 }

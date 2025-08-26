@@ -1,7 +1,8 @@
 // Copyright (c) 2025 Daniel Moreno
 // All rights reserved.
 
-#include "TiffCraft.hpp"
+#include <TiffCraft.hpp>
+#include <TiffStdOut.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -16,6 +17,13 @@ using namespace TiffCraft;
 
 constexpr bool isHostLittleEndian() { return (std::endian::native == std::endian::little); }
 constexpr bool isHostBigEndian() { return (std::endian::native == std::endian::big); }
+
+namespace TiffCraft {
+  template <typename T>
+  bool operator==(const RationalT<T>& lhs, const RationalT<T>& rhs) {
+    return lhs.numerator == rhs.numerator && lhs.denominator == rhs.denominator;
+  }
+}
 
 #ifdef HAS_SPAN
   template <typename T>
