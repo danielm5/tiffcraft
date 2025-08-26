@@ -37,6 +37,13 @@ namespace std {
 }
 #endif
 
+#if __cpp_lib_span >= 20202L
+# include <span>
+# define HAS_SPAN
+#endif
+
+#define TIFF_TAGS_HPP_0A7E2B2C_8F8B_4E6A_9B2E_7D3C1A2F4B5C
+#include "TiffTags.hpp"
 
 namespace TiffCraft {
 
@@ -85,6 +92,10 @@ namespace TiffCraft {
   struct Rational {
     uint32_t numerator;
     uint32_t denominator;
+
+    bool operator==(const Rational& other) const {
+      return numerator == other.numerator && denominator == other.denominator;
+    }
   };
   static_assert(sizeof(Rational) == 8, "Rational must be 8 bytes");
 
@@ -370,10 +381,20 @@ namespace TiffCraft {
       // The field types and their sizes are defined in the `Type` enum.
       class Entry {
       public:
-        uint16_t tag() const { return tag_; }
+        Tag tag() const { return tag_; }
         Type type() const { return type_; }
         uint32_t count() const { return count_; }
         const std::byte* values() const { return values_.data(); }
+
+#ifdef HAS_SPAN
+        template <typename T>
+        std::span<const T> values() const {
+          if (sizeof(T) != valueBytes()) {
+            throw std::runtime_error("Invalid type size for values span");
+          }
+          return std::span<const T>(reinterpret_cast<const T*>(values_.data()), count());
+        }
+#endif // HAS_SPAN
 
         uint32_t valueBytes() const { return TiffCraft::typeBytes(type_); }
         uint32_t bytes() const { return count() * valueBytes(); }
@@ -381,7 +402,7 @@ namespace TiffCraft {
 
         static Entry read(std::istream& stream, bool mustSwap = false) {
           Entry entry;
-          entry.tag_ = readValue<uint16_t>(stream, mustSwap);
+          entry.tag_ = static_cast<Tag>(readValue<uint16_t>(stream, mustSwap));
           entry.type_ = static_cast<Type>(readValue<uint16_t>(stream, mustSwap));
           entry.count_ = readValue<uint32_t>(stream, mustSwap);
 
@@ -423,13 +444,13 @@ namespace TiffCraft {
         }
 
       private:
-        uint16_t tag_;                  // Tag identifying the field
+        Tag tag_;                  // Tag identifying the field
         Type type_;                     // Type of the field
         uint32_t count_;                // Number of values
         std::vector<std::byte> values_; // Pointer to the value data
       };
 
-      const std::map<uint32_t, Entry>& entries() const { return entries_; }
+      const std::map<Tag, Entry>& entries() const { return entries_; }
 
       static IFD read(std::istream& stream, bool mustSwap = false) {
         IFD ifd;
@@ -438,7 +459,7 @@ namespace TiffCraft {
         uint16_t entryCount = readValue<uint16_t>(stream, mustSwap);
 
         // Read each entry
-        uint16_t lastTag = 0;
+        Tag lastTag = Tag::Null;
         for (uint16_t i = 0; i < entryCount; ++i) {
           Entry entry = Entry::read(stream, mustSwap);
           ifd.entries_[entry.tag()] = std::move(entry);
@@ -452,7 +473,7 @@ namespace TiffCraft {
       }
 
       private:
-        std::map<uint32_t, Entry> entries_; // Map of directory entries
+        std::map<Tag, Entry> entries_; // Map of directory entries
     };
 
     const Header& header() const { return header_; }
@@ -556,6 +577,13 @@ std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::IFD::Entr
 }
 
 std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::IFD& ifd) {
+  struct AutoRestore {
+    std::ostream& os_;
+    std::ios_base::fmtflags flags_;
+    AutoRestore(std::ostream& os) : os_(os), flags_(os.flags()) {}
+    ~AutoRestore() { os_.flags(flags_); }
+  } autoRestore(os);
+
   os << "TIFF IFD:\n"
      << "    Entry count: " << ifd.entries().size() << "\n";
   int i = 0;
@@ -566,6 +594,13 @@ std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::IFD& ifd)
 }
 
 std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage& image) {
+  struct AutoRestore {
+    std::ostream& os_;
+    std::ios_base::fmtflags flags_;
+    AutoRestore(std::ostream& os) : os_(os), flags_(os.flags()) {}
+    ~AutoRestore() { os_.flags(flags_); }
+  } autoRestore(os);
+
   os << "TIFF IMAGE START -----------------------\n"
      << image.header()
      << "IFD count: " << image.ifds().size() << "\n";

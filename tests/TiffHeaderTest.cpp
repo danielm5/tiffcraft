@@ -9,6 +9,8 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <algorithm>
+#include <initializer_list>
 
 using namespace TiffCraft;
 
@@ -21,6 +23,18 @@ bool operator==(const TiffImage::IFD::Entry& lhs, const TiffImage::IFD::Entry& r
          std::equal(lhs.values(), lhs.values() + lhs.bytes(), rhs.values());
 }
 
+#ifdef HAS_SPAN
+  template <typename T>
+  bool operator==(const std::span<const T>& lhs, const std::span<const T>& rhs) {
+    return lhs.size() == rhs.size() && std::equal(lhs.begin(), lhs.end(), rhs.begin());
+  }
+
+  template <typename T>
+  std::span<const T> make_span(std::initializer_list<T> values) {
+    return std::span<const T>(values.begin(), values.size());
+  }
+#endif // HAS_SPAN
+
 std::string getTestFilePath(const std::string& filename) {
   std::filesystem::path test_file_path(__FILE__);
   std::filesystem::path test_dir = test_file_path.parent_path();
@@ -29,7 +43,7 @@ std::string getTestFilePath(const std::string& filename) {
 
 std::ostream& write_IFD_entry(
   std::ostream& os,
-  uint16_t tag,
+  Tag tag,
   Type type,
   uint32_t count,
   const std::byte* values,
@@ -233,17 +247,20 @@ TEST_CASE("TiffImage Header class", "[tiff_header]") {
 TEST_CASE("TiffImage IFD::Entry class", "[tiff_IDF_entry]") {
 
   auto testEntry = [](
-      uint16_t tag, Type type, uint32_t count,
+      uint16_t tagInt, Type type, uint32_t count,
       const std::vector<uint8_t>& values,
       uint32_t valueOffset = 0, bool mustSwap = false) {
 
     std::stringstream stream;
     write_IFD_entry(
-      stream, tag, type, count,
+      stream, static_cast<Tag>(tagInt), type, count,
       reinterpret_cast<const std::byte*>(values.data()),
       valueOffset, mustSwap);
 
     TiffImage::IFD::Entry entry = TiffImage::IFD::Entry::read(stream, mustSwap);
+
+    const Tag tag = static_cast<Tag>(mustSwap ? swap16(tagInt) : tagInt);
+
     REQUIRE(entry.tag() == tag);
     REQUIRE(entry.type() == type);
     REQUIRE(entry.count() == count);
@@ -306,7 +323,7 @@ TEST_CASE("TiffImage IFD class", "[tiff_IFD]") {
         std::stringstream stream;
         // Write the entry
         write_IFD_entry(
-          stream, tag, type, count,
+          stream, static_cast<Tag>(tag), type, count,
           reinterpret_cast<const std::byte*>(values.data()),
           valueOffset, mustSwap);
         // Read the entry back
@@ -342,10 +359,34 @@ TEST_CASE("TiffImage IFD class", "[tiff_IFD]") {
 
 TEST_CASE("TiffImage class", "[tiff_image]") {
 
-  {
-    const std::string test_file = "fax2d.tif";
+  { // jim___ah.tif
+    // Dimensions: 664x813
+    // Resolution: 300 DPI
+    // Bit depth: 1
+    // Compression: Uncompressed
+    // Resolution unit: 2
+    const std::string test_file = "jim___ah.tif";
     std::cout << "Test file path: " << getTestFilePath(test_file) << std::endl;
     TiffImage image = TiffImage::read(getTestFilePath(test_file));
     std::cout << image << std::endl;
+
+    const auto& ifds = image.ifds();
+    REQUIRE(ifds.size() == 1);
+
+    const auto& entries = ifds[0].entries();
+    REQUIRE(entries.size() == 14);
+
+  #ifdef HAS_SPAN
+    #define value_span(type, tag) entries.at(tag).values<type>()
+
+    REQUIRE(value_span(uint16_t, Tag::ImageWidth) == make_span<uint16_t>({ 664 }));
+    REQUIRE(value_span(uint16_t, Tag::ImageLength) == make_span<uint16_t>({ 813 }));
+    REQUIRE(value_span(uint16_t, Tag::Compression) == make_span<uint16_t>({ 1 }));
+    REQUIRE(value_span(uint16_t, Tag::PhotometricInterpretation) == make_span<uint16_t>({ 0 }));
+    REQUIRE(value_span(Rational, Tag::XResolution) == make_span({ Rational{300, 1} }));
+    REQUIRE(value_span(Rational, Tag::YResolution) == make_span({ Rational{300, 1} }));
+
+    #undef value_span
+  #endif
   }
 }
