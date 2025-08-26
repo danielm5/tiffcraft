@@ -13,67 +13,12 @@
 
 #include "netpbm.hpp"
 
-#include "flower-rgb-contig-08.h"
-
 using namespace TiffCraft;
 
 std::filesystem::path getFilePath(std::filesystem::path relativePath) {
   std::filesystem::path test_file_path(__FILE__);
   std::filesystem::path test_dir = test_file_path.parent_path();
   return test_dir / relativePath;
-}
-
-std::string getTestFilePath(const std::string& filename) {
-  std::filesystem::path test_file_path(__FILE__);
-  std::filesystem::path test_dir = test_file_path.parent_path();
-  return (test_dir / "libtiff-pics" / "depth" / filename).string();
-}
-
-void checkImageFields(const Image& image, int bitDepth, int channels) {
-  REQUIRE(image.width == FlowerImage::width);
-  REQUIRE(image.height == FlowerImage::height);
-  REQUIRE(image.channels == channels);
-  REQUIRE(image.bitDepth == bitDepth);
-  REQUIRE(image.dataSize() == channels * FlowerImage::numPixels * (bitDepth / 8));
-  REQUIRE(image.dataPtr() != nullptr);
-}
-
-void checkImageFields(const TiffExporter& exporter, int bitDepth, int channels) {
-  checkImageFields(exporter.image(), bitDepth, channels); //TMP
-}
-
-template <typename DstType>
-void compareImageDataRgb(const Image& image, int bitsPerPixel, int margin)
-{
-  const int pixelBits = 8 * sizeof(DstType);
-  const int shift = pixelBits > 8 ? pixelBits - 8 : 8 - bitsPerPixel;
-  const uint8_t* data1 = FlowerImage::data;
-  const Rgb<DstType>* data2 = image.dataPtr<Rgb<DstType>>();
-  for (size_t i = 0; i < FlowerImage::numPixels; ++i) {
-    uint8_t pixel1[3];
-    FlowerImage::nextPixel(data1, pixel1);
-    DstType r = static_cast<DstType>(pixel1[0]) << (8 * (sizeof(DstType) - 1));
-    DstType g = static_cast<DstType>(pixel1[1]) << (8 * (sizeof(DstType) - 1));
-    DstType b = static_cast<DstType>(pixel1[2]) << (8 * (sizeof(DstType) - 1));
-    if (static_cast<double>(data2[i].r >> shift) != Catch::Approx(r >> shift).margin(margin))
-    {
-      std::cout << "Pixel " << i << ": expected r=" << (r >> shift)
-        << ", got r=" << (data2[i].r >> shift) << std::endl;
-    }
-    if (static_cast<double>(data2[i].g >> shift) != Catch::Approx(g >> shift).margin(margin))
-    {
-      std::cout << "Pixel " << i << ": expected g=" << (g >> shift)
-        << ", got g=" << (data2[i].g >> shift) << std::endl;
-    }
-    if (static_cast<double>(data2[i].b >> shift) != Catch::Approx(b >> shift).margin(margin))
-    {
-      std::cout << "Pixel " << i << ": expected b=" << (b >> shift)
-        << ", got b=" << (data2[i].b >> shift) << std::endl;
-    }
-    REQUIRE(static_cast<double>(data2[i].r >> shift) == Catch::Approx(r >> shift).margin(margin));
-    REQUIRE(static_cast<double>(data2[i].g >> shift) == Catch::Approx(g >> shift).margin(margin));
-    REQUIRE(static_cast<double>(data2[i].b >> shift) == Catch::Approx(b >> shift).margin(margin));
-  }
 }
 
 template <typename PixelType>
@@ -146,6 +91,11 @@ void TestExporter(const std::vector<std::string>& testFiles)
 
     try { // RGB 16bits
       compareToReference<netpbm::RGB16>(image, refFilePath);
+      return;
+    } catch (const std::exception& ex) { /* ignore */ }
+
+    try { // RGB 32bits
+      compareToReference<netpbm::RGB32>(image, refFilePath);
       return;
     } catch (const std::exception& ex) { /* ignore */ }
 
@@ -276,31 +226,28 @@ TEST_CASE("TiffExporterPaletteBitsTest", "[flower_image][palette-bits-16]") {
 }
 
 TEST_CASE("TiffExporterRgb8Test", "[flower_image][rgb8]") {
-  LoadParams loadParams{ 0 };
-  TiffExporterRgb8 exporter;
-  const std::string filename = getTestFilePath("flower-rgb-contig-08.tif");
-  INFO("Test file: " + filename);
-  load(filename, std::ref(exporter), loadParams);
-  checkImageFields(exporter, 8, 3);
-  compareImageDataRgb<uint8_t>(exporter.image(), 8, 1);
+  std::vector<std::string> testFiles = {
+    "libtiff-pics/depth/flower-rgb-contig-08.tif",
+    "reference_images/flower-rgb-contig-08.ppm"
+  };
+  using Exporter = TiffExporterRgb8;
+  TestExporter<Exporter>(testFiles);
 }
 
 TEST_CASE("TiffExporterRgb16Test", "[flower_image][rgb16]") {
-  LoadParams loadParams{ 0 };
-  TiffExporterRgb16 exporter;
-  const std::string filename = getTestFilePath("flower-rgb-contig-16.tif");
-  INFO("Test file: " + filename);
-  load(filename, std::ref(exporter), loadParams);
-  checkImageFields(exporter, 16, 3);
-  compareImageDataRgb<uint16_t>(exporter.image(), 16, 1);
+  std::vector<std::string> testFiles = {
+    "libtiff-pics/depth/flower-rgb-contig-16.tif",
+    "reference_images/flower-rgb-contig-16.ppm"
+  };
+  using Exporter = TiffExporterRgb16;
+  TestExporter<Exporter>(testFiles);
 }
 
 TEST_CASE("TiffExporterRgb32Test", "[flower_image][rgb32]") {
-  LoadParams loadParams{ 0 };
-  TiffExporterRgb32 exporter;
-  const std::string filename = getTestFilePath("flower-rgb-contig-32.tif");
-  INFO("Test file: " + filename);
-  load(filename, std::ref(exporter), loadParams);
-  checkImageFields(exporter, 32, 3);
-  compareImageDataRgb<uint32_t>(exporter.image(), 32, 2);
+  std::vector<std::string> testFiles = {
+    "libtiff-pics/depth/flower-rgb-contig-32.tif",
+    "reference_images/flower-rgb-contig-32.ppm"
+  };
+  using Exporter = TiffExporterRgb32;
+  TestExporter<Exporter>(testFiles);
 }

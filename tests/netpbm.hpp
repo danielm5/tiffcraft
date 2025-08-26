@@ -17,6 +17,7 @@ namespace netpbm {
   };
   using RGB8 = RGB<uint8_t>;
   using RGB16 = RGB<uint16_t>;
+  using RGB32 = RGB<uint32_t>;
 
   template <typename T>
   struct Image {
@@ -80,7 +81,7 @@ namespace netpbm {
     std::vector<PixelType> pixels;
     pixels.reserve(width * height);
     if constexpr (is_rgb_v<PixelType>) {
-      int r, g, b;
+      unsigned long int r, g, b;
       while (file >> r >> g >> b) {
         pixels.push_back(PixelType{
           static_cast<typename PixelType::value_type>(r),
