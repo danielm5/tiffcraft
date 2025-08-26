@@ -3,14 +3,18 @@
 
 #pragma once
 
-#include <cstdint>
-#include <string>
-#include <fstream>
+#include <type_traits>
 #include <stdexcept>
-#include <vector>
-#include <map>
+#include <optional>
+#include <cstdint>
+#include <fstream>
 #include <iomanip>
 #include <cassert>
+#include <memory>
+#include <string>
+#include <vector>
+#include <map>
+
 
 #if __cpp_lib_byteswap >= 201806L
 # include <bit> // C++20 byteswap
@@ -47,6 +51,16 @@ namespace std {
 
 namespace TiffCraft {
 
+  struct Rational {
+    uint32_t numerator;
+    uint32_t denominator;
+
+    bool operator==(const Rational& other) const {
+      return numerator == other.numerator && denominator == other.denominator;
+    }
+  };
+  static_assert(sizeof(Rational) == 8, "Rational must be 8 bytes");
+
   // TIFF data types
   // ===============
   // 1 = BYTE 8-bit unsigned integer.
@@ -64,17 +78,18 @@ namespace TiffCraft {
     RATIONAL = 5
   };
 
+  template <Type type> struct TypeTraits;
+  template <> struct TypeTraits<Type::BYTE> { using type = uint8_t; };
+  template <> struct TypeTraits<Type::ASCII> { using type = char; };
+  template <> struct TypeTraits<Type::SHORT> { using type = uint16_t; };
+  template <> struct TypeTraits<Type::LONG> { using type = uint32_t; };
+  template <> struct TypeTraits<Type::RATIONAL> { using type = Rational; };
+
+  template <Type type> using TypeTraits_t = typename TypeTraits<type>::type;
+
   template <Type type>
   constexpr uint32_t typeBytes() {
-    switch (type) {
-      case Type::BYTE:      return 1;
-      case Type::ASCII:     return 1;
-      case Type::SHORT:     return 2;
-      case Type::LONG:      return 4;
-      case Type::RATIONAL:  return 8;
-      default:
-        throw std::runtime_error("Unknown TIFF entry type");
-    }
+    return sizeof(TypeTraits_t<type>);
   }
 
   inline uint32_t typeBytes(Type type) {
@@ -89,15 +104,47 @@ namespace TiffCraft {
     }
   }
 
-  struct Rational {
-    uint32_t numerator;
-    uint32_t denominator;
-
-    bool operator==(const Rational& other) const {
-      return numerator == other.numerator && denominator == other.denominator;
+  template <typename SrcType, typename DstType>
+  void copyVector(const std::byte* src, size_t count, std::vector<DstType>& dest) {
+    if (sizeof(DstType) < sizeof(SrcType)) {
+      throw std::runtime_error("Destination type size is smaller than source type size");
     }
-  };
-  static_assert(sizeof(Rational) == 8, "Rational must be 8 bytes");
+    dest.resize(count);
+    const SrcType* srcPtr = reinterpret_cast<const SrcType*>(src);
+    for (size_t i = 0; i < count; ++i) {
+      dest[i] = static_cast<DstType>(srcPtr[i]);
+    }
+  }
+
+  template <Type type, typename DstType>
+  void copyVector_safe(const std::byte* src, size_t count, std::vector<DstType>& dest) {
+    using SrcType = TypeTraits_t<type>;
+    if constexpr (!std::is_convertible_v<SrcType, DstType>) {
+      throw std::runtime_error("Source type is not convertible to destination type");
+    } else {
+      copyVector<SrcType, DstType>(src, count, dest);
+    }
+  }
+
+  template <typename DstType>
+  void copyVector(Type type, const std::byte* src, size_t count, std::vector<DstType>& dest) {
+    switch (type) {
+      case Type::BYTE:     copyVector_safe<Type::BYTE, DstType>(src, count, dest); break;
+      case Type::ASCII:    copyVector_safe<Type::ASCII, DstType>(src, count, dest); break;
+      case Type::SHORT:    copyVector_safe<Type::SHORT, DstType>(src, count, dest); break;
+      case Type::LONG:     copyVector_safe<Type::LONG, DstType>(src, count, dest); break;
+      case Type::RATIONAL: copyVector_safe<Type::RATIONAL, DstType>(src, count, dest); break;
+      default:
+        throw std::runtime_error("Unknown TIFF entry type");
+    }
+  }
+
+  template <typename DstType>
+  std::vector<DstType> toVector(Type type, const std::byte* src, size_t count) {
+    std::vector<DstType> dest;
+    copyVector(type, src, count, dest);
+    return dest;
+  }
 
   // Utility functions for byte order conversion
   #ifdef HAS_BYTESWAP
@@ -444,7 +491,7 @@ namespace TiffCraft {
         }
 
       private:
-        Tag tag_;                  // Tag identifying the field
+        Tag tag_;                       // Tag identifying the field
         Type type_;                     // Type of the field
         uint32_t count_;                // Number of values
         std::vector<std::byte> values_; // Pointer to the value data
@@ -476,15 +523,26 @@ namespace TiffCraft {
         std::map<Tag, Entry> entries_; // Map of directory entries
     };
 
+    using ImageData = std::vector<std::vector<std::byte>>;
+
     const Header& header() const { return header_; }
     const std::vector<IFD>& ifds() const { return ifds_; }
+
+    std::istream& stream() const {
+      if (!stream_) {
+        throw std::runtime_error("Stream is not set for this TIFF image");
+      }
+      return *stream_;
+    }
 
     static TiffImage read(const std::string& filename) {
       std::ifstream file(filename, std::ios::binary);
       if (!file) {
         throw std::runtime_error("Failed to open TIFF file: " + filename);
       }
-      return read(file);
+      auto image = read(file);
+      image.stream_ = std::make_unique<std::ifstream>(std::move(file));
+      return image;
     }
 
     static TiffImage read(std::istream& stream) {
@@ -514,12 +572,80 @@ namespace TiffCraft {
       return image;
     }
 
+    static ImageData readImageData(std::istream& stream, const IFD& ifd) {
+      const auto& entries = ifd.entries();
+      std::vector<uint32_t> stripOffsets, stripByteCounts;
+      { //copy offsets
+        auto it = entries.find(Tag::StripOffsets);
+        if (it == entries.end()) {
+          throw std::runtime_error("StripOffsets entry not found in IFD");
+        }
+        const auto& entry = it->second;
+        copyVector<uint32_t>(entry.type(), entry.values(), entry.count(), stripOffsets);
+      }
+      { //copy byte counts
+        auto it = entries.find(Tag::StripByteCounts);
+        if (it == entries.end()) {
+          throw std::runtime_error("StripByteCounts entry not found in IFD");
+        }
+        const auto& entry = it->second;
+        copyVector<uint32_t>(entry.type(), entry.values(), entry.count(), stripByteCounts);
+      }
+      if (stripOffsets.size() != stripByteCounts.size()) {
+        throw std::runtime_error("Mismatch between number of StripOffsets and StripByteCounts");
+      }
+      ImageData imageData;
+      for (size_t i = 0; i < stripOffsets.size(); ++i) {
+        const uint32_t offset = stripOffsets[i];
+        const uint32_t byteCount = stripByteCounts[i];
+        if (offset < 8 || byteCount == 0) {
+          throw std::runtime_error("Invalid strip offset or byte count");
+        }
+        imageData.emplace_back(byteCount);
+        readAt(stream, offset, imageData.back().data(), byteCount);
+      }
+      return imageData;
+    }
+
     private:
       Header header_;
       std::vector<IFD> ifds_; // List of IFDs in the TIFF image
+      std::unique_ptr<std::istream> stream_;
   };
 
-}
+  struct LoadParams {
+    std::optional<uint16_t> ifdIndex; // Optional IFD index to load
+  };
+
+  using LoadCallback = void(*)(const TiffImage::IFD& ifd, TiffImage::ImageData imageData);
+
+  void load(std::istream& stream, const LoadCallback&& callback, const LoadParams& params = {}) {
+    // Read the TIFF image from the stream
+    TiffImage image = TiffImage::read(stream);
+
+    if (params.ifdIndex && params.ifdIndex.value() >= image.ifds().size()) {
+      throw std::runtime_error("Requested IFD index is out of bounds");
+    }
+
+    for (size_t i = 0; i < image.ifds().size(); ++i) {
+      if (!params.ifdIndex || params.ifdIndex.value() == i) {
+        // If a specific IFD index is requested, only process that IFD
+        // Otherwise, process all IFDs
+        const auto& ifd = image.ifds()[i];
+        callback(ifd, TiffImage::readImageData(stream, ifd));
+      }
+    }
+  }
+
+  void load(const std::string& filename, const LoadCallback&& callback, const LoadParams& params = {}) {
+    std::ifstream file(filename, std::ios::binary);
+    if (!file) {
+      throw std::runtime_error("Failed to open TIFF file: " + std::string(filename));
+    }
+    load(file, std::move(callback), params);
+  }
+
+} // namespace TiffCraft
 
 std::ostream& operator<<(std::ostream& os, const TiffCraft::Type& type) {
   switch (type) {
