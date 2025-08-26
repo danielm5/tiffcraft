@@ -47,7 +47,9 @@ namespace netpbm {
 
     // Read magic number
     std::getline(file, line);
-    if constexpr (is_rgb_v<PixelType>) {
+    if constexpr (std::is_same_v<PixelType, bool>) {
+      if (line != "P1") throw std::runtime_error("Not an ASCII PBM (P1)");
+    } else if constexpr (is_rgb_v<PixelType>) {
       if (line != "P3") throw std::runtime_error("Not an ASCII PPM (P3)");
     } else {
       if (line != "P2") throw std::runtime_error("Not an ASCII PGM (P2)");
@@ -64,8 +66,10 @@ namespace netpbm {
     wh >> width >> height;
 
     // Read max value
-    size_t maxval;
-    file >> maxval;
+    size_t maxval = 1;
+    if constexpr (!std::is_same_v<PixelType, bool>) {
+      file >> maxval;
+    }
     size_t maxValue;
     if constexpr (is_rgb_v<PixelType>) {
       maxValue = std::numeric_limits<typename PixelType::value_type>::max();
@@ -108,5 +112,9 @@ namespace netpbm {
   template <typename T>
   Image<T> readPGM(const std::string& filename) {
     return read<T>(filename);
+  }
+
+  inline Image<bool> readPBM(const std::string& filename) {
+    return read<bool>(filename);
   }
 }

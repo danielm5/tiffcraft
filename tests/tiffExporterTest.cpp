@@ -54,6 +54,16 @@ void compareToReference(
         REQUIRE(double(refRow[col].b) == Catch::Approx(blue).margin(margin));
       }
     }
+  } else if constexpr (std::is_same_v<PixelType, bool>) {
+    const uint8_t* pixels = image.dataPtr<uint8_t>();
+    for (size_t h = 0; h < image.height; ++h) {
+      const uint8_t* row = pixels + h * image.rowStride / sizeof(uint8_t);
+      for (size_t col = 0; col < image.width; ++col) {
+        const uint8_t* pixel = row + col * image.colStride / sizeof(uint8_t);
+        const int refPixel = refImg.pixels[h * refImg.width + col] ? 0x00 : 0xff; // false = white, true = black
+        REQUIRE(refPixel == *pixel);
+      }
+    }
   } else {
     using T = PixelType;
     const auto* pixels = image.dataPtr<T>();
@@ -116,6 +126,11 @@ void TestExporter(const std::vector<std::string>& testFiles)
 
     try { // RGB 32bits
       compareToReference<netpbm::RGB32>(image, refFilePath);
+      return;
+    } catch (const std::exception& ex) { /* ignore */ }
+
+    try { // Bitmap 1bit
+      compareToReference<bool>(image, refFilePath);
       return;
     } catch (const std::exception& ex) { /* ignore */ }
 
@@ -301,6 +316,29 @@ TEST_CASE("TiffExporterRgbTest", "[flower_image][flower_rgb_planar]") {
       "reference_images/flower-rgb-planar-32.ppm",
     };
     using Exporter = TiffExporterRgb<uint32_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+}
+
+TEST_CASE("TiffExporterJimTest", "[jim_image]") {
+  { // 1 bit
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/jim___ah.tif",
+      "reference_images/jim___ah.pbm"
+    };
+    using Exporter = TiffExporterGray<uint8_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+  { // 8 bits
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/jim___cg.tif",
+      "reference_images/jim___cg.pgm",
+      "libtiff-pics/jim___dg.tif",
+      "reference_images/jim___dg.pgm",
+      "libtiff-pics/jim___gg.tif",
+      "reference_images/jim___gg.pgm"
+    };
+    using Exporter = TiffExporterGray<uint8_t>;
     TestExporter<Exporter>(testFiles);
   }
 }
