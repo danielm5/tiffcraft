@@ -256,10 +256,25 @@ namespace TiffCraft {
       return getInt(ifd, Tag::ImageLength);
     }
 
+    static std::vector<int> getBitsPerSample(const TiffImage::IFD& ifd)
+    {
+      if (ifd.entries().contains(Tag::BitsPerSample)) {
+        return getIntVec(ifd, Tag::BitsPerSample);
+      }
+      return { 1 }; // default value if missing
+    }
+
     static RectInfo getRectInfo(const TiffImage::IFD& ifd)
     {
-      // TODO: this is only for single channel images for now
-      const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
+      const std::vector<int> bitsPerSampleVec = getBitsPerSample(ifd);
+      if (bitsPerSampleVec.empty()
+        || std::any_of(bitsPerSampleVec.begin(), bitsPerSampleVec.end(),
+          [&](int n) { return n != bitsPerSampleVec.front(); })) {
+         throw FormatNotSupportedError("Unsupported bits per sample");
+      }
+      const int bitsPerSample = bitsPerSampleVec.front();
+      const int samplesPerPixel = getInt(ifd, Tag::SamplesPerPixel, 1);
+      const int planarConfiguration = getInt(ifd, Tag::PlanarConfiguration, 1);
 
       const int imageWidth = getWidth(ifd);
       const int imageHeight = getHeight(ifd);
@@ -268,258 +283,10 @@ namespace TiffCraft {
 
       const int tileWidth = getInt(ifd, Tag::TileWidth, imageWidth);
       const int tileHeight = getInt(ifd, Tag::TileLength, rowsPerStrip);
-      const int tileStride = (tileWidth * bitsPerSample + 7) / 8;
+      const int tileChannels = (planarConfiguration == 1 ? samplesPerPixel : 1);
+      const int tileStride = (tileWidth * tileChannels * bitsPerSample + 7) / 8;
 
       return { tileWidth, tileHeight, tileStride, bitsPerSample };
-    }
-
-    // Iterator for TiffImage::ImageData
-    struct Iterator
-    {
-      using Container = TiffImage::ImageData;
-      using Iter1 = typename Container::iterator;
-      using Iter2 = typename Container::value_type::iterator;
-
-      // Iterator traits
-      using difference_type = typename Iter2::difference_type;
-      using value_type = typename Iter2::value_type;
-      using pointer = typename Iter2::pointer;
-      using reference = typename Iter2::reference;
-      using iterator_category = typename Iter2::iterator_category;
-
-      // Constructor
-      Iterator() = default;
-
-      // Iterator operations
-      reference operator*() const { return *iter2_; }
-      pointer operator->() const { return &(*iter2_); }
-
-      // Get the current value as a specific type
-      template <typename T>
-      T& getAs() const { return *reinterpret_cast<T*>(&(*iter2_)); }
-
-      // Advance the iterator to the next element of type T
-      template <typename T>
-      Iterator next() { return (*this += sizeof(T)); }
-
-      // Prefix increment
-      Iterator& operator++() {
-        ++iter2_;
-        if (iter2_ == iter1_->end()) {
-          ++iter1_;
-          if (iter1_ != container_->end()) {
-            iter2_ = iter1_->begin();
-          }
-          else {
-            iter2_ = Iter2(); // Set to end iterator if no more elements
-          }
-        }
-        return *this;
-      }
-
-      // Postfix increment
-      Iterator operator++(int) {
-        Iterator tmp = *this;
-        operator++();
-        return tmp;
-      }
-
-      // Compound assignment
-      Iterator operator+=(int n) {
-        for (int i = 0; i < n; ++i) {
-          ++(*this);
-        }
-        return *this;
-      }
-
-      // Equality comparison
-      friend bool operator==(const Iterator& lhs, const Iterator& rhs) {
-        return lhs.container_ == rhs.container_
-          && lhs.iter1_ == rhs.iter1_ && lhs.iter2_ == rhs.iter2_;
-      }
-
-      // Inequality comparison
-      friend bool operator!=(const Iterator& lhs, const Iterator& rhs) {
-        return !(lhs == rhs);
-      }
-
-      // Create an iterator to the beginning
-      static Iterator begin(Container& container) {
-        if (container.empty()) {
-          return Iterator(&container, container.end(), Iter2());
-        }
-        return Iterator(&container, container.begin(), container.front().begin());
-      }
-
-      // Create an iterator to the end
-      static Iterator end(Container& container) {
-        if (container.empty()) {
-          return Iterator(&container, container.end(), Iter2());
-        }
-        return Iterator(&container, container.end(), Iter2());
-      }
-
-      // Create an const iterator to the beginning
-      static Iterator begin(const Container& container) {
-        return begin(const_cast<Container&>(container));
-      }
-
-      // Create an const iterator to the end
-      static Iterator end(const Container& container) {
-        return end(const_cast<Container&>(container));
-      }
-
-    private:
-      Container* container_ = nullptr;
-      Iter1 iter1_;
-      Iter2 iter2_;
-
-      // Private constructor
-      Iterator(Container* container, Iter1 iter1, Iter2 iter2)
-        : container_(container), iter1_(iter1), iter2_(iter2) {}
-    };
-
-    static Iterator begin(TiffImage::ImageData& container) {
-      return Iterator::begin(container);
-    }
-
-    static Iterator end(TiffImage::ImageData& container) {
-      return Iterator::end(container);
-    }
-
-    static Iterator begin(const TiffImage::ImageData& container) {
-      return Iterator::begin(container);
-    }
-
-    static Iterator end(const TiffImage::ImageData& container) {
-      return Iterator::end(container);
-    }
-
-    // static void copy(
-    //   const TiffImage::ImageData& imageData, std::vector<std::byte>& v)
-    // {
-    //   size_t copied = 0;
-    //   auto it = v.begin();
-    //   for (const auto& strip : imageData) {
-    //     if (strip.empty()) continue; // Skip empty strips
-    //     if (it + strip.size() > v.end()) {
-    //       throw std::runtime_error("Not enough space in vector to copy image data");
-    //     }
-    //     std::copy(strip.begin(), strip.end(), it);
-    //     it += strip.size();
-    //     copied += strip.size();
-    //   }
-    //   if (copied != v.size()) {
-    //     throw std::runtime_error("Not enough pixel data for the image size");
-    //   }
-    // }
-
-    template <typename SrcType, typename DstType, typename UnaryOp>
-    static void copyPixels(
-      const TiffImage::ImageData& imageData,  // source pixel data
-      size_t width,                           // source image width
-      size_t height,                          // source image height
-      size_t channels,                        // source image channels
-      size_t bitsPerSample,                   // source bits per sample
-      bool isPlanar,                          // source is planar
-      bool equalsHostByteOrder,               // source data byte order
-      UnaryOp&& op)
-    {
-      constexpr size_t bitsPerSrcPixel = 8 * sizeof(SrcType);
-      auto src = begin(imageData);
-
-      size_t countAvail = 0;
-      SrcType bitsAvail = 0;
-
-      auto loop_by_row_col_chan = [&](auto processor) {
-        for (int row = 0; row < height; ++row) {
-          for (int col = 0; col < width; ++col) {
-            for (int chan = 0; chan < channels; ++chan) {
-              DstType value = processor();
-              std::invoke(op, value); // Apply the unary operation
-            }
-          }
-          // flush partial words when the row is complete
-          if (countAvail > 0) {
-            countAvail = 0;
-            bitsAvail = 0;
-          }
-        }
-      };
-
-      auto loop_by_chan_row_col = [&](auto processor) {
-        for (int chan = 0; chan < channels; ++chan) {
-          for (int row = 0; row < height; ++row) {
-            for (int col = 0; col < width; ++col) {
-              DstType value = processor();
-              std::invoke(op, value); // Apply the unary operation
-            }
-            // flush partial words when the row is complete
-            if (countAvail > 0) {
-              countAvail = 0;
-              bitsAvail = 0;
-            }
-          }
-        }
-      };
-
-      auto process_word = [&]() -> DstType {
-        if (src == end(imageData)) {
-          throw std::runtime_error("No pixel data available");
-        }
-        DstType value = src.getAs<SrcType>();
-        src.next<SrcType>();
-        if (!equalsHostByteOrder) {
-          value = swap(value);
-        }
-        return value;
-      };
-
-      auto process_bits = [&]() -> DstType {
-        size_t count = 0;
-        DstType value = 0;
-        while (count < bitsPerSample) {
-          // make sure we have some bits available
-          if (countAvail == 0) {
-            if (src == end(imageData)) {
-              throw std::runtime_error("No pixel data available");
-            }
-            bitsAvail = src.getAs<SrcType>();
-            src.next<SrcType>();
-            if (!equalsHostByteOrder) {
-              bitsAvail = swap(bitsAvail);
-            }
-            countAvail = bitsPerSrcPixel;
-          }
-          // consume available bits
-          const size_t n = std::min(bitsPerSample - count, countAvail);
-          value <<= n;
-          value |= (bitsAvail >> (bitsPerSrcPixel - n));
-          count += n;
-          // update available bits
-          countAvail -= n;
-          bitsAvail <<= n;
-        }
-        assert(count == bitsPerSample);
-        return value;
-      };
-
-      if (bitsPerSample == bitsPerSrcPixel) {
-        // Fast path: bits per sample matches source pixel size
-        if (isPlanar)
-          loop_by_chan_row_col(process_word);
-        else
-          loop_by_row_col_chan(process_word);
-      } else {
-        // Slow path: bits per sample does not match source pixel size
-        if (isPlanar)
-          loop_by_chan_row_col(process_bits);
-        else
-          loop_by_row_col_chan(process_bits);
-      }
-      if (src != end(imageData)) {
-        throw std::runtime_error("Not enough pixel data for the image size");
-      }
     }
 
     template <typename SrcType, typename DstType, typename UnaryOp>
@@ -536,27 +303,30 @@ namespace TiffCraft {
 
       const int rectAcross = (imageWidth + (rectInfo.width - 1)) / rectInfo.width;
       const int rectDown = (imageHeight + (rectInfo.height - 1)) / rectInfo.height;
+      const int rectsInPlane = rectAcross * rectDown;
 
       const int rectsInImage = rectAcross * rectDown * planes;
       if (rectsInImage != imageData.size()) {
         throw std::runtime_error("Rectangle count mismatch");
       }
 
-      for (int rectY = 0; rectY < rectDown; ++rectY) {
-        for (int rectX = 0; rectX < rectAcross; ++rectX) {
-          const auto& rect = imageData[rectY * rectAcross + rectX];
-          auto currRectInfo = rectInfo;
-          currRectInfo.width = std::min(rectInfo.width, imageWidth - rectX * rectInfo.width);
-          currRectInfo.height = std::min(rectInfo.height, imageHeight - rectY * rectInfo.height);
-          copyRectangle<SrcType, DstType, UnaryOp>(
-            rect,                        // source pixel data
-            currRectInfo,                // source rectangle info
-            channels,                    // source image channels
-            planes,                      // source image planes
-            equalsHostByteOrder,         // source data byte order
-            rectX * rectInfo.width,      // destination column
-            rectY * rectInfo.height,     // destination row
-            std::forward<UnaryOp>(op));
+      for (int plane = 0; plane < planes; ++plane) {
+        for (int rectY = 0; rectY < rectDown; ++rectY) {
+          for (int rectX = 0; rectX < rectAcross; ++rectX) {
+            const auto& rectData = imageData[plane * rectsInPlane + rectY * rectAcross + rectX];
+            auto currRectInfo = rectInfo;
+            currRectInfo.width = std::min(rectInfo.width, imageWidth - rectX * rectInfo.width);
+            currRectInfo.height = std::min(rectInfo.height, imageHeight - rectY * rectInfo.height);
+            copyRectangle<SrcType, DstType, UnaryOp>(
+              rectData,                    // source pixel data
+              currRectInfo,                // source rectangle info
+              channels,                    // source image channels
+              equalsHostByteOrder,         // source data byte order
+              plane,                       // destination plane
+              rectX * rectInfo.width,      // destination column
+              rectY * rectInfo.height,     // destination row
+              std::forward<UnaryOp>(op));
+          }
         }
       }
     }
@@ -566,8 +336,8 @@ namespace TiffCraft {
       const std::vector<std::byte>& rectData, // source pixel data
       const RectInfo& rectInfo,               // source rectangle info
       size_t channels,                        // source image channels
-      size_t planes,                          // source image planes
       bool equalsHostByteOrder,               // source data byte order
+      size_t dstPlane,                        // destination plane
       size_t dstX,                            // destination column
       size_t dstY,                            // destination row
       UnaryOp&& op)
@@ -583,34 +353,39 @@ namespace TiffCraft {
 
       const size_t dstRowStride = image_.rowStride / sizeof(ValueType);
       const size_t dstColStride = image_.colStride / sizeof(ValueType);
+      const size_t dstChanStride = image_.chanStride / sizeof(ValueType);
+      const size_t dstPlaneStride = dstRowStride * image_.height;
       auto* dst = image_.dataPtr<ValueType>()
-        + dstY * dstRowStride + dstX * dstColStride;
+        + dstPlane * dstPlaneStride
+        + dstY * dstRowStride
+        + dstX * dstColStride;
 
       const auto* srcRow = src;
       auto* dstRow = dst;
 
       auto loop = [&](auto processor) {
-        for (int plane = 0; plane < planes; ++plane) {
-          for (int row = 0; row < rectInfo.height; ++row) {
-            if (src >= srcEnd) {
-              // We've reached the end of the source tile
-              throw std::runtime_error("Unexpected end of source tile");
+        for (int row = 0; row < rectInfo.height; ++row) {
+          if (src >= srcEnd) {
+            // We've reached the end of the source tile
+            throw std::runtime_error("Unexpected end of source tile");
+          }
+          srcRow = src;
+          dstRow = dst;
+          for (int col = 0; col < rectInfo.width; ++col) {
+            auto* dstChan = dstRow;
+            for (int chan = 0; chan < channels; ++chan) {
+              DstType value = processor();
+              *dstChan = std::invoke(op, value);
+              dstChan += dstChanStride;
             }
-            srcRow = src;
-            dstRow = dst;
-            for (int col = 0; col < rectInfo.width; ++col) {
-              for (int chan = 0; chan < channels; ++chan) {
-                DstType value = processor();
-                *dstRow++ = std::invoke(op, value);;
-              }
-            }
-            src += rectInfo.stride;
-            dst += dstRowStride;
-            // flush partial words when the row is complete
-            if (countAvail > 0) {
-              countAvail = 0;
-              bitsAvail = 0;
-            }
+            dstRow += dstColStride;
+          }
+          src += rectInfo.stride;
+          dst += dstRowStride;
+          // flush partial words when the row is complete
+          if (countAvail > 0) {
+            countAvail = 0;
+            bitsAvail = 0;
           }
         }
       };
@@ -693,8 +468,8 @@ namespace TiffCraft {
 
       // create the image and copy the pixel data
       image_ = Image::make<DstType, 1>(getWidth(ifd), getHeight(ifd));
-      using Op = std::function<DstType(DstType)>;
-      copyRectangles<SrcType,DstType,Op>(
+      using UnaryOp = std::function<DstType(DstType)>;
+      copyRectangles<SrcType,DstType,UnaryOp>(
         imageData, // source pixel data
         rectInfo,  // rectangle info
         1, // source image channels
@@ -742,8 +517,8 @@ namespace TiffCraft {
 
       // create the image and copy the pixel data
       image_ = Image::make<DstType, 3>(getWidth(ifd), getHeight(ifd));
-      using Op = std::function<Rgb<DstType>(DstType)>;
-      copyRectangles<SrcType,DstType,Op>(
+      using UnaryOp = std::function<Rgb<DstType>(DstType)>;
+      copyRectangles<SrcType,DstType,UnaryOp>(
         imageData, // source pixel data
         rectInfo,  // rectangle info
         1, // source image channels
@@ -797,20 +572,19 @@ namespace TiffCraft {
       const size_t maxSrcValue = bitsPerSample < sizeof(size_t) * 8
         ? (size_t(1) << bitsPerSample) - 1 : std::numeric_limits<size_t>::max();
 
+      const auto rectInfo = getRectInfo(ifd);
+
       // create the image and copy the pixel data
       image_ = Image::make<DstType, 3>(getWidth(ifd), getHeight(ifd), isPlanar);
-      auto* dst = image_.dataPtr<DstType>();
-      using UnaryOp = std::function<void(DstType)>;
-      copyPixels<SrcType,DstType,UnaryOp>(
+      using UnaryOp = std::function<DstType(DstType)>;
+      copyRectangles<SrcType,DstType,UnaryOp>(
         imageData, // source pixel data
-        image_.width, // source image width
-        image_.height, // source image height
-        3, // source image channels
-        bitsPerSample, // source bits per sample
-        isPlanar, // source is planar
-        header.equalsHostByteOrder(), // source data byte order
-        [&](DstType value) {
-          *dst++ = (value * maxDstValue) / maxSrcValue;
+        rectInfo,  // rectangle info
+        isPlanar ? 1 : samplesPerPixel, // source image channels
+        isPlanar ? samplesPerPixel : 1, // source image planes
+        header.equalsHostByteOrder(),   // source data byte order
+        [&](DstType value) -> DstType {
+          return (value * maxDstValue) / maxSrcValue;
         }
       );
     }
