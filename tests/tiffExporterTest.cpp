@@ -320,7 +320,7 @@ TEST_CASE("TiffExporterRgbTest", "[flower_image][flower_rgb_planar]") {
   }
 }
 
-TEST_CASE("TiffExporterJimTest", "[jim_image]") {
+TEST_CASE("TiffExporterLibTiffPicsTest", "[libtiff_pics]") {
   { // 1 bit
     std::vector<std::string> testFiles = {
       "libtiff-pics/jim___ah.tif",
@@ -329,7 +329,7 @@ TEST_CASE("TiffExporterJimTest", "[jim_image]") {
     using Exporter = TiffExporterGray<uint8_t>;
     TestExporter<Exporter>(testFiles);
   }
-  { // 8 bits
+  { // Gray 8 bits
     std::vector<std::string> testFiles = {
       "libtiff-pics/jim___cg.tif",
       "reference_images/jim___cg.pgm",
@@ -337,6 +337,22 @@ TEST_CASE("TiffExporterJimTest", "[jim_image]") {
       "reference_images/jim___dg.pgm",
       "libtiff-pics/jim___gg.tif",
       "reference_images/jim___gg.pgm"
+    };
+    using Exporter = TiffExporterGray<uint8_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+  { // RGB 8 bits
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/pc260001.tif",
+      "reference_images/pc260001.ppm",
+    };
+    using Exporter = TiffExporterRgb<uint8_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+  { // Tiled gray 8 bits
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/cramps-tile.tif",
+      "reference_images/cramps-tile.pgm",
     };
     using Exporter = TiffExporterGray<uint8_t>;
     TestExporter<Exporter>(testFiles);

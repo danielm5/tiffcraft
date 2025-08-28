@@ -11,7 +11,6 @@
 #include <optional>
 #include <cstdint>
 #include <fstream>
-#include <iomanip>
 #include <cassert>
 #include <memory>
 #include <string>
@@ -551,6 +550,15 @@ namespace TiffCraft {
 
       const std::map<Tag, Entry>& entries() const { return entries_; }
 
+      const Entry& getEntry(Tag tag,
+        std::string errorMessage = "Entry not found") const {
+        auto it = entries_.find(tag);
+        if (it == entries_.end()) {
+          throw std::runtime_error(errorMessage);
+        }
+        return it->second;
+      }
+
       static IFD read(std::istream& stream, bool mustSwap = false) {
         IFD ifd;
 
@@ -624,23 +632,15 @@ namespace TiffCraft {
       return image;
     }
 
-    static ImageData readImageData(std::istream& stream, const IFD& ifd) {
+    static ImageData readImageStrips(std::istream& stream, const IFD& ifd) {
       const auto& entries = ifd.entries();
       std::vector<uint32_t> stripOffsets, stripByteCounts;
       { //copy offsets
-        auto it = entries.find(Tag::StripOffsets);
-        if (it == entries.end()) {
-          throw std::runtime_error("StripOffsets entry not found in IFD");
-        }
-        const auto& entry = it->second;
+        const auto& entry = ifd.getEntry(Tag::StripOffsets, "StripOffsets entry not found in IFD");
         copyVector<uint32_t>(entry.type(), entry.values(), entry.count(), stripOffsets);
       }
       { //copy byte counts
-        auto it = entries.find(Tag::StripByteCounts);
-        if (it == entries.end()) {
-          throw std::runtime_error("StripByteCounts entry not found in IFD");
-        }
-        const auto& entry = it->second;
+        const auto& entry = ifd.getEntry(Tag::StripByteCounts, "StripByteCounts entry not found in IFD");
         copyVector<uint32_t>(entry.type(), entry.values(), entry.count(), stripByteCounts);
       }
       if (stripOffsets.size() != stripByteCounts.size()) {
@@ -652,6 +652,33 @@ namespace TiffCraft {
         const uint32_t byteCount = stripByteCounts[i];
         if (offset < 8 || byteCount == 0) {
           throw std::runtime_error("Invalid strip offset or byte count");
+        }
+        imageData.emplace_back(byteCount);
+        readAt(stream, offset, imageData.back().data(), byteCount);
+      }
+      return imageData;
+    }
+
+    static ImageData readImageTiles(std::istream& stream, const IFD& ifd) {
+      const auto& entries = ifd.entries();
+      std::vector<uint32_t> tileOffsets, tileByteCounts;
+      { //copy offsets
+        const auto& entry = ifd.getEntry(Tag::TileOffsets, "TileOffsets entry not found in IFD");
+        copyVector<uint32_t>(entry.type(), entry.values(), entry.count(), tileOffsets);
+      }
+      { //copy byte counts
+        const auto& entry = ifd.getEntry(Tag::TileByteCounts, "TileByteCounts entry not found in IFD");
+        copyVector<uint32_t>(entry.type(), entry.values(), entry.count(), tileByteCounts);
+      }
+      if (tileOffsets.size() != tileByteCounts.size()) {
+        throw std::runtime_error("Mismatch between number of TileOffsets and TileByteCounts");
+      }
+      ImageData imageData;
+      for (size_t i = 0; i < tileOffsets.size(); ++i) {
+        const uint32_t offset = tileOffsets[i];
+        const uint32_t byteCount = tileByteCounts[i];
+        if (offset < 8 || byteCount == 0) {
+          throw std::runtime_error("Invalid tile offset or byte count");
         }
         imageData.emplace_back(byteCount);
         readAt(stream, offset, imageData.back().data(), byteCount);
@@ -686,7 +713,15 @@ namespace TiffCraft {
         // If a specific IFD index is requested, only process that IFD
         // Otherwise, process all IFDs
         const auto& ifd = image.ifds()[i];
-        callback(header, ifd, TiffImage::readImageData(stream, ifd));
+        if (ifd.entries().contains(Tag::StripOffsets)) {
+          // image contains strip offsets
+          callback(header, ifd, TiffImage::readImageStrips(stream, ifd));
+        } else if (ifd.entries().contains(Tag::TileByteCounts)) {
+          // image contains tile byte counts
+          callback(header, ifd, TiffImage::readImageTiles(stream, ifd));
+        } else {
+          throw std::runtime_error("Unsupported IFD format");
+        }
       }
     }
   }

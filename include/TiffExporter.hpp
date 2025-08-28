@@ -74,6 +74,13 @@ namespace TiffCraft {
   static_assert(sizeof(Rgb16) == 6, "Rgb16 size must be 6 bytes");
   static_assert(sizeof(Rgb32) == 12, "Rgb32 size must be 12 bytes");
 
+  class FormatNotSupportedError : public std::runtime_error
+  {
+  public:
+    explicit FormatNotSupportedError(const std::string& format)
+      : std::runtime_error("Format not supported: " + format) {}
+  };
+
   // Base class for TIFF exporters
   class TiffExporter
   {
@@ -163,7 +170,7 @@ namespace TiffCraft {
     {
       const int value = getInt(ifd, tag, defaultValue);
       if (!comp(value, requiredValue)) {
-        throw std::runtime_error(
+        throw FormatNotSupportedError(
           "Unsupported " + std::to_string(static_cast<int>(tag)) +
           " value: " + std::to_string(value) +
           ", expected: " + std::to_string(requiredValue));
@@ -206,7 +213,7 @@ namespace TiffCraft {
     {
       auto bitsPerSample = getIntVec(ifd, Tag::BitsPerSample);
       if (!comp(bitsPerSample, requiredValue)) {
-        throw std::runtime_error("Unsupported bits per sample");
+        throw FormatNotSupportedError("Unsupported bits per sample");
       }
       return bitsPerSample;
     }
@@ -377,7 +384,7 @@ namespace TiffCraft {
     // }
 
     template <typename SrcType, typename DstType, typename UnaryOp>
-    void copyPixels(
+    static void copyPixels(
       const TiffImage::ImageData& imageData,  // source pixel data
       size_t width,                           // source image width
       size_t height,                          // source image height
@@ -484,6 +491,145 @@ namespace TiffCraft {
       }
     }
 
+    template <typename SrcType, typename DstType, typename UnaryOp>
+    void copyTiles(
+      const TiffImage::ImageData& imageData,  // source pixel data
+      size_t tileWidth,                       // tile image width
+      size_t tileHeight,                      // tile image height
+      size_t tileStride,                      // tile row stride in bytes
+      size_t channels,                        // source image channels
+      size_t planes,                          // source image planes
+      size_t bitsPerSample,                   // source bits per sample
+      bool equalsHostByteOrder,               // source data byte order
+      UnaryOp&& op)
+    {
+      const int imageWidth = image_.width;
+      const int imageHeight = image_.height;
+
+      const int tilesAcross = (imageWidth + (tileWidth - 1)) / tileWidth;
+      const int tilesDown = (imageHeight + (tileHeight - 1)) / tileHeight;
+
+      const int tilesInImage = tilesAcross * tilesDown * planes;
+      if (tilesInImage != imageData.size()) {
+        throw std::runtime_error("Tile count mismatch");
+      }
+
+      for (int tileY = 0; tileY < tilesDown; ++tileY) {
+        for (int tileX = 0; tileX < tilesAcross; ++tileX) {
+          const auto& tile = imageData[tileY * tilesAcross + tileX];
+          const int width = std::min(tileWidth, imageWidth - tileX * tileWidth);
+          const int height = std::min(tileHeight, imageHeight - tileY * tileHeight);
+          copyTile<SrcType, DstType, UnaryOp>(
+            tile,                        // source pixel data
+            width,                       // tile image width
+            height,                      // tile image height
+            tileStride,                  // tile row stride in bytes
+            channels,                    // source image channels
+            planes,                      // source image planes
+            bitsPerSample,               // source bits per sample
+            equalsHostByteOrder,         // source data byte order
+            tileX * tileWidth,           // destination column
+            tileY * tileHeight,          // destination row
+            std::forward<UnaryOp>(op));
+        }
+      }
+
+    }
+
+    template <typename SrcType, typename DstType, typename UnaryOp>
+    void copyTile(
+      const std::vector<std::byte>& tile,     // source pixel data
+      size_t tileWidth,                       // tile image width
+      size_t tileHeight,                      // tile image height
+      size_t tileStride,                      // tile row stride in bytes
+      size_t channels,                        // source image channels
+      size_t planes,                          // source image planes
+      size_t bitsPerSample,                   // source bits per sample
+      bool equalsHostByteOrder,               // source data byte order
+      size_t dstX,                            // destination column
+      size_t dstY,                            // destination row
+      UnaryOp&& op)
+    {
+      constexpr size_t bitsPerSrcPixel = 8 * sizeof(SrcType);
+      const auto* src = tile.data();
+
+      size_t countAvail = 0;
+      SrcType bitsAvail = 0;
+
+      const size_t dstRowStride = image_.rowStride / sizeof(DstType);
+      const size_t dstColStride = image_.colStride / sizeof(DstType);
+      auto* dst = image_.dataPtr<DstType>()
+        + dstY * dstRowStride + dstX * dstColStride;
+
+      const auto* srcRow = src;
+      auto* dstRow = dst;
+
+      auto loop = [&](auto processor) {
+        for (int plane = 0; plane < planes; ++plane) {
+          for (int row = 0; row < tileHeight; ++row) {
+            srcRow = src;
+            dstRow = dst;
+            for (int col = 0; col < tileWidth; ++col) {
+              for (int chan = 0; chan < channels; ++chan) {
+                DstType value = processor();
+                *dstRow++ = std::invoke(op, value); // Apply the unary operation
+              }
+            }
+            src += tileStride;
+            dst += dstRowStride;
+            // flush partial words when the row is complete
+            if (countAvail > 0) {
+              countAvail = 0;
+              bitsAvail = 0;
+            }
+          }
+        }
+      };
+
+      auto process_word = [&]() -> DstType {
+        DstType value = *reinterpret_cast<const SrcType*>(&(*srcRow));
+        srcRow += sizeof(SrcType);
+        if (!equalsHostByteOrder) {
+          value = swap(value);
+        }
+        return value;
+      };
+
+      auto process_bits = [&]() -> DstType {
+        size_t count = 0;
+        DstType value = 0;
+        while (count < bitsPerSample) {
+          // make sure we have some bits available
+          if (countAvail == 0) {
+            bitsAvail = *reinterpret_cast<const SrcType*>(&(*srcRow));
+            srcRow += sizeof(SrcType);
+            if (!equalsHostByteOrder) {
+              bitsAvail = swap(bitsAvail);
+            }
+            countAvail = bitsPerSrcPixel;
+          }
+          // consume available bits
+          const size_t n = std::min(bitsPerSample - count, countAvail);
+          value <<= n;
+          value |= (bitsAvail >> (bitsPerSrcPixel - n));
+          count += n;
+          // update available bits
+          countAvail -= n;
+          bitsAvail <<= n;
+        }
+        assert(count == bitsPerSample);
+        return value;
+      };
+
+      if (bitsPerSample == bitsPerSrcPixel) {
+        // Fast path: bits per sample matches source pixel size
+        loop(process_word);
+      } else {
+        // Slow path: bits per sample does not match source pixel size
+        loop(process_bits);
+      }
+    }
+
     void invertColors() {
       uint8_t* data = image_.dataPtr<uint8_t>();
       for (size_t i = 0; i < image_.data.size(); ++i) {
@@ -514,11 +660,39 @@ namespace TiffCraft {
       const size_t maxSrcValue = bitsPerSample < sizeof(size_t) * 8
         ? (size_t(1) << bitsPerSample) - 1 : std::numeric_limits<size_t>::max();
 
+      const int imageWidth = getWidth(ifd);
+      const int imageHeight = getHeight(ifd);
+
+      const int rowsPerStrip = getInt(ifd, Tag::RowsPerStrip, imageHeight);
+
+      const int tileWidth = getInt(ifd, Tag::TileWidth, imageWidth);
+      const int tileHeight = getInt(ifd, Tag::TileLength, rowsPerStrip);
+      const int tileStride = (tileWidth * bitsPerSample + 7) / 8;
+
       // create the image and copy the pixel data
-      image_ = Image::make<DstType, 1>(getWidth(ifd), getHeight(ifd));
+      image_ = Image::make<DstType, 1>(imageWidth, imageHeight);
+
+      #if 1
+      using Op = std::function<DstType(DstType)>;
+      copyTiles<SrcType,DstType,Op>(
+        imageData, // source pixel data
+        tileWidth, // tile width
+        tileHeight, // tile height
+        tileStride, // tile row stride in bytes
+        1, // source image channels
+        1, // source image planes
+        bitsPerSample, // source bits per sample
+        header.equalsHostByteOrder(), // source data byte order
+        [&](DstType value) -> DstType {
+          return (value * maxDstValue) / maxSrcValue;
+        }
+      );
+
+      #else
+
       auto* dst = image_.dataPtr<DstType>();
-      using UnaryOp = std::function<void(DstType)>;
-      copyPixels<SrcType,DstType,UnaryOp>(
+      using Op = std::function<void(DstType)>;
+      copyPixels<SrcType,DstType,Op>(
         imageData, // source pixel data
         image_.width, // source image width
         image_.height, // source image height
@@ -530,6 +704,8 @@ namespace TiffCraft {
           *dst++ = (value * maxDstValue) / maxSrcValue;
         }
       );
+
+      #endif
 
       if (photometricInterpretation == 0) { // WhiteIsZero
         invertColors();
@@ -607,7 +783,7 @@ namespace TiffCraft {
         [](int value, int requiredValue) {
           return value == 1 || value == 2; // 1 for Contiguous, 2 for Planar
         });
-      const bool isPlanar = planarConfiguration == 2;
+      const bool isPlanar = (planarConfiguration == 2);
 
       const auto bitsPerSampleVec = getIntVec(ifd, Tag::BitsPerSample);
       if (bitsPerSampleVec.size() != 3) {

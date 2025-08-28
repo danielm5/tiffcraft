@@ -388,7 +388,7 @@ TEST_CASE("TiffImage class", "[tiff_image]") {
     #undef value_span
   #endif
 
-    auto imageData = image.readImageData(image.stream(), ifds[0]);
+    auto imageData = image.readImageStrips(image.stream(), ifds[0]);
     constexpr size_t expectedImageDataSize = 664 * 813 / 8; // 1 bit per pixel
     size_t actualImageDataSize = 0;
     for (const auto& data : imageData) {
@@ -424,6 +424,44 @@ TEST_CASE("TiffImage class", "[tiff_image]") {
         size_t actualImageDataSize = 0;
         for (const auto& data : imageData) { actualImageDataSize += data.size(); }
         REQUIRE(actualImageDataSize == expectedImageDataSize);
+      }
+    );
+  }
+
+  { // cramps-tile.tif: using load function
+    const std::string test_file = "cramps-tile.tif";
+    std::cout << "Test file path: " << getTestFilePath(test_file) << std::endl;
+    load(getTestFilePath(test_file),
+      [](const TiffImage::Header& header, const TiffImage::IFD& ifd, TiffImage::ImageData imageData) {
+        std::cout << "Loaded IFD with " << ifd.entries().size() << " entries." << std::endl;
+        std::cout << "Image data size: " << imageData.size() << std::endl;
+
+        const auto& entries = ifd.entries();
+
+      #ifdef HAS_SPAN
+        #define value_span(type, tag) entries.at(tag).values<type>()
+
+        REQUIRE(value_span(uint16_t, Tag::ImageWidth) == make_span<uint16_t>({ 800 }));
+        REQUIRE(value_span(uint16_t, Tag::ImageLength) == make_span<uint16_t>({ 607 }));
+        REQUIRE(value_span(uint16_t, Tag::Compression) == make_span<uint16_t>({ 1 }));
+        REQUIRE(value_span(uint16_t, Tag::PhotometricInterpretation) == make_span<uint16_t>({ 0 }));
+        REQUIRE(value_span(uint16_t, Tag::TileWidth) == make_span<uint16_t>({ 256 }));
+        REQUIRE(value_span(uint16_t, Tag::TileLength) == make_span<uint16_t>({ 256 }));
+        REQUIRE(value_span(uint16_t, Tag::SamplesPerPixel) == make_span<uint16_t>({ 1 }));
+        REQUIRE(value_span(uint16_t, Tag::BitsPerSample) == make_span<uint16_t>({ 8 }));
+
+        #undef value_span
+      #endif
+
+        constexpr size_t tilesAcross = (800 + (256 - 1)) / 256;
+        constexpr size_t tilesDown = (607 + (256 - 1)) / 256;
+        constexpr size_t tilesInImage = tilesAcross * tilesDown;
+        REQUIRE(imageData.size() == tilesInImage);
+
+        constexpr size_t expectedTileSize = 256 * 256;
+        for (const auto& tile : imageData) {
+          REQUIRE(tile.size() == expectedTileSize);
+        }
       }
     );
   }

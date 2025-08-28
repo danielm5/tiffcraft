@@ -29,6 +29,8 @@ namespace TiffCraft {
     SamplesPerPixel = 0x0115,
     RowsPerStrip = 0x0116,
     StripByteCounts = 0x0117,
+    MinSampleValue = 0x0118,
+    MaxSampleValue = 0x0119,
     XResolution = 0x011A,
     YResolution = 0x011B,
     PlanarConfiguration = 0x011C,
@@ -68,6 +70,8 @@ namespace TiffCraft {
       case TiffCraft::Tag::SamplesPerPixel: return "SamplesPerPixel";
       case TiffCraft::Tag::RowsPerStrip: return "RowsPerStrip";
       case TiffCraft::Tag::StripByteCounts: return "StripByteCounts";
+      case TiffCraft::Tag::MinSampleValue: return "MinSampleValue";
+      case TiffCraft::Tag::MaxSampleValue: return "MaxSampleValue";
       case TiffCraft::Tag::XResolution: return "XResolution";
       case TiffCraft::Tag::YResolution: return "YResolution";
       case TiffCraft::Tag::PlanarConfiguration: return "PlanarConfiguration";
