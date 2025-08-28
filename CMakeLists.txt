@@ -37,4 +37,4 @@ enable_testing()
 add_subdirectory(tests)
 
 # Build apps
-add_subdirectory(apps)
+#add_subdirectory(apps)
