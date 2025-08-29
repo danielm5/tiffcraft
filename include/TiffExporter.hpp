@@ -21,7 +21,6 @@ namespace TiffCraft {
     int colStride = 0;      // Bytes per pixel
     int chanStride = 0;     // Bytes per channel
     int bitDepth = 0;       // Bits per channel
-    bool isFloat = false;   // True if floating-point data, false if integer data
     std::vector<std::byte> data;  // Raw pixel data
 
     template <typename T, int N = 1>
@@ -33,14 +32,12 @@ namespace TiffCraft {
           width, height, N,                     // width, height, channels
           width * sT,  sT, width * height * sT, // strides: row, column, channel
           sT * 8,                               // bit depth
-          std::is_floating_point_v<T>,          // is float
           std::vector<std::byte>(width * height * N * sT) };
       }
       return Image{
         width, height, N,             // width, height, channels
         width * N * sT,  N * sT, sT,  // strides: row, column, channel
         sT * 8,                       // bit depth
-        std::is_floating_point_v<T>,  // is float
         std::vector<std::byte>(width * height * N * sT) };
     }
 
@@ -587,6 +584,89 @@ namespace TiffCraft {
           return (value * maxDstValue) / maxSrcValue;
         }
       );
+    }
+  };
+
+  // TiffExporter implementation for all supported image types ---------------
+  class TiffExporterAny : public TiffExporter
+  {
+    bool exported_ = false;
+  public:
+    // Callback for TiffCraft::load() function
+    void operator()(
+      const TiffImage::Header& header,
+      const TiffImage::IFD& ifd,
+      TiffImage::ImageData imageData) override
+    {
+      const int photometricInterpretation = getInt(ifd, Tag::PhotometricInterpretation, 1);
+
+      if (photometricInterpretation >= 0 && photometricInterpretation <= 1) {
+        // grayscale image types
+        const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
+        if (bitsPerSample <= 8) {
+          tryToExport<TiffExporterGray<uint8_t>>(header, ifd, imageData);
+        } else if (bitsPerSample <= 15) {
+          tryToExport<TiffExporterGray<uint16_t,uint8_t>>(header, ifd, imageData);
+        } else if (bitsPerSample == 16) {
+          tryToExport<TiffExporterGray<uint16_t>>(header, ifd, imageData);
+        } else if (bitsPerSample <= 31) {
+          tryToExport<TiffExporterGray<uint32_t,uint8_t>>(header, ifd, imageData);
+        } else if (bitsPerSample == 32) {
+          tryToExport<TiffExporterGray<uint32_t>>(header, ifd, imageData);
+        }
+      } else if (photometricInterpretation == 2) {
+        // RGB image types
+        std::vector<int> bitsPerSampleVec = getIntVec(ifd, Tag::BitsPerSample);
+        if (bitsPerSampleVec.size() > 0
+          && std::any_of(bitsPerSampleVec.begin(), bitsPerSampleVec.end(),
+            [&](int n) { return n != bitsPerSampleVec.front(); })) {
+          throw std::runtime_error("Unsupported bits per sample for RGB image");
+        }
+        const int bitsPerSample = bitsPerSampleVec.empty() ? 1 : bitsPerSampleVec.front();
+        if (bitsPerSample <= 8) {
+          tryToExport<TiffExporterRgb<uint8_t>>(header, ifd, imageData);
+        } else if (bitsPerSample <= 15) {
+          tryToExport<TiffExporterRgb<uint16_t,uint8_t>>(header, ifd, imageData);
+        } else if (bitsPerSample == 16) {
+          tryToExport<TiffExporterRgb<uint16_t>>(header, ifd, imageData);
+        } else if (bitsPerSample <= 31) {
+          tryToExport<TiffExporterRgb<uint32_t,uint8_t>>(header, ifd, imageData);
+        } else if (bitsPerSample == 32) {
+          tryToExport<TiffExporterRgb<uint32_t>>(header, ifd, imageData);
+        }
+      } else if (photometricInterpretation == 3) {
+        // palette-color image types
+        const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
+        if (bitsPerSample <= 8) {
+          tryToExport<TiffExporterPalette<uint8_t>>(header, ifd, imageData);
+        } else if (bitsPerSample <= 16) {
+          tryToExport<TiffExporterPalette<uint16_t>>(header, ifd, imageData);
+        }
+      }
+
+      if (!exported_ || image_.dataSize() == 0)
+      { // image was not exported
+        throw FormatNotSupportedError("No exporter can handle this image");
+      }
+    }
+
+    template <typename Exporter>
+    void tryToExport(const TiffImage::Header& header,
+                     const TiffImage::IFD& ifd,
+                     TiffImage::ImageData imageData)
+    {
+      if (!exported_) {
+        // Image has not been exported yet
+        try {
+          // Try with the provided exporter
+          Exporter exporter;
+          exporter(header, ifd, imageData);
+          image_ = exporter.takeImage();
+          exported_ = true;
+        } catch (const FormatNotSupportedError&) {
+          // Image format not supported by the current exporter, ignore
+        }
+      }
     }
   };
 }

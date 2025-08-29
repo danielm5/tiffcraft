@@ -199,7 +199,7 @@ TEST_CASE("TiffExporterPaletteTest", "[flower_image][flower_palette]") {
       "libtiff-pics/depth/flower-palette-04.tif",
       "reference_images/flower-palette-04.ppm",
       "libtiff-pics/depth/flower-palette-08.tif",
-      "reference_images/flower-palette-08.ppm"
+      "reference_images/flower-palette-08.ppm",
     };
     using Exporter = TiffExporterPalette<uint8_t>;
     TestExporter<Exporter>(testFiles);
@@ -207,7 +207,7 @@ TEST_CASE("TiffExporterPaletteTest", "[flower_image][flower_palette]") {
   { // 16 bits
     std::vector<std::string> testFiles = {
       "libtiff-pics/depth/flower-palette-16.tif",
-      "reference_images/flower-palette-16.ppm"
+      "reference_images/flower-palette-16.ppm",
     };
     using Exporter = TiffExporterPalette<uint16_t>;
     TestExporter<Exporter>(testFiles);
@@ -224,7 +224,7 @@ TEST_CASE("TiffExporterRgbTest", "[flower_image][flower_rgb_contiguous]") {
       "libtiff-pics/depth/flower-rgb-contig-08.tif",
       "reference_images/flower-rgb-contig-08.ppm",
       "libtiff-pics/depth/flower-separated-contig-08.tif",
-      "reference_images/flower-separated-contig-08.ppm"
+      "reference_images/flower-separated-contig-08.ppm",
     };
     using Exporter = TiffExporterRgb<uint8_t>;
     TestExporter<Exporter>(testFiles);
@@ -277,7 +277,7 @@ TEST_CASE("TiffExporterRgbTest", "[flower_image][flower_rgb_planar]") {
       "libtiff-pics/depth/flower-rgb-planar-08.tif",
       "reference_images/flower-rgb-planar-08.ppm",
       "libtiff-pics/depth/flower-separated-planar-08.tif",
-      "reference_images/flower-separated-planar-08.ppm"
+      "reference_images/flower-separated-planar-08.ppm",
     };
     using Exporter = TiffExporterRgb<uint8_t>;
     TestExporter<Exporter>(testFiles);
@@ -324,7 +324,7 @@ TEST_CASE("TiffExporterLibTiffPicsTest", "[libtiff_pics]") {
   { // 1 bit
     std::vector<std::string> testFiles = {
       "libtiff-pics/jim___ah.tif",
-      "reference_images/jim___ah.pbm"
+      "reference_images/jim___ah.pbm",
     };
     using Exporter = TiffExporterGray<uint8_t>;
     TestExporter<Exporter>(testFiles);
@@ -336,7 +336,7 @@ TEST_CASE("TiffExporterLibTiffPicsTest", "[libtiff_pics]") {
       "libtiff-pics/jim___dg.tif",
       "reference_images/jim___dg.pgm",
       "libtiff-pics/jim___gg.tif",
-      "reference_images/jim___gg.pgm"
+      "reference_images/jim___gg.pgm",
     };
     using Exporter = TiffExporterGray<uint8_t>;
     TestExporter<Exporter>(testFiles);
@@ -356,5 +356,113 @@ TEST_CASE("TiffExporterLibTiffPicsTest", "[libtiff_pics]") {
     };
     using Exporter = TiffExporterGray<uint8_t>;
     TestExporter<Exporter>(testFiles);
+  }
+}
+
+TEST_CASE("TiffExporterAnyTest", "[flower_image][libtiff_pics][all_images]") {
+  { // grayscale images
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-minisblack-02.tif",
+      "reference_images/flower-minisblack-02.pgm",
+      "libtiff-pics/depth/flower-minisblack-04.tif",
+      "reference_images/flower-minisblack-04.pgm",
+      "libtiff-pics/depth/flower-minisblack-06.tif",
+      "reference_images/flower-minisblack-06.pgm",
+      "libtiff-pics/depth/flower-minisblack-08.tif",
+      "reference_images/flower-minisblack-08.pgm",
+      "libtiff-pics/depth/flower-minisblack-10.tif",
+      "reference_images/flower-minisblack-10.pgm",
+      "libtiff-pics/depth/flower-minisblack-12.tif",
+      "reference_images/flower-minisblack-12.pgm",
+      "libtiff-pics/depth/flower-minisblack-14.tif",
+      "reference_images/flower-minisblack-14.pgm",
+      "libtiff-pics/depth/flower-minisblack-16.tif",
+      "reference_images/flower-minisblack-16.pgm",
+      "libtiff-pics/depth/flower-minisblack-24.tif",
+      "reference_images/flower-minisblack-24.pgm",
+      "libtiff-pics/depth/flower-minisblack-32.tif",
+      "reference_images/flower-minisblack-32.pgm",
+    };
+    TestExporter<TiffExporterAny>(testFiles);
+  }
+  { // palette-color images
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-palette-02.tif",
+      "reference_images/flower-palette-02.ppm",
+      "libtiff-pics/depth/flower-palette-04.tif",
+      "reference_images/flower-palette-04.ppm",
+      "libtiff-pics/depth/flower-palette-08.tif",
+      "reference_images/flower-palette-08.ppm",
+      "libtiff-pics/depth/flower-palette-16.tif",
+      "reference_images/flower-palette-16.ppm",
+    };
+    TestExporter<TiffExporterAny>(testFiles);
+  }
+  { // RGB images (flower)
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-rgb-contig-02.tif",
+      "reference_images/flower-rgb-contig-02.ppm",
+      "libtiff-pics/depth/flower-rgb-contig-04.tif",
+      "reference_images/flower-rgb-contig-04.ppm",
+      "libtiff-pics/depth/flower-rgb-contig-08.tif",
+      "reference_images/flower-rgb-contig-08.ppm",
+      "libtiff-pics/depth/flower-separated-contig-08.tif",
+      "reference_images/flower-separated-contig-08.ppm",
+      "libtiff-pics/depth/flower-rgb-contig-10.tif",
+      "reference_images/flower-rgb-contig-10.ppm",
+      "libtiff-pics/depth/flower-rgb-contig-12.tif",
+      "reference_images/flower-rgb-contig-12.ppm",
+      "libtiff-pics/depth/flower-rgb-contig-14.tif",
+      "reference_images/flower-rgb-contig-14.ppm",
+      "libtiff-pics/depth/flower-rgb-contig-16.tif",
+      "reference_images/flower-rgb-contig-16.ppm",
+      "libtiff-pics/depth/flower-rgb-contig-24.tif",
+      "reference_images/flower-rgb-contig-24.ppm",
+      "libtiff-pics/depth/flower-rgb-contig-32.tif",
+      "reference_images/flower-rgb-contig-32.ppm",
+    };
+    TestExporter<TiffExporterAny>(testFiles);
+  }
+  { // RGB images planar (flower)
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/depth/flower-rgb-planar-02.tif",
+      "reference_images/flower-rgb-planar-02.ppm",
+      "libtiff-pics/depth/flower-rgb-planar-04.tif",
+      "reference_images/flower-rgb-planar-04.ppm",
+      "libtiff-pics/depth/flower-rgb-planar-08.tif",
+      "reference_images/flower-rgb-planar-08.ppm",
+      "libtiff-pics/depth/flower-separated-planar-08.tif",
+      "reference_images/flower-separated-planar-08.ppm",
+      "libtiff-pics/depth/flower-rgb-planar-10.tif",
+      "reference_images/flower-rgb-planar-10.ppm",
+      "libtiff-pics/depth/flower-rgb-planar-12.tif",
+      "reference_images/flower-rgb-planar-12.ppm",
+      "libtiff-pics/depth/flower-rgb-planar-14.tif",
+      "reference_images/flower-rgb-planar-14.ppm",
+      "libtiff-pics/depth/flower-rgb-planar-16.tif",
+      "reference_images/flower-rgb-planar-16.ppm",
+      "libtiff-pics/depth/flower-rgb-planar-24.tif",
+      "reference_images/flower-rgb-planar-24.ppm",
+      "libtiff-pics/depth/flower-rgb-planar-32.tif",
+      "reference_images/flower-rgb-planar-32.ppm",
+    };
+    TestExporter<TiffExporterAny>(testFiles);
+  }
+  { // libtiff-pics
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/jim___ah.tif",
+      "reference_images/jim___ah.pbm",
+      "libtiff-pics/jim___cg.tif",
+      "reference_images/jim___cg.pgm",
+      "libtiff-pics/jim___dg.tif",
+      "reference_images/jim___dg.pgm",
+      "libtiff-pics/jim___gg.tif",
+      "reference_images/jim___gg.pgm",
+      "libtiff-pics/pc260001.tif",
+      "reference_images/pc260001.ppm",
+      "libtiff-pics/cramps-tile.tif",
+      "reference_images/cramps-tile.pgm",
+    };
+    TestExporter<TiffExporterAny>(testFiles);
   }
 }

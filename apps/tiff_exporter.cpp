@@ -12,67 +12,8 @@
 
 using namespace TiffCraft;
 
-void saveImage(const std::string& filename, const Image& image)
-{
-  // only png is supported for now
-  if (filename.substr(filename.find_last_of(".") + 1) != "png") {
-    throw std::runtime_error("Only PNG format is supported for saving images");
-  }
-
-  // Single channel 8-bit non-float image
-  if (image.channels == 1 && image.bitDepth == 8 && !image.isFloat) {
-    if (image.colStride != 1 || image.chanStride != 1) {
-      throw std::runtime_error("Invalid strides for single channel 8-bit image");
-    }
-    if (!stbi_write_png(filename.c_str(), image.width, image.height, image.channels,
-          reinterpret_cast<const uint8_t*>(image.data.data()), image.rowStride)) {
-      throw std::runtime_error("Failed to save PNG image");
-    }
-    return; // Success
-  }
-
-  // 3-channel 8-bit RGB image
-  if (image.channels == 3 && image.bitDepth == 8 && !image.isFloat) {
-    if (image.colStride != 3 || image.chanStride != 1) {
-      throw std::runtime_error("Invalid strides for 3-channel 8-bit RGB image");
-    }
-    if (!stbi_write_png(filename.c_str(), image.width, image.height, image.channels,
-          reinterpret_cast<const uint8_t*>(image.data.data()), image.rowStride)) {
-      throw std::runtime_error("Failed to save PNG image");
-    }
-    return; // Success
-  }
-
-  throw std::runtime_error("Unsupported image format for saving");
-}
-
-class TiffHandler
-{
-  Image image_;
-public:
-
-  const Image& image() const { return image_; }
-  [[nodiscard]] Image takeImage() const { return std::move(image_); }
-
-  void operator()(
-    const TiffImage::Header& header,
-    const TiffImage::IFD& ifd,
-    TiffImage::ImageData imageData)
-  {
-    try {
-      TiffExporterPalette<uint16_t> exporter;
-      exporter(header, ifd, imageData);
-      image_ = exporter.takeImage();
-      return;
-    }
-    catch (const std::exception& ex) {
-      //ignore
-    }
-
-    // otherwise image format is not supported
-    throw std::runtime_error("Unsupported image format");
-  }
-};
+Image convertImageTo8Bits(Image image);
+void saveImage(const std::string& filename, const Image& image);
 
 int main(int argc, char* argv[]) {
   if (argc < 2) {
@@ -86,39 +27,116 @@ int main(int argc, char* argv[]) {
   LoadParams loadParams;
   loadParams.ifdIndex = 0; // Load the first IFD by default
 
-  TiffHandler tiffHandler;
+  TiffExporterAny tiffExporter;
 
   try {
     std::cout << "Loading TIFF file: " << input_file << std::endl;
-    load(input_file, std::ref(tiffHandler), loadParams);
+    load(input_file, std::ref(tiffExporter), loadParams);
   }
   catch (const std::exception& ex) {
     std::cerr << "Error: " << ex.what() << std::endl;
     return 1;
   }
 
-  if (tiffHandler.image().data.empty()) {
+  if (tiffExporter.image().data.empty()) {
     std::cerr << "No image data loaded." << std::endl;
     return 1;
   }
 
-  Image image = tiffHandler.takeImage();
-  if (image.bitDepth == 16)
-  { //convert to 8bits
-    uint8_t* dst = image.dataPtr<uint8_t>();
-    const uint16_t* src = image.dataPtr<uint16_t>();
-    for (size_t i = 0; i < image.dataSize() / 2; ++i) {
-      dst[i] = static_cast<uint8_t>(src[i] >> 8);
-    }
-    image.data.resize(image.dataSize() / 2);
-    image.bitDepth = 8;
-    image.rowStride /= 2;
-    image.colStride /= 2;
-    image.chanStride /= 2;
-  }
-
+  const Image image = convertImageTo8Bits(tiffExporter.takeImage());
   std::cout << "Saving image as: " << output_file << std::endl;
   saveImage(output_file, image);
 
   return 0;
+}
+
+Image convertImageTo8Bits(Image image)
+{
+  Image image8;
+  if (image.channels == 1)
+  {
+    image8 = Image::make<uint8_t, 1>(image.width, image.height);
+  }
+  else if (image.channels == 3)
+  {
+    image8 = Image::make<uint8_t, 3>(image.width, image.height);
+  }
+  else
+  {
+    throw std::runtime_error("Unsupported number of channels for conversion to 8 bits");
+  }
+
+  auto copyImage = [&]<typename SrcType>() {
+
+    auto* src = image.dataPtr<SrcType>();
+    const auto srcRowStride = image.rowStride / sizeof(SrcType);
+    const auto srcColStride = image.colStride / sizeof(SrcType);
+    const auto srcChanStride = image.chanStride / sizeof(SrcType);
+    const auto srcShift = sizeof(SrcType) * 8 - 8;
+
+    auto* dst = image8.dataPtr<uint8_t>();
+
+    for (int h = 0; h < image.height; ++h) {
+      const auto* srcRow = src + h * srcRowStride;
+      auto* dstRow = dst + h * image8.rowStride;
+      for (int w = 0; w < image.width; ++w) {
+        const auto* srcPixel = srcRow + w * srcColStride;
+        auto* dstPixel = dstRow + w * image8.colStride;
+        for (int c = 0; c < image.channels; ++c) {
+          const auto* srcChan = srcPixel + c * srcChanStride;
+          auto* dstChan = dstPixel + c * image8.chanStride;
+          *dstChan = static_cast<uint8_t>(*srcChan >> srcShift);
+        }
+      }
+    }
+  };
+
+  if (image.bitDepth == 16) {
+    copyImage.template operator()<uint16_t>();
+  }
+  else if (image.bitDepth == 32) {
+    copyImage.template operator()<uint32_t>();
+  }
+  else if (image.bitDepth == 8) {
+    copyImage.template operator()<uint8_t>();
+  }
+  else {
+    throw std::runtime_error("Unsupported bit depth for conversion to 8 bits");
+  }
+
+  return image8;
+}
+
+void saveImage(const std::string& filename, const Image& image)
+{
+  // only png is supported for now
+  if (filename.substr(filename.find_last_of(".") + 1) != "png") {
+    throw std::runtime_error("Only PNG format is supported for saving images");
+  }
+
+  // Single channel 8-bit non-float image
+  if (image.channels == 1 && image.bitDepth == 8) {
+    if (image.colStride != 1 || image.chanStride != 1) {
+      throw std::runtime_error("Invalid strides for single channel 8-bit image");
+    }
+    if (!stbi_write_png(filename.c_str(), image.width, image.height, image.channels,
+          reinterpret_cast<const uint8_t*>(image.data.data()), image.rowStride)) {
+      throw std::runtime_error("Failed to save PNG image");
+    }
+    return; // Success
+  }
+
+  // 3-channel 8-bit RGB image
+  if (image.channels == 3 && image.bitDepth == 8) {
+    if (image.colStride != 3 || image.chanStride != 1) {
+      throw std::runtime_error("Invalid strides for 3-channel 8-bit RGB image");
+    }
+    if (!stbi_write_png(filename.c_str(), image.width, image.height, image.channels,
+          reinterpret_cast<const uint8_t*>(image.data.data()), image.rowStride)) {
+      throw std::runtime_error("Failed to save PNG image");
+    }
+    return; // Success
+  }
+
+  throw std::runtime_error("Unsupported image format for saving");
 }
