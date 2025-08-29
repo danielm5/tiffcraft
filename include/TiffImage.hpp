@@ -1,5 +1,58 @@
+// BSD 2-Clause License
 // Copyright (c) 2025 Daniel Moreno
-// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+//
+// 1. Redistributions of source code must retain the above copyright notice,
+//    this list of conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright notice,
+//    this list of conditions and the following disclaimer in the documentation
+//    and/or other materials provided with the distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS”
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+// ---------------------------------------------------------------------------
+//
+// TiffImage.hpp
+// =============
+// This file contains the TiffImage class and related functionality. This class
+// holds TIFF image metadata and provides access to the image structure and
+// pixel data. No functionality for manipulating or interpreting the image data
+// is provided here.
+//
+// A program like the following could be used for loading a TIFF image with your
+// custom processing:
+//
+//     #include <TiffImage.hpp>
+//     #include <iostream>
+//
+//     int main() {
+//       TiffCraft::load("image.tiff",
+//         [](const TiffCraft::TiffImage::Header& header,
+//            const TiffCraft::TiffImage::IFD& ifd,
+//            TiffCraft::TiffImage::ImageData imageData) {
+//           std::cout << "Loaded IFD with " << ifd.entries().size()
+//                     << " entries." << std::endl;
+//           std::cout << "Image data size: " << imageData.size() << std::endl;
+//
+//           // Add your own image processing code here
+//
+//         });
+//
+//       return 0;
+//     }
+//
 
 #pragma once
 
@@ -48,6 +101,17 @@ namespace std {
 #endif
 
 namespace TiffCraft {
+
+  // TiffCraft version
+  constexpr int MAJOR_VERSION = 0;
+  constexpr int MINOR_VERSION = 1;
+  constexpr int PATCH_VERSION = 0;
+
+  std::string version() {
+    return std::to_string(MAJOR_VERSION)
+      + "." + std::to_string(MINOR_VERSION)
+      + "." + std::to_string(PATCH_VERSION);
+  }
 
   template <typename T>
   struct RationalT {
@@ -139,22 +203,22 @@ namespace TiffCraft {
 
   template <typename F>
   decltype(auto) dispatchType(Type type, F&& f) {
-      switch (type) {
-          case Type::BYTE:      return f.template operator()<Type::BYTE>();
-          case Type::ASCII:     return f.template operator()<Type::ASCII>();
-          case Type::SHORT:     return f.template operator()<Type::SHORT>();
-          case Type::LONG:      return f.template operator()<Type::LONG>();
-          case Type::RATIONAL:  return f.template operator()<Type::RATIONAL>();
-          case Type::SBYTE:     return f.template operator()<Type::SBYTE>();
-          case Type::UNDEFINED: return f.template operator()<Type::UNDEFINED>();
-          case Type::SSHORT:    return f.template operator()<Type::SSHORT>();
-          case Type::SLONG:     return f.template operator()<Type::SLONG>();
-          case Type::SRATIONAL: return f.template operator()<Type::SRATIONAL>();
-          case Type::FLOAT:     return f.template operator()<Type::FLOAT>();
-          case Type::DOUBLE:    return f.template operator()<Type::DOUBLE>();
-          default:
-              throw std::runtime_error("Unknown TIFF entry type");
-      }
+    switch (type) {
+      case Type::BYTE:      return f.template operator()<Type::BYTE>();
+      case Type::ASCII:     return f.template operator()<Type::ASCII>();
+      case Type::SHORT:     return f.template operator()<Type::SHORT>();
+      case Type::LONG:      return f.template operator()<Type::LONG>();
+      case Type::RATIONAL:  return f.template operator()<Type::RATIONAL>();
+      case Type::SBYTE:     return f.template operator()<Type::SBYTE>();
+      case Type::UNDEFINED: return f.template operator()<Type::UNDEFINED>();
+      case Type::SSHORT:    return f.template operator()<Type::SSHORT>();
+      case Type::SLONG:     return f.template operator()<Type::SLONG>();
+      case Type::SRATIONAL: return f.template operator()<Type::SRATIONAL>();
+      case Type::FLOAT:     return f.template operator()<Type::FLOAT>();
+      case Type::DOUBLE:    return f.template operator()<Type::DOUBLE>();
+      default:
+        throw std::runtime_error("Unknown TIFF entry type");
+    }
   }
 
   inline uint32_t typeBytes(Type type) {
