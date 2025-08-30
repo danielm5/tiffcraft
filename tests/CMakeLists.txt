@@ -9,8 +9,12 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(Catch2)
 
+enable_testing()
+
 add_executable(tiffImageTest tiffImageTest.cpp)
 target_link_libraries(tiffImageTest PRIVATE TiffCraft Catch2::Catch2WithMain)
+add_test(NAME tiffImageTest COMMAND tiffImageTest)
 
 add_executable(tiffExporterTest tiffExporterTest.cpp netpbm.hpp)
 target_link_libraries(tiffExporterTest PRIVATE TiffCraft Catch2::Catch2WithMain)
+add_test(NAME tiffExporterTest COMMAND tiffExporterTest)

@@ -63,6 +63,7 @@
 #include <stdexcept>
 #include <optional>
 #include <cstdint>
+#include <cstring>
 #include <fstream>
 #include <cassert>
 #include <memory>
