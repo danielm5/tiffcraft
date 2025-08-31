@@ -33,7 +33,7 @@
 // Usage: tiff_exporter <input.tif> [output.png]
 //
 
-#include "TiffExporter.hpp"
+#include <tiffcraft/TiffExporter.hpp>
 
 #include <algorithm>
 #include <iostream>

@@ -35,6 +35,7 @@
 #include <cstdint>
 
 namespace TiffCraft {
+
   enum class Tag : uint16_t {
     // Image File Directory (IFD) tags
     Null = 0x0000, // Not a real tag, used for padding or as a placeholder

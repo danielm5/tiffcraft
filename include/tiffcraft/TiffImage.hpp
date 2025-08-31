@@ -34,7 +34,7 @@
 // A program like the following could be used for loading a TIFF image with your
 // custom processing:
 //
-//     #include <TiffImage.hpp>
+//     #include <tiffcraft/TiffImage.hpp>
 //     #include <iostream>
 //
 //     int main() {
@@ -72,13 +72,24 @@
 #include <map>
 
 #if __cpp_lib_byteswap >= 201806L
-# include <bit> // C++20 byteswap
-# define HAS_BYTESWAP
+# include <bit> // C++23 byteswap
+#else
+# include <algorithm>
+namespace std {
+  template <typename T>
+  T byteswap(T value) {
+    static_assert(std::is_trivially_copyable_v<T>, "Type must be trivially copyable");
+    T result;
+    std::reverse_copy(reinterpret_cast<const char*>(&value),
+                      reinterpret_cast<const char*>(&value) + sizeof(T),
+                      reinterpret_cast<char*>(&result));
+    return result;
+  }
+}
 #endif
 
 #if __cpp_lib_endian >= 201907L
 # include <bit> // C++20 endian
-# define HAS_ENDIAN
 #else
 namespace std {
   enum class endian
@@ -252,73 +263,33 @@ namespace TiffCraft {
   }
 
   // Utility functions for byte order conversion
-  #ifdef HAS_BYTESWAP
-    inline uint16_t swap16(uint16_t val) { return std::byteswap(val); }
-    inline uint32_t swap32(uint32_t val) { return std::byteswap(val); }
-    inline uint64_t swap64(uint64_t val) { return std::byteswap(val); }
-    inline int16_t swap16(int16_t val) { return std::byteswap(val); }
-    inline int32_t swap32(int32_t val) { return std::byteswap(val); }
-    inline int64_t swap64(int64_t val) { return std::byteswap(val); }
-  #else
-    inline uint16_t swap16(uint16_t val) {
-      return (val << 8) | (val >> 8);
-    }
-    inline uint32_t swap32(uint32_t val) {
-      return  ((val << 24) & 0xFF000000) |
-              ((val << 8)  & 0x00FF0000) |
-              ((val >> 8)  & 0x0000FF00) |
-              ((val >> 24) & 0x000000FF);
-    }
-    inline uint64_t swap64(uint64_t val) {
-      return  ((val << 56) & 0xFF00000000000000ULL) |
-              ((val << 40) & 0x00FF000000000000ULL) |
-              ((val << 24) & 0x0000FF0000000000ULL) |
-              ((val << 8)  & 0x000000FF00000000ULL) |
-              ((val >> 8)  & 0x00000000FF000000ULL) |
-              ((val >> 24) & 0x0000000000FF0000ULL) |
-              ((val >> 40) & 0x000000000000FF00ULL) |
-              ((val >> 56) & 0x00000000000000FFULL);
-    }
-    inline int16_t swap16(int16_t val) {
-      return static_cast<int16_t>(swap16(static_cast<uint16_t>(val)));
-    }
-    inline int32_t swap32(int32_t val) {
-      return static_cast<int32_t>(swap32(static_cast<uint32_t>(val)));
-    }
-    inline int64_t swap64(int64_t val) {
-      return static_cast<int64_t>(swap64(static_cast<uint64_t>(val)));
-    }
-  #endif // HAS_BYTESWAP
-  inline Type swap16(Type val) {
-    return static_cast<Type>(swap16(static_cast<uint16_t>(val)));
-  }
-  inline float swap32(float val) {
-    uint32_t u32;
-    std::memcpy(&u32, &val, sizeof(u32));
-    u32 = swap32(u32);
-    std::memcpy(&val, &u32, sizeof(val));
-    return val;
-  }
-  inline double swap64(double val) {
-    uint64_t u64;
-    std::memcpy(&u64, &val, sizeof(u64));
-    u64 = swap64(u64);
-    std::memcpy(&val, &u64, sizeof(val));
-    return val;
-  }
-
   template <typename T>
   inline T swap(T val) {
-    if constexpr (std::is_same_v<T, uint16_t> || std::is_same_v<T, int16_t> || std::is_same_v<T, Type>) {
-        return swap16(val);
-    } else if constexpr (std::is_same_v<T, uint32_t> || std::is_same_v<T, int32_t> || std::is_same_v<T, float>) {
-        return swap32(val);
-    } else if constexpr (std::is_same_v<T, uint64_t> || std::is_same_v<T, int64_t> || std::is_same_v<T, double>) {
-        return swap64(val);
-    } else if constexpr (std::is_same_v<T, Rational> || std::is_same_v<T, SRational>) {
-        return { swap32(val.numerator), swap32(val.denominator) };
-    } else {
-        return val; // No swap needed for other types
+    if constexpr (std::is_same_v<T, Rational> || std::is_same_v<T, SRational>) {
+      return { std::byteswap(val.numerator), std::byteswap(val.denominator) };
+    } else if constexpr (std::is_same_v<T, float>) {
+      uint32_t u32;
+      std::memcpy(&u32, &val, sizeof(u32));
+      u32 = std::byteswap(u32);
+      std::memcpy(&val, &u32, sizeof(val));
+      return val;
+    } else if constexpr (std::is_same_v<T, double>) {
+      uint64_t u64;
+      std::memcpy(&u64, &val, sizeof(u64));
+      u64 = std::byteswap(u64);
+      std::memcpy(&val, &u64, sizeof(val));
+      return val;
+    } else if constexpr (std::is_same_v<T, Tag>) {
+      const auto value = static_cast<std::underlying_type_t<Tag>>(val);
+      return static_cast<Tag>(std::byteswap(value));
+    } else if constexpr (std::is_same_v<T, Type>) {
+      const auto value = static_cast<std::underlying_type_t<Type>>(val);
+      return static_cast<Type>(std::byteswap(value));
+    } else if constexpr (sizeof(T) > 1) {
+      return std::byteswap(val);
+    }
+    else {
+      return val; // No swap needed single byte
     }
   }
 

@@ -32,6 +32,9 @@ endif()
 add_library(TiffCraft INTERFACE)
 target_include_directories(TiffCraft INTERFACE include)
 
+# Install all files in include/ directory and subdirectories
+install(DIRECTORY include/ DESTINATION include)
+
 # Enable testing
 enable_testing()
 add_subdirectory(tests)

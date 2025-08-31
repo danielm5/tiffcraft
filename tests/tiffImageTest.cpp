@@ -29,8 +29,8 @@
 // Unit tests for <TiffImage.hpp> functions.
 //
 
-#include <TiffCraft.hpp>
-#include <TiffStdOut.hpp>
+#include <tiffcraft/TiffCraft.hpp>
+#include <tiffcraft/TiffStdOut.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -193,8 +193,8 @@ TEST_CASE("TiffImage Header class", "[tiff_header]") {
       {
         if (std::endian::native == std::endian::little && bo == 0x4D4D // "MM" big-endian
             || std::endian::native == std::endian::big && bo == 0x4949) { // "II" little-endian
-          magicNumber = swap16(magicNumber);
-          firstIFDOffset = swap32(firstIFDOffset);
+          magicNumber = std::byteswap(magicNumber);
+          firstIFDOffset = std::byteswap(firstIFDOffset);
         }
       }
 
@@ -287,7 +287,7 @@ TEST_CASE("TiffImage IFD::Entry class", "[tiff_IDF_entry]") {
 
     TiffImage::IFD::Entry entry = TiffImage::IFD::Entry::read(stream, mustSwap);
 
-    const Tag tag = static_cast<Tag>(mustSwap ? swap16(tagInt) : tagInt);
+    const Tag tag = static_cast<Tag>(tagInt);
 
     REQUIRE(entry.tag() == tag);
     REQUIRE(entry.type() == type);

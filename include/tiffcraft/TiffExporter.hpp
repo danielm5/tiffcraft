@@ -34,7 +34,7 @@
 // Code like the following could be used to read TIFF images and get a copy of
 // their pixel data in a flat buffer:
 //
-//     #include "TiffExporter.hpp"
+//     #include <tiffcraft/TiffExporter.hpp>
 //     #include <functional>
 //
 //     int main(int argc, char* argv[]) {

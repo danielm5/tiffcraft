@@ -49,6 +49,21 @@
             ]
         },
         {
+            "name": "(Windows) CTest [win]",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "ctest",
+            "args": [
+                "-C", "Debug",
+                "--rerun-failed",
+                "--output-on-failure"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${command:cmake.buildDirectory}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
             "name": "Python Debugger: Current File",
             "type": "debugpy",
             "request": "launch",

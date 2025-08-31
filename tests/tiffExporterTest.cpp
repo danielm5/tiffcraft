@@ -29,8 +29,7 @@
 // Unit tests for <TiffExporter.hpp> functions.
 //
 
-#include "TiffCraft.hpp"
-#include "TiffExporter.hpp"
+#include <tiffcraft/TiffExporter.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
