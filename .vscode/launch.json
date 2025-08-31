@@ -64,6 +64,20 @@
             "console": "integratedTerminal"
         },
         {
+            "name": "(gdb) CTest [linux]",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/bin/bash",
+            "args": [
+                "-c",
+                "ctest -C Debug --rerun-failed --output-on-failure"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${command:cmake.buildDirectory}",
+            "environment": [],
+            "externalConsole": false
+        },
+        {
             "name": "Python Debugger: Current File",
             "type": "debugpy",
             "request": "launch",

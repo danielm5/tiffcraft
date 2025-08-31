@@ -33,6 +33,7 @@
 #include <tiffcraft/TiffStdOut.hpp>
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_range_equals.hpp>
 
 #include <iostream>
 #include <filesystem>
@@ -402,14 +403,16 @@ TEST_CASE("TiffImage class", "[tiff_image]") {
     REQUIRE(entries.size() == 14);
 
     #define value_span(type, tag) entries.at(tag).values<type>()
+    #define Eq Catch::Matchers::RangeEquals
 
-    REQUIRE(value_span(uint16_t, Tag::ImageWidth) == make_span<uint16_t>({ 664 }));
-    REQUIRE(value_span(uint16_t, Tag::ImageLength) == make_span<uint16_t>({ 813 }));
-    REQUIRE(value_span(uint16_t, Tag::Compression) == make_span<uint16_t>({ 1 }));
-    REQUIRE(value_span(uint16_t, Tag::PhotometricInterpretation) == make_span<uint16_t>({ 0 }));
-    REQUIRE(value_span(Rational, Tag::XResolution) == make_span({ Rational{300, 1} }));
-    REQUIRE(value_span(Rational, Tag::YResolution) == make_span({ Rational{300, 1} }));
+    REQUIRE_THAT(value_span(uint16_t, Tag::ImageWidth), Eq(make_span<uint16_t>({ 664 })));
+    REQUIRE_THAT(value_span(uint16_t, Tag::ImageLength), Eq(make_span<uint16_t>({ 813 })));
+    REQUIRE_THAT(value_span(uint16_t, Tag::Compression), Eq(make_span<uint16_t>({ 1 })));
+    REQUIRE_THAT(value_span(uint16_t, Tag::PhotometricInterpretation), Eq(make_span<uint16_t>({ 0 })));
+    REQUIRE_THAT(value_span(Rational, Tag::XResolution), Eq(make_span({ Rational{300, 1} })));
+    REQUIRE_THAT(value_span(Rational, Tag::YResolution), Eq(make_span({ Rational{300, 1} })));
 
+    #undef Eq
     #undef value_span
 
     auto imageData = image.readImageStrips(image.stream(), ifds[0]);
@@ -432,14 +435,16 @@ TEST_CASE("TiffImage class", "[tiff_image]") {
         const auto& entries = ifd.entries();
 
         #define value_span(type, tag) entries.at(tag).values<type>()
+        #define Eq Catch::Matchers::RangeEquals
 
-        REQUIRE(value_span(uint16_t, Tag::ImageWidth) == make_span<uint16_t>({ 664 }));
-        REQUIRE(value_span(uint16_t, Tag::ImageLength) == make_span<uint16_t>({ 813 }));
-        REQUIRE(value_span(uint16_t, Tag::Compression) == make_span<uint16_t>({ 1 }));
-        REQUIRE(value_span(uint16_t, Tag::PhotometricInterpretation) == make_span<uint16_t>({ 0 }));
-        REQUIRE(value_span(Rational, Tag::XResolution) == make_span({ Rational{300, 1} }));
-        REQUIRE(value_span(Rational, Tag::YResolution) == make_span({ Rational{300, 1} }));
+        REQUIRE_THAT(value_span(uint16_t, Tag::ImageWidth), Eq(make_span<uint16_t>({ 664 })));
+        REQUIRE_THAT(value_span(uint16_t, Tag::ImageLength), Eq(make_span<uint16_t>({ 813 })));
+        REQUIRE_THAT(value_span(uint16_t, Tag::Compression), Eq(make_span<uint16_t>({ 1 })));
+        REQUIRE_THAT(value_span(uint16_t, Tag::PhotometricInterpretation), Eq(make_span<uint16_t>({ 0 })));
+        REQUIRE_THAT(value_span(Rational, Tag::XResolution), Eq(make_span({ Rational{300, 1} })));
+        REQUIRE_THAT(value_span(Rational, Tag::YResolution), Eq(make_span({ Rational{300, 1} })));
 
+        #undef Eq
         #undef value_span
 
         constexpr size_t expectedImageDataSize = 664 * 813 / 8; // 1 bit per pixel
@@ -461,16 +466,18 @@ TEST_CASE("TiffImage class", "[tiff_image]") {
         const auto& entries = ifd.entries();
 
         #define value_span(type, tag) entries.at(tag).values<type>()
+        #define Eq Catch::Matchers::RangeEquals
 
-        REQUIRE(value_span(uint16_t, Tag::ImageWidth) == make_span<uint16_t>({ 800 }));
-        REQUIRE(value_span(uint16_t, Tag::ImageLength) == make_span<uint16_t>({ 607 }));
-        REQUIRE(value_span(uint16_t, Tag::Compression) == make_span<uint16_t>({ 1 }));
-        REQUIRE(value_span(uint16_t, Tag::PhotometricInterpretation) == make_span<uint16_t>({ 0 }));
-        REQUIRE(value_span(uint16_t, Tag::TileWidth) == make_span<uint16_t>({ 256 }));
-        REQUIRE(value_span(uint16_t, Tag::TileLength) == make_span<uint16_t>({ 256 }));
-        REQUIRE(value_span(uint16_t, Tag::SamplesPerPixel) == make_span<uint16_t>({ 1 }));
-        REQUIRE(value_span(uint16_t, Tag::BitsPerSample) == make_span<uint16_t>({ 8 }));
+        REQUIRE_THAT(value_span(uint16_t, Tag::ImageWidth), Eq(make_span<uint16_t>({ 800 })));
+        REQUIRE_THAT(value_span(uint16_t, Tag::ImageLength), Eq(make_span<uint16_t>({ 607 })));
+        REQUIRE_THAT(value_span(uint16_t, Tag::Compression), Eq(make_span<uint16_t>({ 1 })));
+        REQUIRE_THAT(value_span(uint16_t, Tag::PhotometricInterpretation), Eq(make_span<uint16_t>({ 0 })));
+        REQUIRE_THAT(value_span(uint16_t, Tag::TileWidth), Eq(make_span<uint16_t>({ 256 })));
+        REQUIRE_THAT(value_span(uint16_t, Tag::TileLength), Eq(make_span<uint16_t>({ 256 })));
+        REQUIRE_THAT(value_span(uint16_t, Tag::SamplesPerPixel), Eq(make_span<uint16_t>({ 1 })));
+        REQUIRE_THAT(value_span(uint16_t, Tag::BitsPerSample), Eq(make_span<uint16_t>({ 8 })));
 
+        #undef Eq
         #undef value_span
 
         constexpr size_t tilesAcross = (800 + (256 - 1)) / 256;
