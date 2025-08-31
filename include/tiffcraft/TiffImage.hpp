@@ -69,7 +69,9 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <span>
 #include <map>
+#include <bit>
 
 #if __cpp_lib_byteswap >= 201806L
 # include <bit> // C++23 byteswap
@@ -86,30 +88,6 @@ namespace std {
     return result;
   }
 }
-#endif
-
-#if __cpp_lib_endian >= 201907L
-# include <bit> // C++20 endian
-#else
-namespace std {
-  enum class endian
-  {
-  #if defined(_MSC_VER) && !defined(__clang__)
-      little = 0,
-      big    = 1,
-      native = little
-  #else
-      little = __ORDER_LITTLE_ENDIAN__,
-      big    = __ORDER_BIG_ENDIAN__,
-      native = __BYTE_ORDER__
-  #endif
-  };
-}
-#endif
-
-#if __cpp_lib_span >= 20202L
-# include <span>
-# define HAS_SPAN
 #endif
 
 namespace TiffCraft {
@@ -515,7 +493,6 @@ namespace TiffCraft {
         uint32_t count() const { return count_; }
         const std::byte* values() const { return values_.data(); }
 
-#ifdef HAS_SPAN
         template <typename T>
         std::span<const T> values() const {
           if (sizeof(T) != TiffCraft::typeBytes(type_)) {
@@ -523,7 +500,6 @@ namespace TiffCraft {
           }
           return std::span<const T>(reinterpret_cast<const T*>(values_.data()), count());
         }
-#endif // HAS_SPAN
 
         uint32_t bytes() const { return count() * TiffCraft::typeBytes(type_); }
 

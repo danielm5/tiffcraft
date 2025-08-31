@@ -18,3 +18,7 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
 - Initial TiffCraft code for loading TIFF images and exporter for bilevel,
   grayscale, palette-color, and RGB images. Compression is not supported.
 - Example `tiff_exporter` program to convert TIFF images to PNG 8-bit format.
+
+### Changed
+
+- Moved all headers to `include/tiffcraft`.

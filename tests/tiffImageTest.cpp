@@ -53,17 +53,15 @@ namespace TiffCraft {
   }
 }
 
-#ifdef HAS_SPAN
-  template <typename T>
-  bool operator==(const std::span<const T>& lhs, const std::span<const T>& rhs) {
-    return lhs.size() == rhs.size() && std::equal(lhs.begin(), lhs.end(), rhs.begin());
-  }
+template <typename T>
+bool operator==(const std::span<const T>& lhs, const std::span<const T>& rhs) {
+  return lhs.size() == rhs.size() && std::equal(lhs.begin(), lhs.end(), rhs.begin());
+}
 
-  template <typename T>
-  std::span<const T> make_span(std::initializer_list<T> values) {
-    return std::span<const T>(values.begin(), values.size());
-  }
-#endif // HAS_SPAN
+template <typename T>
+std::span<const T> make_span(std::initializer_list<T> values) {
+  return std::span<const T>(values.begin(), values.size());
+}
 
 std::string getTestFilePath(const std::string& filename) {
   std::filesystem::path test_file_path(__FILE__);
@@ -403,7 +401,6 @@ TEST_CASE("TiffImage class", "[tiff_image]") {
     const auto& entries = ifds[0].entries();
     REQUIRE(entries.size() == 14);
 
-  #ifdef HAS_SPAN
     #define value_span(type, tag) entries.at(tag).values<type>()
 
     REQUIRE(value_span(uint16_t, Tag::ImageWidth) == make_span<uint16_t>({ 664 }));
@@ -414,7 +411,6 @@ TEST_CASE("TiffImage class", "[tiff_image]") {
     REQUIRE(value_span(Rational, Tag::YResolution) == make_span({ Rational{300, 1} }));
 
     #undef value_span
-  #endif
 
     auto imageData = image.readImageStrips(image.stream(), ifds[0]);
     constexpr size_t expectedImageDataSize = 664 * 813 / 8; // 1 bit per pixel
@@ -435,7 +431,6 @@ TEST_CASE("TiffImage class", "[tiff_image]") {
 
         const auto& entries = ifd.entries();
 
-      #ifdef HAS_SPAN
         #define value_span(type, tag) entries.at(tag).values<type>()
 
         REQUIRE(value_span(uint16_t, Tag::ImageWidth) == make_span<uint16_t>({ 664 }));
@@ -446,7 +441,6 @@ TEST_CASE("TiffImage class", "[tiff_image]") {
         REQUIRE(value_span(Rational, Tag::YResolution) == make_span({ Rational{300, 1} }));
 
         #undef value_span
-      #endif
 
         constexpr size_t expectedImageDataSize = 664 * 813 / 8; // 1 bit per pixel
         size_t actualImageDataSize = 0;
@@ -466,7 +460,6 @@ TEST_CASE("TiffImage class", "[tiff_image]") {
 
         const auto& entries = ifd.entries();
 
-      #ifdef HAS_SPAN
         #define value_span(type, tag) entries.at(tag).values<type>()
 
         REQUIRE(value_span(uint16_t, Tag::ImageWidth) == make_span<uint16_t>({ 800 }));
@@ -479,7 +472,6 @@ TEST_CASE("TiffImage class", "[tiff_image]") {
         REQUIRE(value_span(uint16_t, Tag::BitsPerSample) == make_span<uint16_t>({ 8 }));
 
         #undef value_span
-      #endif
 
         constexpr size_t tilesAcross = (800 + (256 - 1)) / 256;
         constexpr size_t tilesDown = (607 + (256 - 1)) / 256;
