@@ -178,5 +178,47 @@
       "configurePreset": "gcc-linux-ninja-release",
       "configuration": "Release"
     }
+  ],
+  "testPresets": [
+    {
+      "name": "msvc-win64-debug",
+      "configurePreset": "msvc-win64-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "msvc-win64-release",
+      "configurePreset": "msvc-win64-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "clang-macos-debug",
+      "configurePreset": "clang-macos-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "clang-macos-release",
+      "configurePreset": "clang-macos-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "gcc-linux-debug",
+      "configurePreset": "gcc-linux-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "gcc-linux-release",
+      "configurePreset": "gcc-linux-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "gcc-linux-ninja-debug",
+      "configurePreset": "gcc-linux-ninja-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "gcc-linux-ninja-release",
+      "configurePreset": "gcc-linux-ninja-release",
+      "configuration": "Release"
+    }
   ]
 }

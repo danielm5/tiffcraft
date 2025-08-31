@@ -1,0 +1,37 @@
+name: GitHub Workflow
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: # manually trigger the workflow
+
+permissions:
+  checks: write
+  actions: read
+  contents: read
+
+jobs:
+
+  build:
+    name: Ubuntu-Build
+    runs-on: ubuntu-latest
+
+    env:
+      PRESET_NAME: gcc-linux-release
+
+    steps:
+
+    - name: Checkout source code
+      uses: actions/checkout@v5.0.0
+
+    - name: Checkout submodules
+      run: git submodule update --init --recursive
+
+    - name: Cmake configure
+      run: cmake --preset ${{ env.PRESET_NAME }} ${{ env.CMAKE_CONFIG_OPTIONS }}
+
+    - name: Cmake build
+      run: cmake --build --preset "${{ env.PRESET_NAME }}" -j
+
+    - name: Run Tests
+      run: ctest --preset ${{ env.PRESET_NAME }} --output-on-failure
