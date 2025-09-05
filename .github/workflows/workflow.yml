@@ -3,7 +3,9 @@ name: Build and Test
 on:
   push:
     branches: [ main ]
-  workflow_dispatch: # manually trigger the workflow
+  pull_request:
+    branches: [ main ]  # on pull requests to main branch
+  workflow_dispatch:    # manually trigger the workflow
 
 permissions:
   checks: write

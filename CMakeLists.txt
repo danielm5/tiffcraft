@@ -39,5 +39,6 @@ install(DIRECTORY include/ DESTINATION include)
 enable_testing()
 add_subdirectory(tests)
 
-# Build apps
+# Build apps and code examples
 add_subdirectory(apps)
+add_subdirectory(examples)

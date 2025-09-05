@@ -40,8 +40,8 @@
 //     int main(int argc, char* argv[]) {
 //       if (argc < 2) { return 1; }
 //       TiffCraft::TiffExporterAny tiffExporter;
-//       TiffCraft::load(argv[1], std::ref(tiffExporter), loadParams);
-//       auto image = iffExporter.takeImage();
+//       TiffCraft::load(argv[1], std::ref(tiffExporter));
+//       auto image = tiffExporter.takeImage();
 //
 //       // your own image processing code
 //

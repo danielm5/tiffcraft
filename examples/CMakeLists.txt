@@ -1,0 +1,6 @@
+
+add_executable(tiff_image_example tiff_image.cpp)
+target_link_libraries(tiff_image_example PRIVATE TiffCraft)
+
+add_executable(tiff_exporter_example tiff_exporter.cpp)
+target_link_libraries(tiff_exporter_example PRIVATE TiffCraft)

@@ -11,7 +11,13 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
     MINOR version when you add functionality in a backward compatible manner.
     PATCH version when you make backward compatible bug fixes.
 
-## [Unreleased]
+## [0.2.0-Unreleased]
+
+### Added
+
+- Code examples
+
+## [0.1.0]
 
 ### Added
 

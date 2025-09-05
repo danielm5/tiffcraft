@@ -78,6 +78,28 @@
             "externalConsole": false
         },
         {
+            "name": "(Windows) tiff_image_example",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.buildDirectory}/bin/tiff_image_example.exe",
+            "args": ["tests/libtiff-pics/jim___ah.tif"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "(Windows) tiff_exporter_example",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${command:cmake.buildDirectory}/bin/tiff_exporter_example.exe",
+            "args": ["tests/libtiff-pics/jim___ah.tif"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "console": "integratedTerminal"
+        },
+        {
             "name": "Python Debugger: Current File",
             "type": "debugpy",
             "request": "launch",
