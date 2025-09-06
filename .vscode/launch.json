@@ -64,6 +64,20 @@
             "console": "integratedTerminal"
         },
         {
+            "name": "(lldb) CTest [mac]",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/usr/local/bin/ctest",
+            "args": [
+                "--rerun-failed", "--output-on-failure"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${command:cmake.buildDirectory}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb"
+        },
+        {
             "name": "(gdb) CTest [linux]",
             "type": "cppdbg",
             "request": "launch",
