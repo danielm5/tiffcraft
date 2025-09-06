@@ -59,3 +59,26 @@ jobs:
 
     - name: Run Tests
       run: ctest --preset ${{ env.PRESET_NAME }} --output-on-failure
+
+    build-macos:
+      name: MacOS-Build
+      runs-on: macos-15
+
+      env:
+        PRESET_NAME: clang-macos-release
+
+      steps:
+      - name: Checkout source code
+        uses: actions/checkout@v5.0.0
+
+      - name: Checkout submodules
+        run: git submodule update --init --recursive
+
+      - name: Cmake configure
+        run: cmake --preset ${{ env.PRESET_NAME }} ${{ env.CMAKE_CONFIG_OPTIONS }}
+
+      - name: Cmake build
+        run: cmake --build --preset "${{ env.PRESET_NAME }}" -j
+
+      - name: Run Tests
+        run: ctest --preset ${{ env.PRESET_NAME }} --output-on-failure
