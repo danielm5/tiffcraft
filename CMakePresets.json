@@ -107,6 +107,11 @@
       "inherits": ["clang-unix","macos","make"]
     },
     {
+      "name": "clang-macos-ninja",
+      "hidden": true,
+      "inherits": ["clang-unix","macos","ninja"]
+    },
+    {
       "name": "gcc-linux-make",
       "hidden": true,
       "inherits": ["gcc-unix","linux","make"]
@@ -139,6 +144,14 @@
     {
       "name": "clang-macos-release",
       "inherits": ["clang-macos-make","release-config"]
+    },
+    {
+      "name": "clang-macos-ninja-debug",
+      "inherits": ["clang-macos-ninja","debug-config"]
+    },
+    {
+      "name": "clang-macos-ninja-release",
+      "inherits": ["clang-macos-ninja","release-config"]
     },
     {
       "name": "gcc-linux-debug",
@@ -191,6 +204,16 @@
       "configuration": "Release"
     },
     {
+      "name": "clang-macos-ninja-debug",
+      "configurePreset": "clang-macos-ninja-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "clang-macos-ninja-release",
+      "configurePreset": "clang-macos-ninja-release",
+      "configuration": "Release"
+    },
+    {
       "name": "gcc-linux-debug",
       "configurePreset": "gcc-linux-debug",
       "configuration": "Debug"
@@ -240,6 +263,16 @@
     {
       "name": "clang-macos-release",
       "configurePreset": "clang-macos-release",
+      "configuration": "Release"
+    },
+    {
+      "name": "clang-macos-ninja-debug",
+      "configurePreset": "clang-macos-ninja-debug",
+      "configuration": "Debug"
+    },
+    {
+      "name": "clang-macos-ninja-release",
+      "configurePreset": "clang-macos-ninja-release",
       "configuration": "Release"
     },
     {
