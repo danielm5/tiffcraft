@@ -68,7 +68,7 @@ jobs:
     runs-on: macos-15
 
     env:
-      PRESET_NAME: clang-macos-release
+      PRESET_NAME: clang-macos-ninja-release
 
     steps:
     - name: Checkout source code
