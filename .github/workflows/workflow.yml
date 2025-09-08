@@ -42,7 +42,7 @@ jobs:
     runs-on: windows-2025
 
     env:
-      PRESET_NAME: msvc-win64-release
+      PRESET_NAME: msvc-win64-ninja-release
 
     steps:
     - name: Checkout source code
@@ -50,6 +50,9 @@ jobs:
 
     - name: Checkout submodules
       run: git submodule update --init --recursive
+
+    - name: Set up MSVC environment
+      uses: ilammy/msvc-dev-cmd@v1
 
     - name: Cmake configure
       run: cmake --preset ${{ env.PRESET_NAME }} ${{ env.CMAKE_CONFIG_OPTIONS }}
