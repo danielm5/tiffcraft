@@ -34,8 +34,75 @@
 
 #include "TiffImage.hpp"
 
+#include <string>
 #include <iostream>
 #include <iomanip>
+
+namespace TiffCraft {
+  inline std::string toString(Tag tag)
+  {
+    switch (tag) {
+      case TiffCraft::Tag::Null: return "Null";
+      case TiffCraft::Tag::NewSubfileType: return "NewSubfileType";
+      case TiffCraft::Tag::SubfileType: return "SubfileType";
+      case TiffCraft::Tag::ImageWidth: return "ImageWidth";
+      case TiffCraft::Tag::ImageLength: return "ImageLength";
+      case TiffCraft::Tag::BitsPerSample: return "BitsPerSample";
+      case TiffCraft::Tag::Compression: return "Compression";
+      case TiffCraft::Tag::PhotometricInterpretation: return "PhotometricInterpretation";
+      case TiffCraft::Tag::Thresholding: return "Thresholding";
+      case TiffCraft::Tag::FillOrder: return "FillOrder";
+      case TiffCraft::Tag::DocumentName: return "DocumentName";
+      case TiffCraft::Tag::ImageDescription: return "ImageDescription";
+      case TiffCraft::Tag::Make: return "Make";
+      case TiffCraft::Tag::Model: return "Model";
+      case TiffCraft::Tag::StripOffsets: return "StripOffsets";
+      case TiffCraft::Tag::Orientation: return "Orientation";
+      case TiffCraft::Tag::SamplesPerPixel: return "SamplesPerPixel";
+      case TiffCraft::Tag::RowsPerStrip: return "RowsPerStrip";
+      case TiffCraft::Tag::StripByteCounts: return "StripByteCounts";
+      case TiffCraft::Tag::MinSampleValue: return "MinSampleValue";
+      case TiffCraft::Tag::MaxSampleValue: return "MaxSampleValue";
+      case TiffCraft::Tag::XResolution: return "XResolution";
+      case TiffCraft::Tag::YResolution: return "YResolution";
+      case TiffCraft::Tag::PlanarConfiguration: return "PlanarConfiguration";
+      case TiffCraft::Tag::ResolutionUnit: return "ResolutionUnit";
+      case TiffCraft::Tag::PageName: return "PageName";
+      case TiffCraft::Tag::Software: return "Software";
+      case TiffCraft::Tag::DateTime: return "DateTime";
+      case TiffCraft::Tag::Artist: return "Artist";
+      case TiffCraft::Tag::ColorMap: return "ColorMap";
+      case TiffCraft::Tag::HalftoneHints: return "HalftoneHints";
+      case TiffCraft::Tag::TileWidth: return "TileWidth";
+      case TiffCraft::Tag::TileLength: return "TileLength";
+      case TiffCraft::Tag::TileOffsets: return "TileOffsets";
+      case TiffCraft::Tag::TileByteCounts: return "TileByteCounts";
+      case TiffCraft::Tag::SampleFormat: return "SampleFormat";
+      default: /* unknown tag */ break;
+    }
+    char buf[8] = "0x0000";
+    std::snprintf(buf, sizeof(buf), "0x%04X", static_cast<uint16_t>(tag));
+    return buf;
+  }
+
+  inline std::string_view toString(Type type) {
+    switch (type) {
+      case TiffCraft::Type::BYTE:      return "BYTE";
+      case TiffCraft::Type::ASCII:     return "ASCII";
+      case TiffCraft::Type::SHORT:     return "SHORT";
+      case TiffCraft::Type::LONG:      return "LONG";
+      case TiffCraft::Type::RATIONAL:  return "RATIONAL";
+      case TiffCraft::Type::SBYTE:     return "SBYTE";
+      case TiffCraft::Type::UNDEFINED: return "UNDEFINED";
+      case TiffCraft::Type::SSHORT:    return "SSHORT";
+      case TiffCraft::Type::SLONG:     return "SLONG";
+      case TiffCraft::Type::SRATIONAL: return "SRATIONAL";
+      case TiffCraft::Type::FLOAT:     return "FLOAT";
+      case TiffCraft::Type::DOUBLE:    return "DOUBLE";
+      default:                         return "!UNKNOWN";
+    }
+  }
+}
 
 std::ostream& operator<<(std::ostream& os, TiffCraft::Tag tag) {
   return os << TiffCraft::toString(tag);

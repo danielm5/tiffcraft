@@ -56,8 +56,6 @@
 
 #pragma once
 
-#include "TiffTags.hpp"
-
 #include <type_traits>
 #include <functional>
 #include <stdexcept>
@@ -102,6 +100,51 @@ namespace TiffCraft {
       + "." + std::to_string(MINOR_VERSION)
       + "." + std::to_string(PATCH_VERSION);
   }
+
+  // TIFF known tags
+  // ===============
+  // The enum provides a list of known TIFF tags for easy access and display.
+  // Those tags not included in this list can still be accessed by their
+  // numerical value.
+  enum class Tag : uint16_t {
+    // Image File Directory (IFD) tags
+    Null = 0x0000, // Not a real tag, used for padding or as a placeholder
+    NewSubfileType = 0x00FE,
+    SubfileType = 0x00FF,
+    ImageWidth = 0x0100,
+    ImageLength = 0x0101,
+    BitsPerSample = 0x0102,
+    Compression = 0x0103,
+    PhotometricInterpretation = 0x0106,
+    Thresholding = 0x0107,
+    FillOrder = 0x010A,
+    DocumentName = 0x010D,
+    ImageDescription = 0x010E,
+    Make = 0x010F,
+    Model = 0x0110,
+    StripOffsets = 0x0111,
+    Orientation = 0x0112,
+    SamplesPerPixel = 0x0115,
+    RowsPerStrip = 0x0116,
+    StripByteCounts = 0x0117,
+    MinSampleValue = 0x0118,
+    MaxSampleValue = 0x0119,
+    XResolution = 0x011A,
+    YResolution = 0x011B,
+    PlanarConfiguration = 0x011C,
+    PageName = 0x011D,
+    ResolutionUnit = 0x0128,
+    Software = 0x0131,
+    DateTime = 0x0132,
+    Artist = 0x013B,
+    ColorMap = 0x0140,
+    HalftoneHints = 0x0141,
+    TileWidth = 0x0142,
+    TileLength = 0x0143,
+    TileOffsets = 0x0144,
+    TileByteCounts = 0x0145,
+    SampleFormat = 0x0153,
+  };
 
   template <typename T>
   struct RationalT {
@@ -156,24 +199,6 @@ namespace TiffCraft {
     FLOAT = 11,
     DOUBLE = 12
   };
-
-  std::string_view toString(Type type) {
-    switch (type) {
-      case TiffCraft::Type::BYTE:      return "BYTE";
-      case TiffCraft::Type::ASCII:     return "ASCII";
-      case TiffCraft::Type::SHORT:     return "SHORT";
-      case TiffCraft::Type::LONG:      return "LONG";
-      case TiffCraft::Type::RATIONAL:  return "RATIONAL";
-      case TiffCraft::Type::SBYTE:     return "SBYTE";
-      case TiffCraft::Type::UNDEFINED: return "UNDEFINED";
-      case TiffCraft::Type::SSHORT:    return "SSHORT";
-      case TiffCraft::Type::SLONG:     return "SLONG";
-      case TiffCraft::Type::SRATIONAL: return "SRATIONAL";
-      case TiffCraft::Type::FLOAT:     return "FLOAT";
-      case TiffCraft::Type::DOUBLE:    return "DOUBLE";
-      default:                         return "!UNKNOWN";
-    }
-  }
 
   template <Type type> struct TypeTraits;
   template <> struct TypeTraits<Type::BYTE> { using type = uint8_t; };
