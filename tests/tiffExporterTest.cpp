@@ -31,8 +31,9 @@
 
 #include <tiffcraft/TiffExporter.hpp>
 
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/catch_approx.hpp>
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#define DOCTEST_CONFIG_DOUBLE_STRINGIFY
+#include "doctest.h"
 
 #include <string>
 #include <filesystem>
@@ -57,13 +58,13 @@ void compareToReference(
   auto refImg = netpbm::read<PixelType>(refFilePath.string());
   const int channels = netpbm::is_rgb_v<PixelType> ? 3 : 1;
   const int bitDepth = 8 * sizeof(PixelType) / channels;
-  REQUIRE(image.width == refImg.width);
-  REQUIRE(image.height == refImg.height);
-  REQUIRE(image.channels == channels);
-  REQUIRE(image.bitDepth == bitDepth);
-  REQUIRE(image.dataSize() == channels * refImg.width * refImg.height * (bitDepth / 8));
-  REQUIRE(image.dataSize<PixelType>() == refImg.pixels.size());
-  REQUIRE(image.dataPtr() != nullptr);
+  REQUIRE (image.width == refImg.width);
+  REQUIRE (image.height == refImg.height);
+  REQUIRE (image.channels == channels);
+  REQUIRE (image.bitDepth == bitDepth);
+  REQUIRE (image.dataSize() == channels * refImg.width * refImg.height * (bitDepth / 8));
+  REQUIRE (image.dataSize<PixelType>() == refImg.pixels.size());
+  REQUIRE (image.dataPtr() != nullptr);
   if constexpr (netpbm::is_rgb_v<PixelType>) {
     using T = typename PixelType::value_type;
     const auto* pixels = image.dataPtr<T>();
@@ -76,9 +77,9 @@ void compareToReference(
         const auto red = pixel[0 * image.chanStride / sizeof(T)];
         const auto green = pixel[1 * image.chanStride / sizeof(T)];
         const auto blue = pixel[2 * image.chanStride / sizeof(T)];
-        REQUIRE(double(refRow[col].r) == Catch::Approx(red).margin(margin));
-        REQUIRE(double(refRow[col].g) == Catch::Approx(green).margin(margin));
-        REQUIRE(double(refRow[col].b) == Catch::Approx(blue).margin(margin));
+        REQUIRE (std::abs(double(refRow[col].r) - red) <= margin);
+        REQUIRE (std::abs(double(refRow[col].g) - green) <= margin);
+        REQUIRE (std::abs(double(refRow[col].b) - blue) <= margin);
       }
     }
   } else if constexpr (std::is_same_v<PixelType, bool>) {
@@ -88,7 +89,7 @@ void compareToReference(
       for (size_t col = 0; col < image.width; ++col) {
         const uint8_t* pixel = row + col * image.colStride / sizeof(uint8_t);
         const int refPixel = refImg.pixels[h * refImg.width + col] ? 0x00 : 0xff; // false = white, true = black
-        REQUIRE(refPixel == *pixel);
+        REQUIRE (refPixel == *pixel);
       }
     }
   } else {
@@ -100,7 +101,7 @@ void compareToReference(
       const auto* refRow = refPixels + h * refImg.width;
       for (size_t col = 0; col < image.width; ++col) {
         const auto* pixel = row + col * image.colStride / sizeof(T);
-        REQUIRE(double(refRow[col]) == Catch::Approx(pixel[0]).margin(margin));
+        REQUIRE (std::abs(double(refRow[col]) - pixel[0]) <= margin);
       }
     }
   }
@@ -120,8 +121,8 @@ void TestExporter(const std::vector<std::string>& testFiles)
   for (size_t i = 0; i < testFiles.size() / 2; ++i) {
     const auto tiffFilePath = getFilePath(testFiles[2*i + 0]);
     const auto refFilePath = getFilePath(testFiles[2*i + 1]);
-    INFO("Test file: " + tiffFilePath.string());
-    INFO("Reference file: " + refFilePath.string());
+    INFO(("Test file: " + tiffFilePath.string()));
+    INFO(("Reference file: " + refFilePath.string()));
     load(tiffFilePath.string(), std::ref(exporter), loadParams);
 
     const auto& image = exporter.image();
@@ -161,11 +162,11 @@ void TestExporter(const std::vector<std::string>& testFiles)
       return;
     } catch (const std::exception& ex) { /* ignore */ }
 
-    FAIL("Unsupported reference file format: " + refFilePath.string());
+    FAIL(("Unsupported reference file format: " + refFilePath.string()));
   }
 }
 
-TEST_CASE("TiffExporterGrayTest", "[flower_image][flower_grayscale]") {
+TEST_CASE("TiffExporterGrayTest") {
   { // up to 8 bits
     std::vector<std::string> testFiles = {
       "libtiff-pics/depth/flower-minisblack-02.tif",
@@ -218,7 +219,7 @@ TEST_CASE("TiffExporterGrayTest", "[flower_image][flower_grayscale]") {
   }
 }
 
-TEST_CASE("TiffExporterPaletteTest", "[flower_image][flower_palette]") {
+TEST_CASE("TiffExporterPaletteTest") {
   { // up to 8 bits
     std::vector<std::string> testFiles = {
       "libtiff-pics/depth/flower-palette-02.tif",
@@ -241,7 +242,7 @@ TEST_CASE("TiffExporterPaletteTest", "[flower_image][flower_palette]") {
   }
 }
 
-TEST_CASE("TiffExporterRgbTest", "[flower_image][flower_rgb_contiguous]") {
+TEST_CASE("TiffExporterRgbTest") {
   { // up to 8 bits
     std::vector<std::string> testFiles = {
       "libtiff-pics/depth/flower-rgb-contig-02.tif",
@@ -294,7 +295,7 @@ TEST_CASE("TiffExporterRgbTest", "[flower_image][flower_rgb_contiguous]") {
   }
 }
 
-TEST_CASE("TiffExporterRgbTest", "[flower_image][flower_rgb_planar]") {
+TEST_CASE("TiffExporterRgbTest") {
   { // up to 8 bits
     std::vector<std::string> testFiles = {
       "libtiff-pics/depth/flower-rgb-planar-02.tif",
@@ -347,7 +348,7 @@ TEST_CASE("TiffExporterRgbTest", "[flower_image][flower_rgb_planar]") {
   }
 }
 
-TEST_CASE("TiffExporterLibTiffPicsTest", "[libtiff_pics]") {
+TEST_CASE("TiffExporterLibTiffPicsTest") {
   { // 1 bit
     std::vector<std::string> testFiles = {
       "libtiff-pics/jim___ah.tif",
@@ -386,7 +387,7 @@ TEST_CASE("TiffExporterLibTiffPicsTest", "[libtiff_pics]") {
   }
 }
 
-TEST_CASE("TiffExporterAnyTest", "[flower_image][libtiff_pics][all_images]") {
+TEST_CASE("TiffExporterAnyTest") {
   { // grayscale images
     std::vector<std::string> testFiles = {
       "libtiff-pics/depth/flower-minisblack-02.tif",
