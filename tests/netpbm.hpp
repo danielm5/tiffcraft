@@ -44,6 +44,9 @@ namespace netpbm {
   struct RGB {
     T r, g, b;
     using value_type = T;
+    T& operator[](size_t index) {
+      return reinterpret_cast<T*>(&r)[index];
+    }
   };
   using RGB8 = RGB<uint8_t>;
   using RGB16 = RGB<uint16_t>;
@@ -56,8 +59,14 @@ namespace netpbm {
       size_t maxval;
       std::vector<T> pixels;
   };
-  using Image8 = Image<RGB8>;
-  using Image16 = Image<RGB16>;
+
+  using Image8 = Image<uint8_t>;
+  using Image16 = Image<uint16_t>;
+  using Image32 = Image<uint32_t>;
+
+  using ImageRgb8 = Image<RGB8>;
+  using ImageRgb16 = Image<RGB16>;
+  using ImageRgb32 = Image<RGB32>;
 
   template <typename>
   struct is_rgb : std::false_type {};
@@ -147,4 +156,51 @@ namespace netpbm {
   inline Image<bool> readPBM(const std::string& filename) {
     return read<bool>(filename);
   }
-}
+
+  template <typename PixelType>
+  void write(const std::string& filename, const Image<PixelType>& image) {
+    std::ofstream file(filename);
+    if (!file) throw std::runtime_error("Cannot open file");
+
+    // Write magic number
+    if constexpr (std::is_same_v<PixelType, bool>) {
+      file << "P1\n";
+    } else if constexpr (is_rgb_v<PixelType>) {
+      file << "P3\n";
+    } else {
+      file << "P2\n";
+    }
+
+    // Write image dimensions
+    file << image.width << " " << image.height << "\n";
+
+    // Write max value
+    file << image.maxval << "\n";
+
+    // Write pixel data
+    for (const auto& pixel : image.pixels) {
+      if constexpr (is_rgb_v<PixelType>) {
+        file << static_cast<unsigned long int>(pixel.r) << " "
+             << static_cast<unsigned long int>(pixel.g) << " "
+             << static_cast<unsigned long int>(pixel.b) << "\n";
+      } else {
+        file << static_cast<unsigned long int>(pixel) << "\n";
+      }
+    }
+  }
+
+  template <typename T>
+  void writePPM(const std::string& filename, const Image<RGB<T>>& image) {
+    write<RGB<T>>(filename, image);
+  }
+
+  template <typename T>
+  void writePGM(const std::string& filename, const Image<T>& image) {
+    write<T>(filename, image);
+  }
+
+  inline void writePBM(const std::string& filename, const Image<bool>& image) {
+    write<bool>(filename, image);
+  }
+
+} // namespace netpbm

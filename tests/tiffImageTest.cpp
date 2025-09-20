@@ -32,8 +32,9 @@
 #include <tiffcraft/TiffCraft.hpp>
 #include <tiffcraft/TiffStdOut.hpp>
 
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_range_equals.hpp>
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#define DOCTEST_CONFIG_DOUBLE_STRINGIFY
+#include "doctest.h"
 
 #include <iostream>
 #include <filesystem>
@@ -176,7 +177,7 @@ std::ostream& write_IFD(
   return os;
 }
 
-TEST_CASE("TiffImage Header class", "[tiff_header]") {
+TEST_CASE("TiffImage Header class") {
 
   std::cout << "TiffCraft version: " << TiffCraft::version() << std::endl;
 
@@ -216,8 +217,8 @@ TEST_CASE("TiffImage Header class", "[tiff_header]") {
     headerBytes.write(stream);
 
     TiffImage::Header header = TiffImage::Header::read(stream);
-    REQUIRE(header.byteOrder() == std::endian::little);
-    REQUIRE(header.equalsHostByteOrder() == isHostLittleEndian());
+    CHECK(header.byteOrder() == std::endian::little);
+    CHECK(header.equalsHostByteOrder() == isHostLittleEndian());
   }
 
   { // Test big-endian header
@@ -226,8 +227,8 @@ TEST_CASE("TiffImage Header class", "[tiff_header]") {
     headerBytes.write(stream);
 
     TiffImage::Header header = TiffImage::Header::read(stream);
-    REQUIRE(header.byteOrder() == std::endian::big);
-    REQUIRE(header.equalsHostByteOrder() == isHostBigEndian());
+    CHECK(header.byteOrder() == std::endian::big);
+    CHECK(header.equalsHostByteOrder() == isHostBigEndian());
   }
 
   { // Test wrong byte order
@@ -235,7 +236,7 @@ TEST_CASE("TiffImage Header class", "[tiff_header]") {
     std::stringstream stream;
     headerBytes.write(stream);
     // This should throw an exception due to invalid byte order
-    REQUIRE_THROWS_AS(TiffImage::Header::read(stream), std::runtime_error);
+    CHECK_THROWS_AS(TiffImage::Header::read(stream), std::runtime_error);
   }
 
   { // Test wrong magic number
@@ -243,7 +244,7 @@ TEST_CASE("TiffImage Header class", "[tiff_header]") {
     std::stringstream stream;
     headerBytes.write(stream);
     // This should throw an exception due to invalid magic number
-    REQUIRE_THROWS_AS(TiffImage::Header::read(stream), std::runtime_error);
+    CHECK_THROWS_AS(TiffImage::Header::read(stream), std::runtime_error);
   }
 
   { // Test wrong offset
@@ -251,27 +252,27 @@ TEST_CASE("TiffImage Header class", "[tiff_header]") {
     std::stringstream stream;
     headerBytes.write(stream);
     // This should throw an exception due to invalid first IFD offset
-    REQUIRE_THROWS_AS(TiffImage::Header::read(stream), std::runtime_error);
+    CHECK_THROWS_AS(TiffImage::Header::read(stream), std::runtime_error);
   }
 
   { // Test invalid stream
     std::stringstream stream;
     // This should throw an exception due to invalid stream
-    REQUIRE_THROWS_AS(TiffImage::Header::read(stream), std::runtime_error);
+    CHECK_THROWS_AS(TiffImage::Header::read(stream), std::runtime_error);
   }
 
   { // fax2d.tif: big-endian
     const std::string test_file = "fax2d.tif";
     std::cout << "Test file path: " << getTestFilePath(test_file) << std::endl;
     std::ifstream file(getTestFilePath(test_file), std::ios::binary);
-    REQUIRE(file.is_open());
-    REQUIRE(file.good());
+    CHECK(file.is_open());
+    CHECK(file.good());
     auto header = TiffImage::Header::read(file);
     std::cout << header << std::endl;
   }
 }
 
-TEST_CASE("TiffImage IFD::Entry class", "[tiff_IDF_entry]") {
+TEST_CASE("TiffImage IFD::Entry class") {
 
   auto testEntry = [](
       uint16_t tagInt, Type type, uint32_t count,
@@ -288,15 +289,15 @@ TEST_CASE("TiffImage IFD::Entry class", "[tiff_IDF_entry]") {
 
     const Tag tag = static_cast<Tag>(tagInt);
 
-    REQUIRE(entry.tag() == tag);
-    REQUIRE(entry.type() == type);
-    REQUIRE(entry.count() == count);
-    REQUIRE(entry.bytes() == count * TiffCraft::typeBytes(type));
-    REQUIRE(entry.values() != nullptr);
+    CHECK(entry.tag() == tag);
+    CHECK(entry.type() == type);
+    CHECK(entry.count() == count);
+    CHECK(entry.bytes() == count * TiffCraft::typeBytes(type));
+    CHECK(entry.values() != nullptr);
 
     const std::byte* valuePtr = entry.values();
     for (uint32_t i = 0; i < entry.bytes(); ++i) {
-      REQUIRE(valuePtr[i] == static_cast<std::byte>(values[i]));
+      CHECK(valuePtr[i] == static_cast<std::byte>(values[i]));
     }
   };
 
@@ -337,7 +338,7 @@ TEST_CASE("TiffImage IFD::Entry class", "[tiff_IDF_entry]") {
   testEntry(0x0105, Type::ASCII, 6, { 'A', 'B', 'C', 'D', 'E', '\0' }, 16);
 }
 
-TEST_CASE("TiffImage IFD class", "[tiff_IFD]") {
+TEST_CASE("TiffImage IFD class") {
 
   // Create a few entries
   std::vector<TiffImage::IFD::Entry> entries;
@@ -363,7 +364,7 @@ TEST_CASE("TiffImage IFD class", "[tiff_IFD]") {
     addEntry(0x0104, Type::RATIONAL, 1, { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }, 12);
     addEntry(0x0105, Type::ASCII, 6, { 'A', 'B', 'C', 'D', 'E', '\0' }, 12);
   }
-  REQUIRE(entries.size() == 5);
+  CHECK(entries.size() == 5);
 
   { // Test writing and reading IFD
     std::stringstream stream;
@@ -373,17 +374,17 @@ TEST_CASE("TiffImage IFD class", "[tiff_IFD]") {
     TiffImage::IFD ifd = TiffImage::IFD::read(stream, false);
 
     // Check the number of entries
-    REQUIRE(ifd.entries().size() == entries.size());
+    CHECK(ifd.entries().size() == entries.size());
 
     // Check each entry
     auto it = ifd.entries().begin();
     for (size_t i = 0; i < entries.size(); ++i, ++it) {
-      REQUIRE(it->second == entries[i]);
+      CHECK(it->second == entries[i]);
     }
   }
 }
 
-TEST_CASE("TiffImage class", "[tiff_image]") {
+TEST_CASE("TiffImage class") {
 
   { // jim___ah.tif
     // Dimensions: 664x813
@@ -397,20 +398,20 @@ TEST_CASE("TiffImage class", "[tiff_image]") {
     std::cout << image << std::endl;
 
     const auto& ifds = image.ifds();
-    REQUIRE(ifds.size() == 1);
+    CHECK(ifds.size() == 1);
 
     const auto& entries = ifds[0].entries();
-    REQUIRE(entries.size() == 14);
+    CHECK(entries.size() == 14);
 
     #define value_span(type, tag) entries.at(tag).values<type>()
-    #define Eq Catch::Matchers::RangeEquals
+    #define Eq(a, b) std::equal(a.begin(), a.end(), b.begin())
 
-    REQUIRE_THAT(value_span(uint16_t, Tag::ImageWidth), Eq(make_span<uint16_t>({ 664 })));
-    REQUIRE_THAT(value_span(uint16_t, Tag::ImageLength), Eq(make_span<uint16_t>({ 813 })));
-    REQUIRE_THAT(value_span(uint16_t, Tag::Compression), Eq(make_span<uint16_t>({ 1 })));
-    REQUIRE_THAT(value_span(uint16_t, Tag::PhotometricInterpretation), Eq(make_span<uint16_t>({ 0 })));
-    REQUIRE_THAT(value_span(Rational, Tag::XResolution), Eq(make_span({ Rational{300, 1} })));
-    REQUIRE_THAT(value_span(Rational, Tag::YResolution), Eq(make_span({ Rational{300, 1} })));
+    CHECK(Eq(value_span(uint16_t, Tag::ImageWidth), make_span<uint16_t>({ 664 })));
+    CHECK(Eq(value_span(uint16_t, Tag::ImageLength), make_span<uint16_t>({ 813 })));
+    CHECK(Eq(value_span(uint16_t, Tag::Compression), make_span<uint16_t>({ 1 })));
+    CHECK(Eq(value_span(uint16_t, Tag::PhotometricInterpretation), make_span<uint16_t>({ 0 })));
+    CHECK(Eq(value_span(Rational, Tag::XResolution), make_span({ Rational{300, 1} })));
+    CHECK(Eq(value_span(Rational, Tag::YResolution), make_span({ Rational{300, 1} })));
 
     #undef Eq
     #undef value_span
@@ -421,7 +422,7 @@ TEST_CASE("TiffImage class", "[tiff_image]") {
     for (const auto& data : imageData) {
       actualImageDataSize += data.size();
     }
-    REQUIRE(actualImageDataSize == expectedImageDataSize);
+    CHECK(actualImageDataSize == expectedImageDataSize);
   }
 
   { // jim___ah.tif: using load function
@@ -435,14 +436,14 @@ TEST_CASE("TiffImage class", "[tiff_image]") {
         const auto& entries = ifd.entries();
 
         #define value_span(type, tag) entries.at(tag).values<type>()
-        #define Eq Catch::Matchers::RangeEquals
+        #define Eq(a, b) std::equal(a.begin(), a.end(), b.begin())
 
-        REQUIRE_THAT(value_span(uint16_t, Tag::ImageWidth), Eq(make_span<uint16_t>({ 664 })));
-        REQUIRE_THAT(value_span(uint16_t, Tag::ImageLength), Eq(make_span<uint16_t>({ 813 })));
-        REQUIRE_THAT(value_span(uint16_t, Tag::Compression), Eq(make_span<uint16_t>({ 1 })));
-        REQUIRE_THAT(value_span(uint16_t, Tag::PhotometricInterpretation), Eq(make_span<uint16_t>({ 0 })));
-        REQUIRE_THAT(value_span(Rational, Tag::XResolution), Eq(make_span({ Rational{300, 1} })));
-        REQUIRE_THAT(value_span(Rational, Tag::YResolution), Eq(make_span({ Rational{300, 1} })));
+        CHECK(Eq(value_span(uint16_t, Tag::ImageWidth), make_span<uint16_t>({ 664 })));
+        CHECK(Eq(value_span(uint16_t, Tag::ImageLength), make_span<uint16_t>({ 813 })));
+        CHECK(Eq(value_span(uint16_t, Tag::Compression), make_span<uint16_t>({ 1 })));
+        CHECK(Eq(value_span(uint16_t, Tag::PhotometricInterpretation), make_span<uint16_t>({ 0 })));
+        CHECK(Eq(value_span(Rational, Tag::XResolution), make_span({ Rational{300, 1} })));
+        CHECK(Eq(value_span(Rational, Tag::YResolution), make_span({ Rational{300, 1} })));
 
         #undef Eq
         #undef value_span
@@ -450,7 +451,7 @@ TEST_CASE("TiffImage class", "[tiff_image]") {
         constexpr size_t expectedImageDataSize = 664 * 813 / 8; // 1 bit per pixel
         size_t actualImageDataSize = 0;
         for (const auto& data : imageData) { actualImageDataSize += data.size(); }
-        REQUIRE(actualImageDataSize == expectedImageDataSize);
+        CHECK(actualImageDataSize == expectedImageDataSize);
       }
     );
   }
@@ -466,16 +467,16 @@ TEST_CASE("TiffImage class", "[tiff_image]") {
         const auto& entries = ifd.entries();
 
         #define value_span(type, tag) entries.at(tag).values<type>()
-        #define Eq Catch::Matchers::RangeEquals
+        #define Eq(a, b) std::equal(a.begin(), a.end(), b.begin())
 
-        REQUIRE_THAT(value_span(uint16_t, Tag::ImageWidth), Eq(make_span<uint16_t>({ 800 })));
-        REQUIRE_THAT(value_span(uint16_t, Tag::ImageLength), Eq(make_span<uint16_t>({ 607 })));
-        REQUIRE_THAT(value_span(uint16_t, Tag::Compression), Eq(make_span<uint16_t>({ 1 })));
-        REQUIRE_THAT(value_span(uint16_t, Tag::PhotometricInterpretation), Eq(make_span<uint16_t>({ 0 })));
-        REQUIRE_THAT(value_span(uint16_t, Tag::TileWidth), Eq(make_span<uint16_t>({ 256 })));
-        REQUIRE_THAT(value_span(uint16_t, Tag::TileLength), Eq(make_span<uint16_t>({ 256 })));
-        REQUIRE_THAT(value_span(uint16_t, Tag::SamplesPerPixel), Eq(make_span<uint16_t>({ 1 })));
-        REQUIRE_THAT(value_span(uint16_t, Tag::BitsPerSample), Eq(make_span<uint16_t>({ 8 })));
+        CHECK(Eq(value_span(uint16_t, Tag::ImageWidth), make_span<uint16_t>({ 800 })));
+        CHECK(Eq(value_span(uint16_t, Tag::ImageLength), make_span<uint16_t>({ 607 })));
+        CHECK(Eq(value_span(uint16_t, Tag::Compression), make_span<uint16_t>({ 1 })));
+        CHECK(Eq(value_span(uint16_t, Tag::PhotometricInterpretation), make_span<uint16_t>({ 0 })));
+        CHECK(Eq(value_span(uint16_t, Tag::TileWidth), make_span<uint16_t>({ 256 })));
+        CHECK(Eq(value_span(uint16_t, Tag::TileLength), make_span<uint16_t>({ 256 })));
+        CHECK(Eq(value_span(uint16_t, Tag::SamplesPerPixel), make_span<uint16_t>({ 1 })));
+        CHECK(Eq(value_span(uint16_t, Tag::BitsPerSample), make_span<uint16_t>({ 8 })));
 
         #undef Eq
         #undef value_span
@@ -483,11 +484,11 @@ TEST_CASE("TiffImage class", "[tiff_image]") {
         constexpr size_t tilesAcross = (800 + (256 - 1)) / 256;
         constexpr size_t tilesDown = (607 + (256 - 1)) / 256;
         constexpr size_t tilesInImage = tilesAcross * tilesDown;
-        REQUIRE(imageData.size() == tilesInImage);
+        CHECK(imageData.size() == tilesInImage);
 
         constexpr size_t expectedTileSize = 256 * 256;
         for (const auto& tile : imageData) {
-          REQUIRE(tile.size() == expectedTileSize);
+          CHECK(tile.size() == expectedTileSize);
         }
       }
     );
