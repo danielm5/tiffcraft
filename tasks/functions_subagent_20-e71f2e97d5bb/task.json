@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "functions_subagent_20-e71f2e97d5bb",
+  "agent_id": "ses_e29dc790effemLAs4WSO513DmI",
+  "subagent_type": "explore",
+  "task_description": "Code impact analysis trail-11",
+  "token_usage": {
+    "input_tokens": 54062,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 985984,
+    "output_tokens": 5046,
+    "api_call_count": 31
+  },
+  "started_at": "2026-11-13T13:20:14.956-05:00",
+  "completed_at": "2026-11-13T13:22:13.940428446-05:00"
+}

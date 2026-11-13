@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "functions_subagent_21-6939d00f2e3b",
+  "agent_id": "ses_e29dc790bffesngwE2XFPcbEr1",
+  "subagent_type": "explore",
+  "task_description": "Build/test impact trail-11",
+  "token_usage": {
+    "input_tokens": 31449,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 484608,
+    "output_tokens": 4073,
+    "api_call_count": 33
+  },
+  "started_at": "2026-11-13T13:20:14.956-05:00",
+  "completed_at": "2026-11-13T13:21:51.433980519-05:00"
+}
