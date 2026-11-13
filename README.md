@@ -17,6 +17,53 @@ TiffCraft is designed based on the following principles:
   - TiffCraft is NOT feature complete at this time! The objective is for guiding
     on-going development.
 
+# Building from source
+
+Prerequisites: CMake >= 3.22, a C++20 compiler, git, and git-lfs.
+
+Clone the repository with its submodules:
+
+```sh
+git clone --recursive https://github.com/danielm5/tiffcraft.git
+```
+
+Existing clones can fetch the fixtures with:
+
+```sh
+git submodule update --init --recursive
+```
+
+The test fixtures live in the `tests/libtiff-pics` submodule and are stored
+in Git LFS. On Debian, install git-lfs with `sudo apt install git-lfs`.
+`./build.sh` runs the submodule and LFS steps for you; otherwise pull the
+fixtures manually:
+
+```sh
+git -C tests/libtiff-pics lfs pull
+```
+
+Build (auto-picks a preset on Linux, Windows, and macOS):
+
+```sh
+./build.sh gcc-linux-release
+```
+
+Run the tests:
+
+```sh
+ctest --preset gcc-linux-release --output-on-failure
+```
+
+or `./run_test.sh`.
+
+Note: without git-lfs the checkout keeps Git LFS pointer files instead of
+real TIFFs, and configure now stops with a clear message instead of failing
+the tests with "Invalid byte order in TIFF header". To remedy, run:
+
+```sh
+git submodule update --init --recursive && git -C tests/libtiff-pics lfs pull
+```
+
 # Usage
 
 For quick access to TIFF image pixel data with individual pixels aligned to

@@ -16,6 +16,11 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
 ### Added
 
 - Code examples
+- README build and test instructions (including git-lfs fixture prerequisites).
+
+### Fixed
+
+- Configure-time check in tests/CMakeLists.txt detects missing or unresolved Git LFS fixtures in tests/libtiff-pics and fails with setup instructions instead of the cryptic "Invalid byte order in TIFF header" test failure.
 
 ## [0.1.0]
 
