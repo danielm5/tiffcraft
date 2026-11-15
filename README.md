@@ -65,8 +65,8 @@ ctest --preset gcc-linux-release --output-on-failure
 or `./run_test.sh`.
 
 Note: without git-lfs the checkout keeps Git LFS pointer files instead of
-real TIFFs, and configure now stops with a clear message instead of failing
-the tests with "Invalid byte order in TIFF header". To remedy, run:
+real TIFFs, and the tests will fail with "Invalid byte order in TIFF header".
+To remedy, run:
 
 ```sh
 git submodule update --init --recursive && git -C tests/libtiff-pics lfs pull

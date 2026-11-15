@@ -17,10 +17,9 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
 
 - Code examples
 - README build and test instructions (including git-lfs fixture prerequisites).
-
-### Fixed
-
-- Configure-time check in tests/CMakeLists.txt detects missing or unresolved Git LFS fixtures in tests/libtiff-pics (LFS pointer signatures for all LFS-tracked extensions, classic TIFF and BigTIFF magic for TIFF files) and fails with setup instructions instead of the cryptic "Invalid byte order in TIFF header" test failure. Hard-fails only when TiffCraft is the top-level project; warns-only when vendored as a subproject.
+- build.sh fetches the tests/libtiff-pics submodule and its Git LFS objects
+  before configuring, so a fresh clone with git-lfs installed builds and
+  tests cleanly.
 
 ## [0.1.0]
 
