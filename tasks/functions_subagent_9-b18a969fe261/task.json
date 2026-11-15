@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "functions_subagent_9-b18a969fe261",
+  "agent_id": "ses_e226f1e0dffeqPsHFxHQDAnrPu",
+  "subagent_type": "explore",
+  "task_description": "Poll code research",
+  "token_usage": {
+    "input_tokens": 0,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 0,
+    "output_tokens": 0,
+    "api_call_count": 0
+  },
+  "started_at": "2026-11-14T23:58:38.965-05:00",
+  "completed_at": "2026-11-15T01:12:02.776457973-05:00"
+}
