@@ -42,7 +42,15 @@ fixtures manually:
 git -C tests/libtiff-pics lfs pull
 ```
 
-Build (auto-picks a preset on Linux, Windows, and macOS):
+Build (`./build.sh` without arguments auto-picks a preset on Linux, Windows,
+and macOS):
+
+```sh
+./build.sh
+```
+
+Or pass an explicit preset (e.g. `gcc-linux-release`, listed in
+`CMakePresets.json`):
 
 ```sh
 ./build.sh gcc-linux-release

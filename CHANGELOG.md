@@ -20,7 +20,7 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
 
 ### Fixed
 
-- Configure-time check in tests/CMakeLists.txt detects missing or unresolved Git LFS fixtures in tests/libtiff-pics and fails with setup instructions instead of the cryptic "Invalid byte order in TIFF header" test failure.
+- Configure-time check in tests/CMakeLists.txt detects missing or unresolved Git LFS fixtures in tests/libtiff-pics (LFS pointer signatures for all LFS-tracked extensions, classic TIFF and BigTIFF magic for TIFF files) and fails with setup instructions instead of the cryptic "Invalid byte order in TIFF header" test failure. Hard-fails only when TiffCraft is the top-level project; warns-only when vendored as a subproject.
 
 ## [0.1.0]
 
