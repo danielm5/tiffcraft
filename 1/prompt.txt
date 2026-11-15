@@ -1,0 +1,49 @@
+Very good findings! I don't want to forget any of this. Please create a GitHub epic with all these things and we'll start addressing them incrementally.
+
+---
+
+tell me more about why the submodule is always dirty?
+
+---
+
+I've reinitialized the submodule and I think it's fixed
+
+---
+
+the question I have is why lfs didn't run the first time I did this
+
+---
+
+ok, thanks! tell me more about what did you mean by build.sh hardening before?
+
+---
+
+I looked at build.sh, I don't think a build script has the authority to update submodules! I think we've built slop just because I didn't realize I didn't have lfs installed in this PC and asked about tests fix
+
+---
+
+what about the github workflow?
+
+---
+
+what I meant about CI was if it would break when we remove the build.sh block?
+
+---
+
+ok, update the epic (non destructively! I'd like to keep the history of changes), then create an issue for removing the build.sh slop and address all the things related to that as mentioned by you before.
+
+---
+
+I'm disatisfied with #24, I asked na agent to address it and I saw changes to the shared preset file. When I asked why it said you've requested it.
+
+---
+
+I've removed the work of the last few days, I've declined the PR, and I closed the issues. I was extremely dissastified with the work done, with the PR reviews from agents, and with the issues drafted and proposed solutions. Now I've booted that agent too and I've chosen you to save the day. Review the epic written by that model and the current code and straight things up.
+
+---
+
+I like your plan, how do we do it?
+
+---
+
+so I ask a question, literally "how do we do it?" and you go rogue and start making changes?

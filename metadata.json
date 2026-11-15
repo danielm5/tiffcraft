@@ -3,7 +3,7 @@
   "checkpoint_id": "01M7ESPXNJZ7VAR4CGBVMWHJE1",
   "strategy": "manual-commit",
   "branch": "bugfix/issue-27",
-  "checkpoints_count": 5,
+  "checkpoints_count": 19,
   "files_touched": [
     "CHANGELOG.md",
     "README.md",
@@ -19,31 +19,38 @@
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
       "prompt": "/0/prompt.txt"
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
+      "prompt": "/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 366525,
+    "input_tokens": 1302754,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 2534400,
-    "output_tokens": 22070,
-    "api_call_count": 58,
+    "cache_read_tokens": 22875712,
+    "output_tokens": 173914,
+    "api_call_count": 177,
     "subagent_tokens": {
-      "input_tokens": 412057,
+      "input_tokens": 463727,
       "cache_creation_tokens": 0,
-      "cache_read_tokens": 6038784,
-      "output_tokens": 41556,
-      "api_call_count": 185
+      "cache_read_tokens": 8602432,
+      "output_tokens": 47310,
+      "api_call_count": 253
     }
   },
   "redaction": {
-    "replacements": 0,
+    "replacements": 28,
     "layers": {
       "betterleaks": 0,
       "connection_string": 0,
       "credential_key": 0,
       "credential_value": 0,
       "credentialed_uri": 0,
-      "entropy": 0,
+      "entropy": 28,
       "key_context": 0,
       "provider_token": 0,
       "shell_stdin": 0
