@@ -28,17 +28,61 @@ if(MSVC)
   add_compile_options(/permissive-)
 endif()
 
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
 # Interface library for public headers
 add_library(TiffCraft INTERFACE)
-target_include_directories(TiffCraft INTERFACE include)
+add_library(TiffCraft::TiffCraft ALIAS TiffCraft)
+
+target_include_directories(TiffCraft INTERFACE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
 
 # Install all files in include/ directory and subdirectories
 install(DIRECTORY include/ DESTINATION include)
 
-# Enable testing
-enable_testing()
-add_subdirectory(tests)
+# Only build the test suite, apps, and examples when consumed standalone;
+# when used via FetchContent or add_subdirectory, build the library only.
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+  set(TIFFCRAFT_BUILD_ALL_DEFAULT ON)
+else()
+  set(TIFFCRAFT_BUILD_ALL_DEFAULT OFF)
+endif()
+option(TIFFCRAFT_BUILD_ALL
+  "Build the TiffCraft tests, apps, and examples" ${TIFFCRAFT_BUILD_ALL_DEFAULT})
 
-# Build apps and code examples
-add_subdirectory(apps)
-add_subdirectory(examples)
+if(TIFFCRAFT_BUILD_ALL)
+  # Enable testing
+  enable_testing()
+  add_subdirectory(tests)
+
+  # Build apps and code examples
+  add_subdirectory(apps)
+  add_subdirectory(examples)
+endif()
+
+# Install/export for find_package consumption
+install(TARGETS TiffCraft EXPORT TiffCraftTargets)
+install(EXPORT TiffCraftTargets
+  FILE TiffCraftTargets.cmake
+  NAMESPACE TiffCraft::
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/TiffCraft
+)
+
+configure_package_config_file(
+  cmake/TiffCraftConfig.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/TiffCraftConfig.cmake
+  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/TiffCraft
+)
+write_basic_package_version_file(
+  ${CMAKE_CURRENT_BINARY_DIR}/TiffCraftConfigVersion.cmake
+  VERSION ${PROJECT_VERSION}
+  COMPATIBILITY SameMajorVersion
+)
+install(FILES
+  ${CMAKE_CURRENT_BINARY_DIR}/TiffCraftConfig.cmake
+  ${CMAKE_CURRENT_BINARY_DIR}/TiffCraftConfigVersion.cmake
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/TiffCraft
+)

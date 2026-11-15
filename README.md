@@ -86,6 +86,45 @@ Advanced users could use TiffCraft for other configurations than those
 enumerated above by writing their customizing any of the existing exporter
 classes, or writing their own from scratch.
 
+# CMake consumption
+
+## FetchContent
+
+TiffCraft is header-only and can be consumed directly from source with
+CMake's `FetchContent` module:
+
+```cmake
+include(FetchContent)
+
+FetchContent_Declare(
+  TiffCraft
+  SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tiffcraft
+)
+FetchContent_MakeAvailable(TiffCraft)
+
+target_link_libraries(my_app PRIVATE TiffCraft::TiffCraft)
+```
+
+When consumed this way, the `TIFFCRAFT_BUILD_ALL` option defaults to `OFF`,
+so the library's tests, apps, and examples are not built.
+
+## find_package
+
+To consume a CMake-installed TiffCraft package:
+
+```sh
+cmake --install /path/to/tiffcraft/build/gcc-linux-release --prefix /path/to/install
+```
+
+```cmake
+find_package(TiffCraft REQUIRED)
+
+target_link_libraries(my_app PRIVATE TiffCraft::TiffCraft)
+```
+
+The installed package provides the `TiffCraft::TiffCraft` namespaced target and
+the public headers under `include/tiffcraft`.
+
 # Feedback
 
 Feedback is welcomed! Please don't hesitate to reach out by opening a
