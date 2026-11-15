@@ -2,9 +2,9 @@
 
 # TiffCraft
 
-TiffCraft is a header-only C++ library for working with TIFF images. At the
-moment, it requires C++20 or newer and contains functionality for reading TIFF
-images in various uncompressed formats.
+TiffCraft is a header-only C++20 library for reading uncompressed TIFF images.
+It provides a customizable image-data export interface and requires no separate
+library binary.
 
 # Objectives
 
