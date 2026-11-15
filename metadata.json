@@ -3,7 +3,7 @@
   "checkpoint_id": "01M7EJW64JA0FXWCVVMH6A2ZV7",
   "strategy": "manual-commit",
   "branch": "bugfix/issue-24",
-  "checkpoints_count": 6,
+  "checkpoints_count": 7,
   "files_touched": [
     "CHANGELOG.md",
     "README.md",
@@ -23,14 +23,21 @@
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
       "prompt": "/0/prompt.txt"
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
+      "prompt": "/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 99790,
+    "input_tokens": 272050,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 1789440,
-    "output_tokens": 19583,
-    "api_call_count": 39,
+    "cache_read_tokens": 5017728,
+    "output_tokens": 30060,
+    "api_call_count": 60,
     "subagent_tokens": {
       "input_tokens": 226515,
       "cache_creation_tokens": 0,
@@ -40,9 +47,9 @@
     }
   },
   "redaction": {
-    "replacements": 6,
+    "replacements": 12,
     "layers": {
-      "betterleaks": 0,
+      "betterleaks": 6,
       "connection_string": 0,
       "credential_key": 0,
       "credential_value": 0,
@@ -52,5 +59,6 @@
       "provider_token": 0,
       "shell_stdin": 0
     }
-  }
+  },
+  "has_review": true
 }
