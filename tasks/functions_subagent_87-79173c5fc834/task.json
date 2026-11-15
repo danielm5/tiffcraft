@@ -1,0 +1,23 @@
+{
+  "tool_use_id": "functions_subagent_87-79173c5fc834",
+  "agent_id": "ses_e20822898ffeNsoXjw9J3sTeaN",
+  "subagent_type": "general",
+  "task_description": "Add regression tests for PR 28",
+  "files": [
+    "CHANGELOG.md",
+    "tests/CMakeLists.txt",
+    "tests/readmeUsageTest.cpp",
+    "tests/tiffExporterTest.cpp",
+    "tests/twoTuLinkTestA.cpp",
+    "tests/twoTuLinkTestB.cpp"
+  ],
+  "token_usage": {
+    "input_tokens": 270695,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1605376,
+    "output_tokens": 8340,
+    "api_call_count": 37
+  },
+  "started_at": "2026-11-15T08:55:28.741-05:00",
+  "completed_at": "2026-11-15T09:00:31.062620622-05:00"
+}

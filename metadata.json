@@ -1,0 +1,52 @@
+{
+  "cli_version": "0.13.4-nightly.202611121940.ce16562b9",
+  "checkpoint_id": "01M7FR5CCH2YWMZ883E48Y3NTK",
+  "strategy": "manual-commit",
+  "branch": "bugfix/issue-27",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "CHANGELOG.md",
+    "tests/CMakeLists.txt",
+    "tests/readmeUsageTest.cpp",
+    "tests/tiffExporterTest.cpp",
+    "tests/twoTuLinkTestA.cpp",
+    "tests/twoTuLinkTestB.cpp"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 237519,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1447424,
+    "output_tokens": 11165,
+    "api_call_count": 16,
+    "subagent_tokens": {
+      "input_tokens": 270695,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 1605376,
+      "output_tokens": 8340,
+      "api_call_count": 37
+    }
+  },
+  "redaction": {
+    "replacements": 0,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 0,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}
