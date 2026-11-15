@@ -102,17 +102,16 @@ namespace TiffCraft {
       default:                         return "!UNKNOWN";
     }
   }
-}
 
-std::ostream& operator<<(std::ostream& os, TiffCraft::Tag tag) {
+  inline std::ostream& operator<<(std::ostream& os, TiffCraft::Tag tag) {
   return os << TiffCraft::toString(tag);
 }
 
-std::ostream& operator<<(std::ostream& os, TiffCraft::Type type) {
+  inline std::ostream& operator<<(std::ostream& os, TiffCraft::Type type) {
   return os << TiffCraft::toString(type);
 }
 
-std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::Header& header) {
+  inline std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::Header& header) {
   os << "TIFF Header:\n"
      << " - Byte Order: " << (header.byteOrder() == std::endian::little ? "Little Endian" : "Big Endian") << "\n"
      << " - First IFD Offset: " << header.firstIFDOffset() << "\n"
@@ -120,8 +119,7 @@ std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::Header& h
   return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::IFD::Entry& entry) {
-  using namespace TiffCraft;
+  inline std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::IFD::Entry& entry) {
   os << "Tag: " << entry.tag() << "; "
      << "Type: " << entry.type() << "; "
      << "Count: " << entry.count() << ": "
@@ -134,7 +132,7 @@ std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::IFD::Entr
       const std::byte* value = entry.values() + i * TiffCraft::typeBytes(entry.type());
       switch (entry.type()) {
         case Type::BYTE:
-          os << " " << *reinterpret_cast<const TypeTraits_t<Type::BYTE>*>(value);
+          os << " " << static_cast<int>(*reinterpret_cast<const TypeTraits_t<Type::BYTE>*>(value));
           break;
         case Type::SHORT:
           os << " " << *reinterpret_cast<const TypeTraits_t<Type::SHORT>*>(value);
@@ -187,7 +185,7 @@ std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::IFD::Entr
   return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::IFD& ifd) {
+  inline std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::IFD& ifd) {
   struct AutoRestore {
     std::ostream& os_;
     std::ios_base::fmtflags flags_;
@@ -204,7 +202,7 @@ std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage::IFD& ifd)
   return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage& image) {
+  inline std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage& image) {
   struct AutoRestore {
     std::ostream& os_;
     std::ios_base::fmtflags flags_;
@@ -221,3 +219,5 @@ std::ostream& operator<<(std::ostream& os, const TiffCraft::TiffImage& image) {
   os << "TIFF IMAGE END -------------------------\n";
   return os;
 }
+
+} // namespace TiffCraft

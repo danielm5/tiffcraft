@@ -69,6 +69,7 @@
 #include <vector>
 #include <span>
 #include <map>
+#include <set>
 #include <bit>
 
 #if __cpp_lib_byteswap >= 201806L
@@ -95,7 +96,7 @@ namespace TiffCraft {
   constexpr int MINOR_VERSION = 2;
   constexpr int PATCH_VERSION = 0;
 
-  std::string version() {
+  inline std::string version() {
     return std::to_string(MAJOR_VERSION)
       + "." + std::to_string(MINOR_VERSION)
       + "." + std::to_string(PATCH_VERSION);
@@ -330,7 +331,7 @@ namespace TiffCraft {
     return value;
   }
 
-  std::istream& readAt(
+  inline std::istream& readAt(
     std::istream& stream, std::streampos pos,
     std::byte* buffer, std::size_t size) {
     if (!stream) {
@@ -350,6 +351,9 @@ namespace TiffCraft {
       throw std::runtime_error("Failed to seek to position in stream");
     }
     stream.read(reinterpret_cast<char*>(buffer), size);
+    if (!stream || static_cast<std::size_t>(stream.gcount()) != size) {
+      throw std::runtime_error("Failed to read the requested number of bytes from the stream");
+    }
     return stream;
   }
 
@@ -365,7 +369,7 @@ namespace TiffCraft {
     return stream;
   }
 
-  std::ostream& writeAt(
+  inline std::ostream& writeAt(
     std::ostream& stream, std::streampos pos,
     const std::byte* buffer, std::size_t size) {
     if (!stream) {
@@ -540,7 +544,9 @@ namespace TiffCraft {
           if (valueSize <= sizeof(uint32_t)) {
             // Value fits in 4 bytes, read directly
             const uint32_t value = readValue<uint32_t>(stream);
-            std::memcpy(entry.values_.data(), &value, valueSize);
+            if (valueSize > 0) {
+              std::memcpy(entry.values_.data(), &value, valueSize);
+            }
           }
           else {
             // Value is too large, read as an offset
@@ -563,6 +569,9 @@ namespace TiffCraft {
 
           if (entry.type_ == Type::ASCII) {
             // Ensure the last byte is NUL for ASCII type
+            if (valueSize == 0) {
+              throw std::runtime_error("ASCII entry must contain at least one byte");
+            }
             if (entry.values_[valueSize - 1] != std::byte{0}) {
               throw std::runtime_error("ASCII value must end with NUL byte");
             }
@@ -650,8 +659,12 @@ namespace TiffCraft {
 
       // Read the IFDs
       const bool mustSwap = !image.header_.equalsHostByteOrder();
+      std::set<uint32_t> visited;
       uint32_t offset = image.header_.firstIFDOffset();
       while (offset > 0) {
+        if (!visited.insert(offset).second) {
+          throw std::runtime_error("Cyclic IFD offset detected in TIFF file");
+        }
         // Seek to the IFD offset
         stream.seekg(offset);
         if (stream.fail()) {
@@ -736,7 +749,7 @@ namespace TiffCraft {
   using LoadCallback = std::function<void(
     const TiffImage::Header&, const TiffImage::IFD&, TiffImage::ImageData)>;
 
-  void load(std::istream& stream, LoadCallback&& callback, const LoadParams& params = {}) {
+  inline void load(std::istream& stream, LoadCallback&& callback, const LoadParams& params = {}) {
     // Read the TIFF image from the stream
     TiffImage image = TiffImage::read(stream);
     const auto& header = image.header();
@@ -763,7 +776,7 @@ namespace TiffCraft {
     }
   }
 
-  void load(const std::string& filename, LoadCallback&& callback, const LoadParams& params = {}) {
+  inline void load(const std::string& filename, LoadCallback&& callback, const LoadParams& params = {}) {
     std::ifstream file(filename, std::ios::binary);
     if (!file) {
       throw std::runtime_error("Failed to open TIFF file: " + std::string(filename));
