@@ -38,6 +38,9 @@
 #include <string>
 #include <filesystem>
 #include <iostream>
+#include <functional>
+#include <vector>
+#include <sstream>
 
 #include "netpbm.hpp"
 
@@ -493,4 +496,85 @@ TEST_CASE("TiffExporterAnyTest") {
     };
     TestExporter<TiffExporterAny>(testFiles);
   }
+}
+
+TEST_CASE("TiffExporterAny takeImage") {
+  TiffExporterAny exporter;
+  load(getFilePath("libtiff-pics/jim___ah.tif").string(), std::ref(exporter));
+
+  CHECK(exporter.image().dataSize() > 0);
+
+  auto image = exporter.takeImage();
+  CHECK(exporter.image().data.size() == 0);
+  CHECK(image.dataSize() > 0);
+}
+
+TEST_CASE("TiffExporterAny multi-IFD export") {
+  // Synthesize a 2-IFD 8-bit grayscale TIFF in-memory:
+  //   IFD1 at offset 8,   strip pixels at offset 122 (10, 20, 30, 40)
+  //   IFD2 at offset 126, strip pixels at offset 240 (200, 210, 220, 230)
+  constexpr uint32_t W = 2, H = 2;
+  constexpr uint32_t ifdSize = 2 + 9 * 12 + 4; // 2-byte count, 9 entries, 4-byte next IFD offset
+  constexpr uint32_t ifd1Offset = 8;
+  constexpr uint32_t pix1Offset = ifd1Offset + ifdSize; // 122
+  constexpr uint32_t ifd2Offset = pix1Offset + 4;       // 126
+  constexpr uint32_t pix2Offset = ifd2Offset + ifdSize; // 240
+
+  const std::vector<std::byte> pix1{ std::byte{10}, std::byte{20}, std::byte{30}, std::byte{40} };
+  const std::vector<std::byte> pix2{ std::byte{200}, std::byte{210}, std::byte{220}, std::byte{230} };
+
+  std::stringstream stream;
+  auto le16 = [&stream](uint16_t v) {
+    const char bytes[2] = { static_cast<char>(v & 0xff), static_cast<char>((v >> 8) & 0xff) };
+    stream.write(bytes, sizeof(bytes));
+  };
+  auto le32 = [&stream](uint32_t v) {
+    const char bytes[4] = {
+      static_cast<char>(v & 0xff), static_cast<char>((v >> 8) & 0xff),
+      static_cast<char>((v >> 16) & 0xff), static_cast<char>((v >> 24) & 0xff)
+    };
+    stream.write(bytes, sizeof(bytes));
+  };
+  auto entry = [&le16, &le32](uint16_t tag, Type type, uint32_t count, uint32_t value) {
+    le16(tag);
+    le16(static_cast<uint16_t>(type));
+    le32(count);
+    le32(value); // Inline value, or the offset of the value for values larger than 4 bytes
+  };
+  auto writeIfd = [&](uint32_t pixOffset, uint32_t nextIfd) {
+    le16(9); // 9 entries
+    entry(256, Type::LONG, 1, W); // ImageWidth
+    entry(257, Type::LONG, 1, H); // ImageLength
+    entry(258, Type::SHORT, 1, 8); // BitsPerSample (inline, low 2 bytes)
+    entry(259, Type::SHORT, 1, 1); // Compression = none
+    entry(262, Type::SHORT, 1, 1); // PhotometricInterpretation = BlackIsZero
+    entry(273, Type::LONG, 1, pixOffset); // StripOffsets
+    entry(277, Type::SHORT, 1, 1); // SamplesPerPixel
+    entry(278, Type::LONG, 1, H); // RowsPerStrip
+    entry(279, Type::LONG, 1, 4); // StripByteCounts
+    le32(nextIfd);
+  };
+
+  // Header: little-endian, magic 42, first IFD at offset 8
+  stream.write("II", 2);
+  le16(42);
+  le32(ifd1Offset);
+  // IFD1 + pixels
+  writeIfd(pix1Offset, ifd2Offset);
+  stream.write(reinterpret_cast<const char*>(pix1.data()), pix1.size());
+  // IFD2 + pixels
+  writeIfd(pix2Offset, 0);
+  stream.write(reinterpret_cast<const char*>(pix2.data()), pix2.size());
+
+  TiffExporterAny exporter;
+  load(stream, std::ref(exporter));
+
+  // Each IFD is exported in turn; the last successfully exported image wins
+  CHECK(exporter.image().dataSize() == 4);
+  const auto& data = exporter.image().data;
+  REQUIRE(data.size() == 4);
+  CHECK(static_cast<unsigned char>(data[0]) == 200);
+  CHECK(static_cast<unsigned char>(data[1]) == 210);
+  CHECK(static_cast<unsigned char>(data[2]) == 220);
+  CHECK(static_cast<unsigned char>(data[3]) == 230);
 }

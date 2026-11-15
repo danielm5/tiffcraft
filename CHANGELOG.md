@@ -33,8 +33,9 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
   truncated strips/tiles no longer silently yield zero-filled buffers.
 - `takeImage()` no longer copies instead of moving; it moves the image buffer
   out of the exporter, leaving it empty.
-- `TiffExporterAny` now resets its multi-IFD state per IFD, so images with
-  multiple IFDs export correctly instead of silently skipping later IFDs.
+- `TiffExporterAny` now resets its multi-IFD state per IFD; each IFD is
+  exported and the last successfully exported image wins (previously later
+  IFDs were silently skipped).
 - Example `tiff_image` reads `ImageWidth`/`ImageLength` type-agnostically, so
   LONG-typed entries no longer throw.
 - README quick-start snippet fixed (removed undeclared `loadParams` argument;
