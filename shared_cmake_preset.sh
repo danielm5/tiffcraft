@@ -1,12 +1,13 @@
 #!/bin/bash
+set -euo pipefail
 # shared_cmake_preset.sh
 # Usage: source shared_cmake_preset.sh [PRESET_NAME]
 
-PRESET_NAME=$1
-HOST_OS=$OS$OSTYPE
+PRESET_NAME=${1:-}
+HOST_OS=${OS:-}${OSTYPE}
 HOST_TYPE=$HOSTTYPE
 HOST_ID="${HOST_OS}-${HOST_TYPE}"
-INSTALL_DIR=`pwd`/install
+INSTALL_DIR="$(pwd)/install"
 
 # Convert HOST_ID to lowercase
 if ((BASH_VERSINFO[0] < 3))
@@ -20,7 +21,7 @@ echo "Host OS: $HOST_OS"
 echo "Host Type: $HOST_TYPE"
 echo "Host Id: $HOST_ID"
 
-if [[ $1 == "" ]]; then
+if [[ ${1:-} == "" ]]; then
   case "$HOST_ID" in
     "windows_"*)
       # Windows

@@ -1,5 +1,6 @@
-
 #!/bin/bash
+set -euo pipefail
+cd "$(dirname "$0")"
 
 # Parse --preset argument
 PRESET_ARG=""
@@ -11,7 +12,7 @@ for ((i=1; i<=$#; i++)); do
     fi
 done
 
-source "$(dirname "$0")/shared_cmake_preset.sh" "$PRESET_ARG"
+source "./shared_cmake_preset.sh" "$PRESET_ARG"
 
 echo "Installing ${PRESET_NAME}"
 cmake --build --preset "${PRESET_NAME}" --target install

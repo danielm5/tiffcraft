@@ -21,6 +21,12 @@ TiffCraft is designed based on the following principles:
 
 Prerequisites: CMake >= 3.22, a C++20 compiler, git, and git-lfs.
 
+The test fixtures live in the `tests/libtiff-pics` submodule and are stored
+in Git LFS. On Debian, install git-lfs with `sudo apt install git-lfs`.
+LFS commands must run INSIDE the submodule (e.g. `git -C tests/libtiff-pics
+lfs pull`): the parent repository has no LFS objects, so a root-level
+`git lfs pull` is a silent no-op.
+
 Clone the repository with its submodules:
 
 ```sh
@@ -31,14 +37,6 @@ Existing clones can fetch the fixtures with:
 
 ```sh
 git submodule update --init --recursive
-```
-
-The test fixtures live in the `tests/libtiff-pics` submodule and are stored
-in Git LFS. On Debian, install git-lfs with `sudo apt install git-lfs`.
-`./build.sh` runs the submodule and LFS steps for you; otherwise pull the
-fixtures manually:
-
-```sh
 git -C tests/libtiff-pics lfs pull
 ```
 
@@ -65,12 +63,19 @@ ctest --preset gcc-linux-release --output-on-failure
 or `./run_test.sh`.
 
 Note: without git-lfs the checkout keeps Git LFS pointer files instead of
-real TIFFs, and the tests will fail with "Invalid byte order in TIFF header".
+real TIFFs, and the tests will fail with "Git LFS pointer file, not a TIFF"
+followed by "Install git-lfs and run: git -C tests/libtiff-pics lfs pull".
 To remedy, run:
 
 ```sh
-git submodule update --init --recursive && git -C tests/libtiff-pics lfs pull
+git submodule update --init --recursive
+git -C tests/libtiff-pics lfs pull
+git -C tests/libtiff-pics reset --hard
 ```
+
+The `reset --hard` is mandatory: the submodule index keeps the stat data of
+the 131-byte pointer files while the worktree holds real content, so without
+it the submodule stays permanently dirty.
 
 # Usage
 

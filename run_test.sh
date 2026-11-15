@@ -1,7 +1,8 @@
-
 #!/bin/bash
+set -euo pipefail
+cd "$(dirname "$0")"
 
-source "$(dirname "$0")/shared_cmake_preset.sh" "$1"
+source "./shared_cmake_preset.sh" "${1:-}"
 
 echo "Testing ${PRESET_NAME}"
 

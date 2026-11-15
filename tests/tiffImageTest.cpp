@@ -35,6 +35,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #define DOCTEST_CONFIG_DOUBLE_STRINGIFY
 #include "doctest.h"
+#include "fixtureCheck.hpp"
 
 #include <iostream>
 #include <filesystem>
@@ -68,7 +69,9 @@ std::span<const T> make_span(std::initializer_list<T> values) {
 std::string getTestFilePath(const std::string& filename) {
   std::filesystem::path test_file_path(__FILE__);
   std::filesystem::path test_dir = test_file_path.parent_path();
-  return (test_dir / "libtiff-pics" / filename).string();
+  std::filesystem::path path = test_dir / "libtiff-pics" / filename;
+  requireRealFixture(path);
+  return path.string();
 }
 
 std::ostream& write_IFD_entry(

@@ -40,13 +40,16 @@
 #include <iostream>
 
 #include "netpbm.hpp"
+#include "fixtureCheck.hpp"
 
 using namespace TiffCraft;
 
 std::filesystem::path getFilePath(std::filesystem::path relativePath) {
   std::filesystem::path test_file_path(__FILE__);
   std::filesystem::path test_dir = test_file_path.parent_path();
-  return test_dir / relativePath;
+  std::filesystem::path path = test_dir / relativePath;
+  requireRealFixture(path);
+  return path;
 }
 
 template <typename PixelType>

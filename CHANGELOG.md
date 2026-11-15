@@ -16,10 +16,8 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
 ### Added
 
 - Code examples
-- README build and test instructions (including git-lfs fixture prerequisites).
-- build.sh fetches the tests/libtiff-pics submodule and its Git LFS objects
-  before configuring, so a fresh clone with git-lfs installed builds and
-  tests cleanly.
+- README build and test instructions (including git-lfs fixture prerequisites
+  and LFS pointer-file recovery steps).
 
 ## [0.1.0]
 
