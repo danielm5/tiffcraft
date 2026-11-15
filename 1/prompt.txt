@@ -1,0 +1,53 @@
+review the last few sessions to orient yourself about the last problems we had, and how we're trying to improve
+
+---
+
+It's clean because I've cleaned it!
+
+---
+
+you are (hopefully) the better advisor we've made in the last session
+
+---
+
+there was a plan about how to uncomplicate the epic and claims of previous models, have you seen the plan? do you agree with it?
+
+---
+
+I take that as an answer about you've no idea what I'm talking about
+
+---
+
+I'm referring to the session where I asked "how do we do it?" I was asking for the plan which was suggested. Next time, if don't know just ask instead of what did
+
+---
+
+can you review what was before that question in that session?
+
+---
+
+that is the plan I was trying to recall, what do you think about it? is it still your recommendation?
+
+---
+
+We do have this epic, and I'd like to keep the work resquests on issues and ask separate agents to address the issues following the strict github-solve issue. Do we rewrite the epic? is there anything else to save from the epic beside the 7 bugs? do we close it and make new issue?
+
+---
+
+I don't want an issue for one line doc change
+
+---
+
+ok, close the epic with some comment and create the new issue for the bugs
+
+---
+
+how come you requested no new tests for an issue about true bug fixes?
+
+---
+
+I mean existing tests were already passing without detecting any problem...
+
+---
+
+yes

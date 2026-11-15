@@ -3,12 +3,13 @@
   "checkpoint_id": "01M7FR5CCH2YWMZ883E48Y3NTK",
   "strategy": "manual-commit",
   "branch": "bugfix/issue-27",
-  "checkpoints_count": 1,
+  "checkpoints_count": 15,
   "files_touched": [
     "CHANGELOG.md",
     "tests/CMakeLists.txt",
     "tests/readmeUsageTest.cpp",
     "tests/tiffExporterTest.cpp",
+    "tests/tiffImageTest.cpp",
     "tests/twoTuLinkTestA.cpp",
     "tests/twoTuLinkTestB.cpp"
   ],
@@ -19,14 +20,21 @@
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
       "prompt": "/0/prompt.txt"
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
+      "prompt": "/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 237519,
+    "input_tokens": 469338,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 1447424,
-    "output_tokens": 11165,
-    "api_call_count": 16,
+    "cache_read_tokens": 3024128,
+    "output_tokens": 28116,
+    "api_call_count": 52,
     "subagent_tokens": {
       "input_tokens": 270695,
       "cache_creation_tokens": 0,
@@ -36,14 +44,14 @@
     }
   },
   "redaction": {
-    "replacements": 0,
+    "replacements": 4,
     "layers": {
       "betterleaks": 0,
       "connection_string": 0,
       "credential_key": 0,
       "credential_value": 0,
       "credentialed_uri": 0,
-      "entropy": 0,
+      "entropy": 4,
       "key_context": 0,
       "provider_token": 0,
       "shell_stdin": 0
