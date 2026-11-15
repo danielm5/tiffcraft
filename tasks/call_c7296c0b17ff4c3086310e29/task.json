@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "call_c7296c0b17ff4c3086310e29",
+  "agent_id": "ses_e1fc265aaffevJmIvY1H9VZ7d4",
+  "subagent_type": "general",
+  "task_description": "Write issue-30 plan artifact",
+  "token_usage": {
+    "input_tokens": 6345,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 7296,
+    "output_tokens": 763,
+    "api_call_count": 2
+  },
+  "started_at": "2026-11-15T12:24:56.013-05:00",
+  "completed_at": "2026-11-15T12:25:10.763273647-05:00"
+}

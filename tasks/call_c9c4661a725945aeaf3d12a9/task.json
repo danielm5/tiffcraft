@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "call_c9c4661a725945aeaf3d12a9",
+  "agent_id": "ses_e1fc46390ffeVclZADbKqDHEZ2",
+  "subagent_type": "explore",
+  "task_description": "Tooling impact for issue #30",
+  "token_usage": {
+    "input_tokens": 9571,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 20352,
+    "output_tokens": 3078,
+    "api_call_count": 4
+  },
+  "started_at": "2026-11-15T12:22:45.486-05:00",
+  "completed_at": "2026-11-15T12:23:41.998674092-05:00"
+}

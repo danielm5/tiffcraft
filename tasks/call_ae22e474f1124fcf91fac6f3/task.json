@@ -1,0 +1,21 @@
+{
+  "tool_use_id": "call_ae22e474f1124fcf91fac6f3",
+  "agent_id": "ses_e1fc13f5dffe0YEXyAVo0xzMQB",
+  "subagent_type": "general",
+  "task_description": "Implement issue #30 CMake support",
+  "files": [
+    "CHANGELOG.md",
+    "CMakeLists.txt",
+    "README.md",
+    "cmake/TiffCraftConfig.cmake.in"
+  ],
+  "token_usage": {
+    "input_tokens": 48464,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 828160,
+    "output_tokens": 14537,
+    "api_call_count": 34
+  },
+  "started_at": "2026-11-15T12:26:11.359-05:00",
+  "completed_at": "2026-11-15T12:31:14.1706466-05:00"
+}
