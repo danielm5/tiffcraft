@@ -90,15 +90,16 @@ classes, or writing their own from scratch.
 
 ## FetchContent
 
-TiffCraft is header-only and can be consumed directly from source with
-CMake's `FetchContent` module:
+TiffCraft is header-only and can be consumed directly from its git
+repository with CMake's `FetchContent` module:
 
 ```cmake
 include(FetchContent)
 
 FetchContent_Declare(
   TiffCraft
-  SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tiffcraft
+  GIT_REPOSITORY https://github.com/danielm5/tiffcraft.git
+  GIT_TAG <release tag>   # e.g. the latest release tag
 )
 FetchContent_MakeAvailable(TiffCraft)
 
@@ -106,7 +107,8 @@ target_link_libraries(my_app PRIVATE TiffCraft::TiffCraft)
 ```
 
 When consumed this way, the `TIFFCRAFT_BUILD_ALL` option defaults to `OFF`,
-so the library's tests, apps, and examples are not built.
+so the library's tests, apps, and examples are not built. The same applies
+when consuming via `add_subdirectory` from a local checkout.
 
 ## find_package
 

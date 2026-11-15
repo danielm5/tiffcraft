@@ -8,7 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(FetchContent)
 
 # Repo root is three directories above this consumer project dir
-# (/home/daniel/tiffcraft/tests/cmake-consumers/fetchcontent -> /home/daniel/tiffcraft)
+# (tests/cmake-consumers/fetchcontent -> repository root)
 FetchContent_Declare(
   TiffCraft
   SOURCE_DIR ${CMAKE_SOURCE_DIR}/../../..

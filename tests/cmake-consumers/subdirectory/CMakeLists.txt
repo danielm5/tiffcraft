@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22.0)
 project(subdirectory_consumer LANGUAGES CXX)
 
 # Repo root is three directories above this consumer project directory
-# (/home/daniel/tiffcraft/tests/cmake-consumers/subdirectory -> /home/daniel/tiffcraft)
+# (tests/cmake-consumers/subdirectory -> repository root)
 add_subdirectory(${CMAKE_SOURCE_DIR}/../../.. ${CMAKE_BINARY_DIR}/tiffcraft)
 
 set(CMAKE_CXX_STANDARD 20)
