@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "functions_subagent_11-607f826c0eb5",
+  "agent_id": "ses_e226c1809ffeijO7aUwJ4idZmB",
+  "subagent_type": "general",
+  "task_description": "Write context artifact",
+  "token_usage": {
+    "input_tokens": 109958,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 572672,
+    "output_tokens": 8936,
+    "api_call_count": 28
+  },
+  "started_at": "2026-11-15T00:00:20.339-05:00",
+  "completed_at": "2026-11-15T00:02:29.084297401-05:00"
+}

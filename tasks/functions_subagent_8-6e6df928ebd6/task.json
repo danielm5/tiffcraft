@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "functions_subagent_8-6e6df928ebd6",
+  "agent_id": "ses_e226f145bffeesR4TL97e6dou5",
+  "subagent_type": "explore",
+  "task_description": "Tooling and build research",
+  "token_usage": {
+    "input_tokens": 41075,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 718848,
+    "output_tokens": 6641,
+    "api_call_count": 34
+  },
+  "started_at": "2026-11-14T23:57:04.675-05:00",
+  "completed_at": "2026-11-14T23:58:38.761003991-05:00"
+}

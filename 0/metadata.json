@@ -1,0 +1,66 @@
+{
+  "cli_version": "0.13.4-nightly.202611121940.ce16562b9",
+  "checkpoint_id": "01M7ESPXNJZ7VAR4CGBVMWHJE1",
+  "session_id": "ses_e226f7cfaffecnL2jCWaa8ylDP",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-15T05:08:39.003324622Z",
+  "branch": "bugfix/issue-27",
+  "checkpoints_count": 5,
+  "files_touched": [
+    "CHANGELOG.md",
+    "README.md",
+    "examples/tiff_image.cpp",
+    "include/tiffcraft/TiffExporter.hpp",
+    "include/tiffcraft/TiffImage.hpp",
+    "include/tiffcraft/TiffStdOut.hpp"
+  ],
+  "agent": "OpenCode",
+  "model": "inkling-2-small-free",
+  "turn_id": "004c855d7110",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 366525,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2534400,
+    "output_tokens": 22070,
+    "api_call_count": 58,
+    "subagent_tokens": {
+      "input_tokens": 412057,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 6038784,
+      "output_tokens": 41556,
+      "api_call_count": 185
+    }
+  },
+  "session_token_usage": {
+    "input_tokens": 366525,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2534400,
+    "output_tokens": 22070,
+    "api_call_count": 58,
+    "subagent_tokens": {
+      "input_tokens": 412057,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 6038784,
+      "output_tokens": 41556,
+      "api_call_count": 185
+    }
+  },
+  "redaction": {
+    "replacements": 0,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 0,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "session_metrics": {
+    "turn_count": 5
+  }
+}

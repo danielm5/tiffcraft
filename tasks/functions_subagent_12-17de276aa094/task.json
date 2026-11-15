@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "functions_subagent_12-17de276aa094",
+  "agent_id": "ses_e226be701ffez2d8K0IapoKCcH",
+  "subagent_type": "general",
+  "task_description": "Write plan artifact",
+  "token_usage": {
+    "input_tokens": 68370,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 455680,
+    "output_tokens": 8189,
+    "api_call_count": 14
+  },
+  "started_at": "2026-11-15T00:00:32.891-05:00",
+  "completed_at": "2026-11-15T00:02:28.139449934-05:00"
+}

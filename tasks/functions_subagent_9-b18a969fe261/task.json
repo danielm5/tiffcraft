@@ -1,0 +1,8 @@
+{
+  "tool_use_id": "functions_subagent_9-b18a969fe261",
+  "agent_id": "ses_e226f1e0dffeqPsHFxHQDAnrPu",
+  "subagent_type": "explore",
+  "task_description": "Poll code research",
+  "started_at": "2026-11-14T23:58:38.965-05:00",
+  "transcript_unavailable_reason": "transcript path unresolvable"
+}
