@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "functions_subagent_13-8d8bc7075b2c",
+  "agent_id": "ses_e22d7a358ffecoLxvtJwgTNyhU",
+  "subagent_type": "explore",
+  "task_description": "Test code impact research",
+  "token_usage": {
+    "input_tokens": 51033,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 475648,
+    "output_tokens": 4251,
+    "api_call_count": 21
+  },
+  "started_at": "2026-11-14T22:02:52.32-05:00",
+  "completed_at": "2026-11-14T22:03:53.584783427-05:00"
+}

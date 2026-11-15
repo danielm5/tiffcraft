@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "functions_subagent_21-6939d00f2e3b",
+  "agent_id": "ses_e22d5458cffe6Lopfm6Gy4R2E0",
+  "subagent_type": "general",
+  "task_description": "Write doc-todos artifact",
+  "token_usage": {
+    "input_tokens": 66,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 7168,
+    "output_tokens": 5,
+    "api_call_count": 1
+  },
+  "started_at": "2026-11-14T22:05:27.408-05:00",
+  "completed_at": "2026-11-14T22:05:28.88603436-05:00"
+}

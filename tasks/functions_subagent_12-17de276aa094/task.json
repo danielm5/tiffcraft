@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "functions_subagent_12-17de276aa094",
+  "agent_id": "ses_e22d7a35affe7lktb1Tz5pi0gU",
+  "subagent_type": "explore",
+  "task_description": "Docs impact research",
+  "token_usage": {
+    "input_tokens": 20617,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 133632,
+    "output_tokens": 4288,
+    "api_call_count": 13
+  },
+  "started_at": "2026-11-14T22:02:52.318-05:00",
+  "completed_at": "2026-11-14T22:03:42.967331657-05:00"
+}

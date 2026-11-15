@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "functions_subagent_14-48461cfc23c7",
+  "agent_id": "ses_e22d7917affewyWMlAX0XdRmjV",
+  "subagent_type": "explore",
+  "task_description": "Build tooling impact research",
+  "token_usage": {
+    "input_tokens": 24248,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 274304,
+    "output_tokens": 8426,
+    "api_call_count": 21
+  },
+  "started_at": "2026-11-14T22:02:56.899-05:00",
+  "completed_at": "2026-11-14T22:04:47.368644782-05:00"
+}

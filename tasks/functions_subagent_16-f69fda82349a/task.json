@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "functions_subagent_16-f69fda82349a",
+  "agent_id": "ses_e22d6dd28ffeYaoLKFxuwy853u",
+  "subagent_type": "explore",
+  "task_description": "Wait for remaining research",
+  "token_usage": {
+    "input_tokens": 113,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2176,
+    "output_tokens": 5,
+    "api_call_count": 1
+  },
+  "started_at": "2026-11-14T22:03:43.061-05:00",
+  "completed_at": "2026-11-14T22:03:44.471362429-05:00"
+}
