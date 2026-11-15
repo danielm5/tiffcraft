@@ -2,8 +2,7 @@
   "cli_version": "0.13.4-nightly.202611121940.ce16562b9",
   "checkpoint_id": "01M7ESPXNJZ7VAR4CGBVMWHJE1",
   "strategy": "manual-commit",
-  "branch": "bugfix/issue-27",
-  "checkpoints_count": 19,
+  "checkpoints_count": 20,
   "files_touched": [
     "CHANGELOG.md",
     "README.md",
@@ -26,14 +25,21 @@
       "compact_transcript": "/1/transcript.jsonl",
       "content_hash": "/1/content_hash.txt",
       "prompt": "/1/prompt.txt"
+    },
+    {
+      "metadata": "/2/metadata.json",
+      "transcript": "/2/full.jsonl",
+      "compact_transcript": "/2/transcript.jsonl",
+      "content_hash": "/2/content_hash.txt",
+      "prompt": "/2/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 1302754,
+    "input_tokens": 1420593,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 22875712,
-    "output_tokens": 173914,
-    "api_call_count": 177,
+    "cache_read_tokens": 23852032,
+    "output_tokens": 184791,
+    "api_call_count": 212,
     "subagent_tokens": {
       "input_tokens": 463727,
       "cache_creation_tokens": 0,
@@ -55,5 +61,6 @@
       "provider_token": 0,
       "shell_stdin": 0
     }
-  }
+  },
+  "has_review": true
 }
