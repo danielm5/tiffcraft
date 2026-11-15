@@ -1,0 +1,42 @@
+{
+  "cli_version": "0.13.4-nightly.202611121940.ce16562b9",
+  "checkpoint_id": "01M7GF4XRN4GKSX4A9DPFVJC0R",
+  "strategy": "manual-commit",
+  "branch": "feature/issue-30",
+  "checkpoints_count": 5,
+  "files_touched": [
+    ".github/workflows/workflow.yml",
+    "tests/cmake-consumers/fetchcontent/CMakeLists.txt",
+    "tests/cmake-consumers/subdirectory/CMakeLists.txt"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 153731,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 775364,
+    "output_tokens": 23341,
+    "api_call_count": 25
+  },
+  "redaction": {
+    "replacements": 32,
+    "layers": {
+      "betterleaks": 10,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 32,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}

@@ -1,0 +1,17 @@
+I'm using tokentracker to upload usage to cloud, it used to work well unattended, I don't know if changes were done recently or what, for instance now cloud devices are paid beyond one, which is new; anyways, I don't feel is uploading anything now unless I run sync, can you check if a service or cron or something is set up?
+
+---
+
+yes, yesterday I manually run tokentracker sync, that's what I mean, nothing has uploaded today
+
+---
+
+I didn't do any manual run today, precisely because I wanted to make sure automatically syncs
+
+---
+
+https://github.com/xiufengsun/TokenTracker/issues/1094
+
+---
+
+https://github.com/xiufengsun/TokenTracker/issues/1094
