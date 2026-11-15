@@ -494,3 +494,131 @@ TEST_CASE("TiffImage class") {
     );
   }
 }
+
+TEST_CASE("Malformed TIFF input") {
+
+  { // (a) ASCII entry with count == 0
+    std::stringstream stream;
+    writeValue(stream, static_cast<uint16_t>(0x4949), false); // "II"
+    writeValue(stream, static_cast<uint16_t>(42), false);     // Magic number
+    writeValue(stream, static_cast<uint32_t>(8), false);      // First IFD offset
+    // IFD at offset 8
+    writeValue(stream, static_cast<uint16_t>(1), false);                      // 1 entry
+    writeValue(stream, static_cast<uint16_t>(Tag::ImageDescription), false);  // Tag
+    writeValue(stream, static_cast<uint16_t>(Type::ASCII), false);            // Type
+    writeValue(stream, static_cast<uint32_t>(0), false);                      // Count == 0
+    writeValue(stream, static_cast<uint32_t>(0), false);                      // Inline value
+    writeValue(stream, static_cast<uint32_t>(0), false);                      // Next IFD offset
+    CHECK_THROWS_AS(TiffImage::read(stream), std::runtime_error);
+  }
+
+  { // (b) Cyclic IFD offset
+    std::stringstream stream;
+    writeValue(stream, static_cast<uint16_t>(0x4949), false); // "II"
+    writeValue(stream, static_cast<uint16_t>(42), false);     // Magic number
+    writeValue(stream, static_cast<uint32_t>(8), false);      // First IFD offset
+    // IFD at offset 8: 0 entries, next IFD offset points back to itself
+    writeValue(stream, static_cast<uint16_t>(0), false);      // 0 entries
+    writeValue(stream, static_cast<uint32_t>(8), false);      // Next IFD offset (cyclic)
+    CHECK_THROWS_AS(TiffImage::read(stream), std::runtime_error);
+  }
+
+  { // (c) Truncated strip: strip data is missing from the stream
+    std::vector<TiffImage::IFD::Entry> entries;
+    auto addEntry = [&entries](
+      uint16_t tag, Type type, uint32_t count,
+      const std::vector<uint8_t>& values,
+      uint32_t valueOffset = 0, bool mustSwap = false) {
+        std::stringstream stream;
+        // Write the entry
+        write_IFD_entry(
+          stream, static_cast<Tag>(tag), type, count,
+          reinterpret_cast<const std::byte*>(values.data()),
+          valueOffset, mustSwap);
+        // Read the entry back
+        TiffImage::IFD::Entry entry = TiffImage::IFD::Entry::read(stream, mustSwap);
+        // Add the entry to the vector
+        entries.push_back(entry);
+    };
+    // Entries must be sorted in ascending tag order
+    addEntry(0x0103, Type::SHORT, 1, { 1 });                  // Compression = none
+    addEntry(0x0106, Type::SHORT, 1, { 0 });                  // PhotometricInterpretation = WhiteIsZero
+    addEntry(0x0111, Type::LONG, 1, { 100, 0, 0, 0 });        // StripOffsets = 100 (beyond end of stream)
+    addEntry(0x0117, Type::LONG, 1, { 232, 3, 0, 0 });        // StripByteCounts = 1000
+
+    std::stringstream stream;
+    writeValue(stream, static_cast<uint16_t>(0x4949), false); // "II"
+    writeValue(stream, static_cast<uint16_t>(42), false);     // Magic number
+    writeValue(stream, static_cast<uint32_t>(8), false);      // First IFD offset
+    // IFD at offset 8 (only the IFD; the strip data is not written)
+    write_IFD(stream, entries, false);
+    writeValue(stream, static_cast<uint32_t>(0), false);      // Next IFD offset
+    CHECK_THROWS_AS(
+      load(stream, [](auto&&...) { }, LoadParams{}),
+      std::runtime_error);
+  }
+
+  { // (d) RATIONAL entry with a zero denominator
+    std::stringstream stream;
+    writeValue(stream, static_cast<uint16_t>(0x4949), false); // "II"
+    writeValue(stream, static_cast<uint16_t>(42), false);     // Magic number
+    writeValue(stream, static_cast<uint32_t>(8), false);      // First IFD offset
+    // IFD at offset 8
+    writeValue(stream, static_cast<uint16_t>(1), false);                 // 1 entry
+    writeValue(stream, static_cast<uint16_t>(Tag::XResolution), false);  // Tag
+    writeValue(stream, static_cast<uint16_t>(Type::RATIONAL), false);    // Type
+    writeValue(stream, static_cast<uint32_t>(1), false);                 // Count
+    writeValue(stream, static_cast<uint32_t>(26), false);                // Value offset (after the IFD table)
+    writeValue(stream, static_cast<uint32_t>(0), false);                 // Next IFD offset (offset 22)
+    // RATIONAL value at offset 26: numerator = 300, denominator = 0
+    writeValue(stream, static_cast<uint32_t>(300), false);               // Numerator
+    writeValue(stream, static_cast<uint32_t>(0), false);                 // Denominator
+    // Entry::read does not divide rationals, so reading the image must not throw
+    TiffImage image = TiffImage::read(stream);
+    REQUIRE(image.ifds().size() == 1);
+    CHECK_THROWS_AS(TiffExporter::getIntVec(image.ifds()[0], Tag::XResolution), std::runtime_error);
+  }
+}
+
+TEST_CASE("LONG ImageWidth fixtures") {
+
+  auto checkFixture = [](const std::string& filename, uint32_t expectedWidth, uint32_t expectedLength) {
+    const std::string test_file = filename;
+    std::cout << "Test file path: " << getTestFilePath(test_file) << std::endl;
+    TiffImage image = TiffImage::read(getTestFilePath(test_file));
+
+    const auto& entries = image.ifds().at(0).entries();
+
+    const auto widthIt = entries.find(Tag::ImageWidth);
+    REQUIRE(widthIt != entries.end());
+    CHECK(widthIt->second.type() == Type::LONG);
+    CHECK(widthIt->second.values<uint32_t>()[0] == expectedWidth);
+    // LONG entries do not fit the 16-bit accessor (documents the D6 defect class)
+    CHECK_THROWS_AS(widthIt->second.values<uint16_t>(), std::runtime_error);
+
+    const auto lengthIt = entries.find(Tag::ImageLength);
+    REQUIRE(lengthIt != entries.end());
+    CHECK(lengthIt->second.type() == Type::LONG);
+    CHECK(lengthIt->second.values<uint32_t>()[0] == expectedLength);
+    CHECK_THROWS_AS(lengthIt->second.values<uint16_t>(), std::runtime_error);
+  };
+
+  checkFixture("pc260001.tif", 640, 480);
+  checkFixture("smallliz.tif", 160, 160);
+}
+
+TEST_CASE("Type::BYTE printed as integer") {
+
+  const std::vector<uint8_t> values{ 0x41 }; // 65 ('A')
+  std::stringstream stream;
+  write_IFD_entry(
+    stream, Tag::ImageWidth, Type::BYTE, 1,
+    reinterpret_cast<const std::byte*>(values.data()));
+
+  TiffImage::IFD::Entry entry = TiffImage::IFD::Entry::read(stream, false);
+
+  std::ostringstream ss;
+  ss << entry;
+  CHECK(ss.str().find("65") != std::string::npos);
+  CHECK(ss.str().find("'A'") == std::string::npos);
+}

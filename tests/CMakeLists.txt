@@ -37,3 +37,11 @@ add_test(NAME tiffImageTest COMMAND tiffImageTest)
 add_executable(tiffExporterTest tiffExporterTest.cpp netpbm.hpp)
 target_link_libraries(tiffExporterTest PRIVATE TiffCraft)
 add_test(NAME tiffExporterTest COMMAND tiffExporterTest)
+
+add_executable(twoTuLinkTest twoTuLinkTestA.cpp twoTuLinkTestB.cpp)
+target_link_libraries(twoTuLinkTest PRIVATE TiffCraft)
+add_test(NAME twoTuLinkTest COMMAND twoTuLinkTest)
+
+add_executable(readmeUsageTest readmeUsageTest.cpp)
+target_link_libraries(readmeUsageTest PRIVATE TiffCraft)
+add_test(NAME readmeUsageTest COMMAND readmeUsageTest ${CMAKE_CURRENT_SOURCE_DIR}/libtiff-pics/pc260001.tif)

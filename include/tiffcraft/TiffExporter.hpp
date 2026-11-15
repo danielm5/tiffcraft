@@ -154,7 +154,7 @@ namespace TiffCraft {
     const Image& image() const { return image_; }
 
     // Accessor for the exported image
-    [[nodiscard]] Image takeImage() const { return std::move(image_); }
+    [[nodiscard]] Image takeImage() { return std::move(image_); }
 
     // Callback for TiffCraft::load() function
     virtual void operator()(
@@ -170,6 +170,9 @@ namespace TiffCraft {
       const auto* values = reinterpret_cast<const T*>(entry.values());
       for (size_t i = 0; i < entry.count(); ++i) {
         if constexpr (is_rational_v<T>) {
+          if (values[i].denominator == 0) {
+            throw std::runtime_error("Rational value with zero denominator in TIFF entry");
+          }
           v[i] = static_cast<int>(values[i].numerator / values[i].denominator);
         }
         else {
@@ -646,6 +649,7 @@ namespace TiffCraft {
       const TiffImage::IFD& ifd,
       TiffImage::ImageData imageData) override
     {
+      exported_ = false;
       const int photometricInterpretation = getInt(ifd, Tag::PhotometricInterpretation, 1);
 
       if (photometricInterpretation >= 0 && photometricInterpretation <= 1) {

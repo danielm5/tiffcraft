@@ -54,11 +54,19 @@ int main(int argc, char* argv[]) {
       }
       std::cout << "Image data bytes: " << totalBytes << std::endl;
 
+      auto readDimension = [](const TiffCraft::TiffImage::IFD& ifd, TiffCraft::Tag tag) -> uint32_t {
+        const auto& entry = ifd.getEntry(tag);
+        switch (entry.type()) {
+          case TiffCraft::Type::SHORT: return entry.values<uint16_t>()[0];
+          case TiffCraft::Type::LONG:  return entry.values<uint32_t>()[0];
+          default: throw std::runtime_error("Unsupported ImageWidth/ImageLength entry type");
+        }
+      };
       std::cout << "Image width: "
-                << ifd.getEntry(TiffCraft::Tag::ImageWidth).values<uint16_t>()[0]
+                << readDimension(ifd, TiffCraft::Tag::ImageWidth)
                 << std::endl;
       std::cout << "Image height: "
-                << ifd.getEntry(TiffCraft::Tag::ImageLength).values<uint16_t>()[0]
+                << readDimension(ifd, TiffCraft::Tag::ImageLength)
                 << std::endl;
 
       // Add your own image processing code here
