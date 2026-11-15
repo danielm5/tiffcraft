@@ -1,0 +1,70 @@
+{
+  "cli_version": "0.13.4-nightly.202611121940.ce16562b9",
+  "checkpoint_id": "01M7GF4XRN4GKSX4A9DPFVJC0R",
+  "session_id": "ses_e1fc88056ffe6juywnQ3nLmq7P",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-15T20:42:32.560458838Z",
+  "branch": "feature/issue-30",
+  "checkpoints_count": 3,
+  "save_step_count": 1,
+  "files_touched": [
+    ".github/workflows/workflow.yml",
+    "tests/cmake-consumers/fetchcontent/CMakeLists.txt",
+    "tests/cmake-consumers/fetchcontent/main.cpp",
+    "tests/cmake-consumers/findpackage/CMakeLists.txt",
+    "tests/cmake-consumers/findpackage/main.cpp",
+    "tests/cmake-consumers/subdirectory/CMakeLists.txt",
+    "tests/cmake-consumers/subdirectory/main.cpp"
+  ],
+  "agent": "OpenCode",
+  "model": "flint-40b-free",
+  "turn_id": "6f5a5b8080cb",
+  "checkpoint_transcript_start": 44,
+  "transcript_lines_at_start": 44,
+  "compact_transcript_start": 44,
+  "token_usage": {
+    "input_tokens": 176106,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 2669140,
+    "output_tokens": 25181,
+    "api_call_count": 39,
+    "subagent_tokens": {
+      "input_tokens": 189633,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 4260992,
+      "output_tokens": 39944,
+      "api_call_count": 72
+    }
+  },
+  "session_token_usage": {
+    "input_tokens": 287999,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3436628,
+    "output_tokens": 50640,
+    "api_call_count": 62,
+    "subagent_tokens": {
+      "input_tokens": 313918,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 5359872,
+      "output_tokens": 67042,
+      "api_call_count": 129
+    }
+  },
+  "redaction": {
+    "replacements": 26,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 26,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "session_metrics": {
+    "turn_count": 7
+  }
+}
