@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "call_4eebaa94475b4a97921fb1f0",
+  "agent_id": "ses_e19c2e99cffecopdIJRafxkkkm",
+  "subagent_type": "explore",
+  "task_description": "Tooling/test research for #34",
+  "token_usage": {
+    "input_tokens": 35855,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 333440,
+    "output_tokens": 7812,
+    "api_call_count": 17
+  },
+  "started_at": "2026-11-16T16:22:05.537-05:00",
+  "completed_at": "2026-11-16T16:24:06.549557867-05:00"
+}
