@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "call_1d21fb557a4847dabd1ae595",
+  "agent_id": "ses_e1b808366ffebaAX7wtPdSBXnW",
+  "subagent_type": "explore",
+  "task_description": "Research docs impact for #31",
+  "token_usage": {
+    "input_tokens": 18293,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 77952,
+    "output_tokens": 4898,
+    "api_call_count": 8
+  },
+  "started_at": "2026-11-16T08:15:22.637-05:00",
+  "completed_at": "2026-11-16T08:16:51.73293033-05:00"
+}
