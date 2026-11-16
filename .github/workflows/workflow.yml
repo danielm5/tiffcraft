@@ -37,6 +37,44 @@ jobs:
     - name: Run Tests
       run: ctest --preset ${{ env.PRESET_NAME }} --output-on-failure
 
+  build-linux-consumers:
+    name: Ubuntu-Consumers
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout source code
+      uses: actions/checkout@v5.0.0
+
+    - name: Checkout submodules
+      run: git submodule update --init --recursive
+
+    - name: Cmake configure
+      run: cmake --preset gcc-linux-release -DCMAKE_INSTALL_PREFIX=/tmp/opencode/tiffcraft-install
+
+    - name: Cmake build
+      run: cmake --build --preset gcc-linux-release -j
+
+    - name: Cmake install
+      run: cmake --build --preset gcc-linux-release --target install
+
+    - name: FindPackage consumer
+      run: |
+        cmake -S tests/cmake-consumers/findpackage -B /tmp/opencode/build-fpkg -DCMAKE_PREFIX_PATH=/tmp/opencode/tiffcraft-install
+        cmake --build /tmp/opencode/build-fpkg -j
+        /tmp/opencode/build-fpkg/findpackage_consumer
+
+    - name: FetchContent consumer
+      run: |
+        cmake -S tests/cmake-consumers/fetchcontent -B /tmp/opencode/build-fc
+        cmake --build /tmp/opencode/build-fc -j
+        /tmp/opencode/build-fc/fetchcontent_consumer
+
+    - name: Subdirectory consumer
+      run: |
+        cmake -S tests/cmake-consumers/subdirectory -B /tmp/opencode/build-sub
+        cmake --build /tmp/opencode/build-sub -j
+        /tmp/opencode/build-sub/subdirectory_consumer
+
   build-windows:
     name: Windows-Build
     runs-on: windows-2025

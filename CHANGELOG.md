@@ -16,6 +16,12 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
 ### Added
 
 - Code examples
+- CMake consumption improvements: added the `TiffCraft::TiffCraft` namespaced
+  alias, an installable/exportable target with generated
+  `TiffCraftConfig.cmake`/`TiffCraftConfigVersion.cmake` (for `find_package`),
+  and a `TIFFCRAFT_BUILD_ALL` option that defaults to `ON` when building
+  TiffCraft standalone and to `OFF` when consumed via `FetchContent` or
+  `add_subdirectory`.
 
 ### Fixed
 
