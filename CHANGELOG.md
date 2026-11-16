@@ -16,6 +16,9 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
 ### Added
 
 - Code examples
+- README now documents which headers are needed and the copy-only
+  consumption path (header-only; copy the headers into the project, no build
+  step required).
 - CMake consumption improvements: added the `TiffCraft::TiffCraft` namespaced
   alias, an installable/exportable target with generated
   `TiffCraftConfig.cmake`/`TiffCraftConfigVersion.cmake` (for `find_package`),
@@ -25,6 +28,9 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
 
 ### Fixed
 
+- `TiffExporter.hpp` no longer includes the umbrella header `TiffCraft.hpp`;
+  it now includes `TiffImage.hpp` directly, resolving the include cycle and
+  making the exporter header standalone.
 - ODR violations in headers: `inline` on `version()`, `readAt()`, `writeAt()`,
   and both `load()` overloads (`TiffImage.hpp`); the six `operator<<` overloads
   moved into `namespace TiffCraft` and marked `inline` (`TiffStdOut.hpp`).

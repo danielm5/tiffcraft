@@ -51,7 +51,7 @@
 
 #pragma once
 
-#include "TiffCraft.hpp"
+#include "TiffImage.hpp"
 
 #include <functional>
 #include <algorithm>

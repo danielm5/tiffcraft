@@ -44,6 +44,24 @@ TiffExporterAny will decode and convert pixels to a flat-buffer (i.e.
 format. For example, an image with 2-bits per sample is exported as an 8-bit
 image.
 
+TiffCraft is header-only and can be consumed by copying the headers into
+your project. No build step required: no compiled artifact, no link step, and
+no CMake needed (CMake-based consumption is documented separately).
+
+# Which headers do you need?
+
+TiffCraft is header-only; copy the headers from `include/tiffcraft/` into
+your project and include them directly. No CMake required (CMake-based
+consumption is documented separately).
+
+- `TiffImage.hpp`: core TIFF reading; self-contained.
+- `TiffExporter.hpp`: flat-buffer pixel decoding; requires `TiffImage.hpp`.
+- `TiffStdOut.hpp`: metadata output/printing; requires `TiffImage.hpp`.
+- `TiffCraft.hpp`: umbrella header; includes everything.
+
+`TiffImage.hpp` is self-contained; the other headers assume the full
+`tiffcraft/` tree or their documented dependencies.
+
 # Advanced usage
 
 Users that prefer to decode and handle the image pixel data themselves, or need
