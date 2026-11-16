@@ -54,13 +54,21 @@ TiffCraft is header-only; copy the headers from `include/tiffcraft/` into
 your project and include them directly. No CMake required (CMake-based
 consumption is documented separately).
 
+When copying the headers, keep them together in one directory; if the folder
+is renamed, update the consumer-facing `#include <tiffcraft/...>` paths in
+your own code accordingly.
+
 - `TiffImage.hpp`: core TIFF reading; self-contained.
 - `TiffExporter.hpp`: flat-buffer pixel decoding; requires `TiffImage.hpp`.
 - `TiffStdOut.hpp`: metadata output/printing; requires `TiffImage.hpp`.
 - `TiffCraft.hpp`: umbrella header; includes everything.
 
-`TiffImage.hpp` is self-contained; the other headers assume the full
-`tiffcraft/` tree or their documented dependencies.
+`TiffImage.hpp` is self-contained; the other headers depend on it by filename
+(e.g. `#include "TiffImage.hpp"`), which resolves relative to the including
+header's own directory, so they can live together in any folder. The
+`tiffcraft/` folder name applies only to consumer-facing include paths (e.g.
+`#include <tiffcraft/TiffExporter.hpp>`), which are in the user's own code and
+must be updated if the folder is renamed.
 
 # Advanced usage
 
