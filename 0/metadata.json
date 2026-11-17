@@ -1,0 +1,60 @@
+{
+  "cli_version": "0.13.4-nightly.202611121940.ce16562b9",
+  "checkpoint_id": "01M7MRPAZREYA7NWKMJJ5G0CHJ",
+  "session_id": "ses_e19c433a8ffeI2cO3E3T8lSin0",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-17T12:46:18.539928719Z",
+  "branch": "feature/issue-34",
+  "checkpoints_count": 6,
+  "files_touched": [
+    "CHANGELOG.md",
+    "CMakeLists.txt",
+    "tests/CMakeLists.txt",
+    "tests/cmake-consumers/subdirectory/CMakeLists.txt",
+    "tests/tiffVersionTest.cpp"
+  ],
+  "agent": "OpenCode",
+  "model": "flint-40b-free",
+  "turn_id": "0f99c26a30e2",
+  "checkpoint_transcript_start": 25,
+  "transcript_lines_at_start": 25,
+  "compact_transcript_start": 24,
+  "token_usage": {
+    "input_tokens": 310080,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3250688,
+    "output_tokens": 23814,
+    "api_call_count": 35
+  },
+  "session_token_usage": {
+    "input_tokens": 599924,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3910528,
+    "output_tokens": 32755,
+    "api_call_count": 53,
+    "subagent_tokens": {
+      "input_tokens": 138628,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 933760,
+      "output_tokens": 27490,
+      "api_call_count": 58
+    }
+  },
+  "redaction": {
+    "replacements": 6,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 6,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "session_metrics": {
+    "turn_count": 6
+  }
+}
