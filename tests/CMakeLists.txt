@@ -45,3 +45,8 @@ add_test(NAME twoTuLinkTest COMMAND twoTuLinkTest)
 add_executable(readmeUsageTest readmeUsageTest.cpp)
 target_link_libraries(readmeUsageTest PRIVATE TiffCraft)
 add_test(NAME readmeUsageTest COMMAND readmeUsageTest ${CMAKE_CURRENT_SOURCE_DIR}/libtiff-pics/pc260001.tif)
+
+add_executable(tiffVersionTest tiffVersionTest.cpp)
+target_link_libraries(tiffVersionTest PRIVATE TiffCraft)
+target_compile_definitions(tiffVersionTest PRIVATE TICFCRAFT_EXPECTED_VERSION="${PROJECT_VERSION}")
+add_test(NAME tiffVersionTest COMMAND tiffVersionTest)

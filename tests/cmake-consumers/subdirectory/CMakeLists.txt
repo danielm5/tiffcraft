@@ -22,6 +22,7 @@ foreach(TIFFCRAFT_FORBIDDEN_TARGET
     tiffExporterTest
     twoTuLinkTest
     readmeUsageTest
+    tiffVersionTest
     tiff_exporter
     tiff_image_example
     tiff_exporter_example)
