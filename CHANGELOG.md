@@ -25,6 +25,14 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
   and a `TIFFCRAFT_BUILD_ALL` option that defaults to `ON` when building
   TiffCraft standalone and to `OFF` when consumed via `FetchContent` or
   `add_subdirectory`.
+- Version-consistency test between the CMake `PROJECT_VERSION` and the header
+  version constants (`TiffCraft::version()`), failing with both values named on
+  mismatch.
+
+### Changed
+
+- CMake project version bumped to `0.2.0` to match the header version
+  constants and the `[0.2.0-Unreleased]` changelog section.
 
 ### Fixed
 
