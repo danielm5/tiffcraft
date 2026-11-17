@@ -32,7 +32,6 @@
 #include <tiffcraft/TiffImage.hpp>
 
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-#define DOCTEST_CONFIG_DOUBLE_STRINGIFY
 #include "doctest.h"
 
 #include <string>
