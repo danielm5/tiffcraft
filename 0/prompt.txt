@@ -1,0 +1,3 @@
+text.tif 	1512x359 	4 bpp 	Gray (1 sample) 	Custom (32809) 	Chunky 	No
+
+that compression I've been told is actually "ThunderScan"; updated and add a footnote or something clarifying is non-standard and that libTiff supports only decompression
