@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 source "$(dirname "$0")/shared_cmake_preset.sh" "$1"
