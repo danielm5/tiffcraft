@@ -1,0 +1,1 @@
+Now create markdown file in tests folder with a table listing the names of the test images, property of the image format like number of bits, compression, planar, etc. and if current supported by Tiffcraft. Let's make two tables one for each folder lifftiff-pics and depth. Make the table pretty for human readers
