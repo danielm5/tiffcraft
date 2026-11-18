@@ -1,0 +1,1 @@
+make build.sh and run_tests.sh executable here and in the git repo so that it also works when checking the repo out on windows
