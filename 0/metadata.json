@@ -1,0 +1,49 @@
+{
+  "cli_version": "0.13.4-nightly.202611121940.ce16562b9",
+  "checkpoint_id": "01M7T18TPBZZM94WNE49YQ4B9W",
+  "session_id": "ses_e11565cffffey01Zu0LHvDQwOc",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-19T13:52:26.871882796Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "tests/TEST_IMAGES.md"
+  ],
+  "agent": "OpenCode",
+  "model": "flint-40b-free",
+  "turn_id": "c808c289f24e",
+  "checkpoint_transcript_start": 95,
+  "transcript_lines_at_start": 95,
+  "compact_transcript_start": 95,
+  "token_usage": {
+    "input_tokens": 313777,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3313024,
+    "output_tokens": 81117,
+    "api_call_count": 33
+  },
+  "session_token_usage": {
+    "input_tokens": 1118232,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 13026944,
+    "output_tokens": 201130,
+    "api_call_count": 117
+  },
+  "redaction": {
+    "replacements": 0,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 0,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "session_metrics": {
+    "turn_count": 5
+  }
+}
