@@ -29,9 +29,10 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
   version constants (`TiffCraft::version()`), failing with both values named on
   mismatch.
 - YCbCr (PI=6) test coverage: added the TIFF 6.0 `tests/YCBCR_SUPPORT.md`
-  specification reference, 2 generated YCbCr test images under
-  `tests/ycbcr_images/`, and the corresponding `ycbcr-*.ppm` ground-truth
-  reference images (child issue of the YCbCr support effort, #38).
+  specification reference, 3 generated YCbCr test images under
+  `tests/ycbcr_images/` (including single-tile and multi-tile variants), and
+  the corresponding `ycbcr-*.ppm` ground-truth reference images (child issue of
+  the YCbCr support effort, #38).
 
 ### Changed
 
@@ -43,7 +44,8 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
 - Expanded the `ReferenceBlackWhite` scaling documentation in
   `tests/YCBCR_SUPPORT.md` with the full code-to-full-range formulas, documented
   ImageMagick's tag-writing limitations, and removed or relabeled inaccurate
-  YCbCr fixtures after a tag-level audit (#42).
+  YCbCr fixtures after a tag-level audit, retaining two truthful tiled fixtures
+  with a single 64x48 tile and a 12-tile 16x16 grid (#42).
 - `TiffExporter.hpp` no longer includes the umbrella header `TiffCraft.hpp`;
   it now includes `TiffImage.hpp` directly, resolving the include cycle and
   making the exporter header standalone.

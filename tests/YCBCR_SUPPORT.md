@@ -141,9 +141,11 @@ python3 tests/ycbcr_images/generate_ycbcr.py
 
 The script writes the YCbCr TIFFs to `tests/ycbcr_images/` and the matching
 Netpbm ASCII PPM (P3) ground-truth images to `tests/reference_images/`. It uses
-a fixed source pattern, so rerunning it reproduces the same files. It emits only
-fixtures whose attributes ImageMagick can actually write into the TIFF; cases
-for attributes it cannot write were removed after the tag-level audit below.
+a fixed source pattern, so rerunning it reproduces the same files. It emits
+three fixtures — one stripped full-resolution image and two tiled images (a
+single-tile variant and a 12-tile variant) — whose attributes ImageMagick can
+actually write into the TIFF; cases for attributes it cannot write were removed
+after the tag-level audit below.
 
 ## ImageMagick limitations
 
@@ -167,26 +169,32 @@ than kept with a false claim.
   `-sampling-factor 2x2` leaves the tag at `[1, 1]`. The old generator used
   `-resize`, which physically shrank the images instead of writing the tag —
   misleading — so all subsampled cases were removed.
-- **Tiling:** tiling **can** be set with `-define tiff:tile-geometry=64x48`
-  (verified: writes `TileWidth` = 64, `TileLength` = 48, tile offsets and tile
-  byte counts, and no `RowsPerStrip`). This is the only variant attribute
-  ImageMagick can write, and it is used for the retained tiled fixture.
+- **Tiling:** tiling **can** be set with `-define tiff:tile-geometry=<value>`
+  using any 16-multiple tile geometry (verified with ImageMagick 7.1.2-35):
+  `-define tiff:tile-geometry=64x48` yields a single 64x48 tile (`TileWidth` =
+  64, `TileLength` = 48, one tile offset, no `RowsPerStrip`), and
+  `-define tiff:tile-geometry=16x16` yields a 4x3 grid of 16x16 tiles
+  (`TileWidth` = 16, `TileLength` = 16, 12 tile offsets). This is the only
+  variant attribute ImageMagick can write, and both geometries are used for
+  the retained tiled fixtures.
 
 ## Test image matrix
 
-The table below lists the two retained YCbCr TIFFs in `tests/ycbcr_images/`
+The table below lists the three retained YCbCr TIFFs in `tests/ycbcr_images/`
 and their verified attributes.
 
 | Test image | Subsampling (h x v) | Positioning | Coefficients | RefBW | Planar | Bits | Dimensions | Validates |
 |---|---|---|---|---|---|---|---|---|
 | `ycbcr-1x1.tif` | 1x1 | centered (1) | default | default | chunky | 8 | 64x48 | Full-resolution YCbCr; all YCbCr tags at their TIFF defaults; stripped organization. |
-| `ycbcr-tiled.tif` | 1x1 | centered (1) | default | default | chunky (tiled) | 8 | 64x48 | Tiled organization (TileWidth=64, TileLength=48); otherwise all defaults. |
+| `ycbcr-tiled-single.tif` | 1x1 | centered (1) | default | default | chunky (tiled, 1 tile) | 8 | 64x48 | Tiled organization with a single 64x48 tile; verifies the tile tag path. |
+| `ycbcr-tiled-multi.tif` | 1x1 | centered (1) | default | default | chunky (tiled, 12 tiles) | 8 | 64x48 | Tiled organization with a 4x3 grid of 16x16 tiles; verifies multi-tile traversal. |
 
 ### Removed fixtures (audit results)
 
 A tag-level audit showed that 16 of the original 17 images did not match their
-claimed attributes. Those cases were removed (or, for the tiled case, replaced)
-rather than kept with a false claim; the reasons are recorded here.
+claimed attributes. Those cases were removed (or, for the tiled case, replaced
+by two truthful tiled fixtures) rather than kept with a false claim; the reasons
+are recorded here.
 
 | Removed image | Claimed attribute | Audit result / reason |
 |---|---|---|
@@ -205,7 +213,7 @@ rather than kept with a false claim; the reasons are recorded here.
 | `ycbcr-odd-2x2.tif` | 2x2 subsampling, odd dimensions 61x47 | Actually 31x24 and physically downscaled, with no subsampling tag; odd-dimension chroma-ceiling claims are only meaningful with real subsampling. |
 | `ycbcr-odd-4x4.tif` | 4x4 subsampling, odd dimensions 63x61 | Actually 16x16 and physically downscaled, with no subsampling tag; odd-dimension chroma-ceiling claims are only meaningful with real subsampling. |
 | `ycbcr-odd-mixed.tif` | 2x1 subsampling, odd dimensions 62x47 | Actually 31x47 and physically downscaled, with no subsampling tag; odd-dimension chroma-ceiling claims are only meaningful with real subsampling. |
-| `ycbcr-tiled-2x2.tif` | tiled organization with 2x2 subsampling | Had no tile tags (used `RowsPerStrip = 24`) and falsely claimed 2x2 subsampling; replaced by regenerated `ycbcr-tiled.tif` (64x48, real tile tags). |
+| `ycbcr-tiled-2x2.tif` | tiled organization with 2x2 subsampling | Had no tile tags (used `RowsPerStrip = 24`) and falsely claimed 2x2 subsampling; replaced by the regenerated `ycbcr-tiled-single.tif` and the newly added `ycbcr-tiled-multi.tif` (both with real tile tags). |
 
 ## Ground-truth reference images
 

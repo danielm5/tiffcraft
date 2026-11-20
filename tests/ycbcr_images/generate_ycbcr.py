@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Deterministic generator for the two retained YCbCr
+"""Deterministic generator for the three retained YCbCr
 (PhotometricInterpretation = 6) test fixtures.
 
-Generates:
+Generates three 64x48, 1x1-subsampled fixtures (all other YCbCr tags at their
+TIFF defaults):
 
-* ``tests/ycbcr_images/`` - a full-resolution stripped YCbCr TIFF and a tiled
-  YCbCr TIFF (both 64x48, 1x1 subsampling, all other YCbCr tags at defaults)
+* ``tests/ycbcr_images/`` - one full-resolution stripped YCbCr TIFF, one tiled
+  YCbCr TIFF with a single 64x48 tile, and one tiled YCbCr TIFF with a 4x3 grid
+  of 16x16 tiles (12 tiles)
 * ``tests/reference_images/`` - ground-truth ASCII Netpbm PPM (P3) RGB reference
   images for each generated fixture
 
@@ -18,7 +20,7 @@ A tag-level audit showed that ImageMagick cannot write YCbCrSubSampling,
 YCbCrPositioning, YCbCrCoefficients, ReferenceBlackWhite, or PlanarConfiguration
 = 2; the variant cases that claimed those attributes were removed rather than
 kept with a false claim. Tiling is the one variant attribute ImageMagick can
-write, so the tiled fixture is retained.
+write, so two tiled fixtures (single-tile and multi-tile) are retained.
 
 Usage:
 
@@ -34,14 +36,17 @@ IMAGE_DIR = Path(__file__).resolve().parent
 REFERENCE_DIR = Path(__file__).resolve().parent.parent / "reference_images"
 TMP_DIR = Path("/tmp/opencode")
 
-# (name, tiled). Only these two combinations are truthfully writable by
-# ImageMagick: full-resolution stripped YCbCr, and the same image with real
-# TIFF tile tags. The variant cases (subsampling, positioning, coefficients,
-# RefBW, planar=2) were removed after a tag-level audit because ImageMagick
-# cannot write those tags.
+# (name, tile_geometry). None means stripped (no tile define); a string is
+# passed as -define tiff:tile-geometry=<value>. Only these three combinations
+# are truthfully writable by ImageMagick: full-resolution stripped YCbCr, the
+# same image with a single 64x48 tile, and the same image with a 4x3 grid of
+# 16x16 tiles (12 tiles). The variant cases (subsampling, positioning,
+# coefficients, RefBW, planar=2) were removed after a tag-level audit because
+# ImageMagick cannot write those tags.
 CASES = [
-    ("ycbcr-1x1", False),
-    ("ycbcr-tiled", True),
+    ("ycbcr-1x1", None),
+    ("ycbcr-tiled-single", "64x48"),
+    ("ycbcr-tiled-multi", "16x16"),
 ]
 
 
@@ -81,7 +86,7 @@ def source_pixels(w, h, seed):
 def main():
     IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     REFERENCE_DIR.mkdir(parents=True, exist_ok=True)
-    for name, tiled in CASES:
+    for name, tile_geometry in CASES:
         w, h = BASE_W, BASE_H
         pixels = source_pixels(w, h, zlib.crc32(name.encode()) & 0xFFFFFFFF)
         src = TMP_DIR / f"{name}-src.ppm"
@@ -91,8 +96,8 @@ def main():
         write_binary_ppm(src, w, h, pixels)
 
         args = [str(src), "-compress", "none", "-colorspace", "YCbCr"]
-        if tiled:
-            args += ["-define", "tiff:tile-geometry=64x48"]
+        if tile_geometry is not None:
+            args += ["-define", f"tiff:tile-geometry={tile_geometry}"]
         args += [str(out_tif)]
         run_magick(args)
 
