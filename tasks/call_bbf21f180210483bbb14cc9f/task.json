@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "call_bbf21f180210483bbb14cc9f",
+  "agent_id": "ses_e0a13091bffeDVqDqsQxvk6ph5",
+  "subagent_type": "general",
+  "task_description": "Write issue 38 context artifact",
+  "token_usage": {
+    "input_tokens": 62087,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 221312,
+    "output_tokens": 5153,
+    "api_call_count": 14
+  },
+  "started_at": "2026-11-19T17:28:30.047-05:00",
+  "completed_at": "2026-11-19T17:29:58.759912446-05:00"
+}

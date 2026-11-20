@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "call_91c907ca8b254bf0b4c88b8b",
+  "agent_id": "ses_e0a163b67ffeLiUuzo3kz0xyT1",
+  "subagent_type": "explore",
+  "task_description": "Tooling/test/build research for issue 38",
+  "token_usage": {
+    "input_tokens": 47252,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 263936,
+    "output_tokens": 7281,
+    "api_call_count": 10
+  },
+  "started_at": "2026-11-19T17:25:00.567-05:00",
+  "completed_at": "2026-11-19T17:26:31.373902075-05:00"
+}

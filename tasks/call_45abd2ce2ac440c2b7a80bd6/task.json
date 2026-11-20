@@ -1,0 +1,18 @@
+{
+  "tool_use_id": "call_45abd2ce2ac440c2b7a80bd6",
+  "agent_id": "ses_e0a1018b3ffeC8aaQ0TWxLfoMV",
+  "subagent_type": "general",
+  "task_description": "Implement issue 38 changes",
+  "files": [
+    "tests/YCBCR_SUPPORT.md"
+  ],
+  "token_usage": {
+    "input_tokens": 747883,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 6844800,
+    "output_tokens": 197930,
+    "api_call_count": 54
+  },
+  "started_at": "2026-11-19T17:31:42.666-05:00",
+  "completed_at": "2026-11-19T18:13:41.695130243-05:00"
+}
