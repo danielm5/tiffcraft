@@ -79,35 +79,61 @@ namespace netpbm {
 
   template <typename PixelType>
   Image<PixelType> read(const std::string& filename) {
-    std::ifstream file(filename);
+    std::ifstream file(filename, std::ios::binary);
     if (!file) throw std::runtime_error("Cannot open file");
 
-    std::string line;
+    // Helper function to read a header line, skipping blank lines and comments
+    auto readLine = [&file]() {
+      std::string line;
+      while (std::getline(file, line)) {
+        const auto first = line.find_first_not_of(" \t\r\n\v\f");
+        if (first == std::string::npos) { // blank (or whitespace-only) line
+          continue;
+        }
+        if (line[first] == '#') {         // comment, allowing leading whitespace
+          continue;
+        }
+        const auto last = line.find_last_not_of(" \t\r\n\v\f");
+        return line.substr(first, last - first + 1);
+      }
+      return std::string{};
+    };
 
     // Read magic number
-    std::getline(file, line);
+    const auto magicStr = readLine();
+    if (magicStr.empty()) {
+      throw std::runtime_error{"Failed to read magic number"};
+    }
+    bool isBinary = false;
     if constexpr (std::is_same_v<PixelType, bool>) {
-      if (line != "P1") throw std::runtime_error("Not an ASCII PBM (P1)");
+      if (magicStr != "P1") throw std::runtime_error("Not an ASCII PBM (P1)");
     } else if constexpr (is_rgb_v<PixelType>) {
-      if (line != "P3") throw std::runtime_error("Not an ASCII PPM (P3)");
+      isBinary = (magicStr == "P6");
+      if (!isBinary && magicStr != "P3") {
+        throw std::runtime_error("Not a valid PPM (P3 or P6)");
+      }
     } else {
-      if (line != "P2") throw std::runtime_error("Not an ASCII PGM (P2)");
+      if (magicStr != "P2") throw std::runtime_error("Not an ASCII PGM (P2)");
     }
 
-    // Skip comments
-    do {
-        std::getline(file, line);
-    } while (line[0] == '#');
-
     // Read width and height
-    std::istringstream wh(line);
+    const auto whStr = readLine();
+    if (whStr.empty()) {
+      throw std::runtime_error{"Failed to read width and height"};
+    }
+    std::istringstream wh(whStr);
     int width, height;
     wh >> width >> height;
 
     // Read max value
     size_t maxval = 1;
     if constexpr (!std::is_same_v<PixelType, bool>) {
-      file >> maxval;
+      const auto maxvalStr = readLine();
+      if (maxvalStr.empty()) {
+        throw std::runtime_error{"Failed to read maxval"};
+      }
+      std::istringstream mv(maxvalStr);
+      mv >> maxval;
     }
     size_t maxValue;
     if constexpr (is_rgb_v<PixelType>) {
@@ -117,19 +143,30 @@ namespace netpbm {
       maxValue = std::numeric_limits<PixelType>::max();
     }
     if (maxval != maxValue) {
-      throw std::runtime_error("Unsupported maxval");
+      throw std::runtime_error{"Unsupported maxval"};
     }
 
     // Read pixel data
     std::vector<PixelType> pixels;
     pixels.reserve(width * height);
     if constexpr (is_rgb_v<PixelType>) {
-      unsigned long int r, g, b;
-      while (file >> r >> g >> b) {
-        pixels.push_back(PixelType{
-          static_cast<typename PixelType::value_type>(r),
-          static_cast<typename PixelType::value_type>(g),
-          static_cast<typename PixelType::value_type>(b)});
+      if (isBinary) {
+        // Read binary PPM
+        pixels.resize(width * height);
+        file.read(reinterpret_cast<char*>(pixels.data()),
+                  width * height * sizeof(PixelType));
+        if (!file) {
+          throw std::runtime_error{"Failed to read binary pixel data"};
+        }
+      } else {
+        // Read ASCII PPM
+        unsigned long int r, g, b;
+        while (file >> r >> g >> b) {
+          pixels.push_back(PixelType{
+            static_cast<typename PixelType::value_type>(r),
+            static_cast<typename PixelType::value_type>(g),
+            static_cast<typename PixelType::value_type>(b)});
+        }
       }
     } else {
       unsigned long int gray;
@@ -137,8 +174,9 @@ namespace netpbm {
           pixels.push_back(static_cast<PixelType>(gray));
       }
     }
-    if (pixels.size() != static_cast<size_t>(width * height))
-        throw std::runtime_error("Pixel count does not match image size");
+    if (pixels.size() != static_cast<size_t>(width * height)) {
+      throw std::runtime_error{"Pixel count does not match image size"};
+    }
 
     return {width, height, maxval, std::move(pixels)};
   }

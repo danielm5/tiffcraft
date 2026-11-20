@@ -1,5 +1,5 @@
 // BSD 2-Clause License
-// Copyright (c) 2025 Daniel Moreno
+// Copyright (c) 2025-2026 Daniel Moreno
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
@@ -57,8 +57,10 @@
 #include <algorithm>
 #include <numeric>
 #include <string>
+#include <array>
 
-namespace TiffCraft {
+namespace TiffCraft
+{
 
   struct Image
   {
@@ -140,6 +142,113 @@ namespace TiffCraft {
       : std::runtime_error("Format not supported: " + format) {}
   };
 
+  template <Tag valueTag, typename T = uint8_t, size_t N = 1>
+  class TagValue
+  {
+    std::array<T, N> values_;
+  public:
+    using Type = T;
+    constexpr static size_t size = N;
+    constexpr static Tag tag = valueTag;
+    TagValue(std::array<T, N> values) : values_{std::move(values)} {}
+    T value(size_t index = 0) const { return values_[index]; }
+    const T* data() const { return values_.data(); }
+    T* data() { return values_.data(); }
+  };
+
+  class PlanarConfiguration : public TagValue<Tag::PlanarConfiguration>
+  {
+  public:
+    constexpr static Type Chunky = 1, Planar = 2, defaultValue = Chunky;
+    PlanarConfiguration(Type value = defaultValue) : TagValue{{value}}
+    {
+      if (value != Chunky && value != Planar) {
+        throw std::invalid_argument{"Invalid PlanarConfiguration value"};
+      }
+    }
+    bool isChunky() const { return value() == Chunky; }
+    bool isPlanar() const { return value() == Planar; }
+  };
+
+  class YCbCrPositioning : public TagValue<Tag::YCbCrPositioning>
+  {
+  public:
+    constexpr static Type Centered = 1, Cosited = 2, defaultValue = Centered;
+    YCbCrPositioning(Type value = defaultValue) : TagValue{{value}}
+    {
+      if (value != Centered && value != Cosited) {
+        throw std::invalid_argument{"Invalid YCbCrPositioning value"};
+      }
+    }
+    bool isCentered() const { return value() == Centered; }
+    bool isCosited() const { return value() == Cosited; }
+  };
+
+  class YCbCrCoefficients : public TagValue<Tag::YCbCrCoefficients, float, 3>
+  {
+  public:
+    constexpr static std::array<Type, size> defaultValue{ 0.299f, 0.587f, 0.114f };
+    YCbCrCoefficients(std::array<Type, size> values = defaultValue)
+      : TagValue{std::move(values)}
+    {
+      for (const auto& v : values) {
+        if (v < 0.0f || v > 1.0f) {
+          throw std::invalid_argument{"Invalid YCbCrCoefficients value"};
+        }
+      }
+      const Type sum = values[0] + values[1] + values[2];
+      if (sum < 0.999f || sum > 1.001f) {
+        throw std::invalid_argument{
+          "Invalid YCbCrCoefficients value: coefficients must sum to 1"};
+      }
+    }
+    Type red() const { return value(0); }
+    Type green() const { return value(1); }
+    Type blue() const { return value(2); }
+  };
+
+  class YCbCrSubSampling : public TagValue<Tag::YCbCrSubSampling, int, 2>
+  {
+  public:
+    constexpr static std::array<Type, size> defaultValue{ 2, 2 };
+    YCbCrSubSampling(std::array<Type, size> values = defaultValue)
+      : TagValue{std::move(values)}
+    {
+      for (const auto& v : values) {
+        if (v != 1 && v != 2 && v != 4) {
+          throw std::invalid_argument{"Invalid YCbCrSubSampling value"};
+        }
+      }
+    }
+    Type horizontal() const { return value(0); }
+    Type vertical() const { return value(1); }
+    bool isSubsampled() const { return horizontal() > 1 || vertical() > 1; }
+  };
+
+  template <float R1, float R2, float G1, float G2, float B1, float B2>
+  class ReferenceBlackWhite : public TagValue<Tag::ReferenceBlackWhite, float, 6>
+  {
+  public:
+    constexpr static std::array<Type, size> defaultValue{R1, R2, G1, G2, B1, B2 };
+    ReferenceBlackWhite(std::array<Type, size> values = defaultValue)
+      : TagValue{std::move(values)}
+    {
+      for (size_t i = 0; i < size; i += 2) {
+        if (data()[i] >= data()[i + 1]) {
+          throw std::invalid_argument{
+            "Invalid ReferenceBlackWhite value: black must be less than white"};
+        }
+      }
+    }
+    template <size_t index, Type range> Type map(Type value) const {
+      static_assert(index < 3, "Index must be 0, 1, or 2");
+      const Type* v = data() + index * 2;
+      return (value - v[0]) * range / (v[1] - v[0]);
+    }
+  };
+  using ReferenceBlackWhiteYCbCr = ReferenceBlackWhite<0.0f, 255.0f, 128.0f, 255.0f, 128.0f, 255.0f>;
+
+
   // Base class for TIFF exporters
   class TiffExporter
   {
@@ -162,75 +271,152 @@ namespace TiffCraft {
       const TiffImage::IFD& ifd,
       TiffImage::ImageData imageData) = 0;
 
-    // Copies the values from a TIFF entry to a vector of integers.
-    template <typename T>
-    static std::vector<int> makeIntVec(const TiffImage::IFD::Entry& entry)
+    //! \brief Copies the values from a TIFF entry to a destination buffer of
+    //!        the requested type.
+    //! \tparam DstType The destination type to convert the values to.
+    //! \param[in] entry The TIFF entry containing the values.
+    //! \param[out] dst The destination buffer to copy the values to.
+    //! \throw std::runtime_error if the source type is rational and any
+    //!                           denominator is zero.
+    //!
+    //! This function is used to convert the values from a TIFF entry to a
+    //! destination buffer of the requested type. Values are converted from the
+    //! source type to the destination type, possibly loosing precision. The
+    //! destination buffer must be large enough to hold the converted values.
+    //!
+    template <typename DstType>
+    static void copy(const TiffImage::IFD::Entry& entry, DstType* dst)
     {
-      std::vector<int> v(entry.count());
-      const auto* values = reinterpret_cast<const T*>(entry.values());
-      for (size_t i = 0; i < entry.count(); ++i) {
-        if constexpr (is_rational_v<T>) {
-          if (values[i].denominator == 0) {
-            throw std::runtime_error("Rational value with zero denominator in TIFF entry");
+      return dispatchType(entry.type(), [&, entry]<Type type>() {
+        using SrcType = TypeTraits_t<type>;
+        const auto* values = reinterpret_cast<const SrcType*>(entry.values());
+        for (size_t i = 0; i < entry.count(); ++i) {
+          if constexpr (is_rational_v<SrcType>) {
+            if (values[i].denominator == 0) {
+              throw std::runtime_error{
+                "Rational value with zero denominator in TIFF entry"};
+            }
+            const auto numerator = static_cast<DstType>(values[i].numerator);
+            const auto denominator = static_cast<DstType>(values[i].denominator);
+            dst[i] = numerator / denominator;
           }
-          v[i] = static_cast<int>(values[i].numerator / values[i].denominator);
+          else {
+            dst[i] = static_cast<DstType>(values[i]);
+          }
         }
-        else {
-          v[i] = static_cast<int>(values[i]);
-        }
-      }
-      return v;
+      });
     }
 
-    // Copies the values from a TIFF entry to a vector of integers.
-    // \param ifd The IFD containing the entry.
-    // \param tag The tag to look for.
-    // \param defaultValue An optional default value to return if the tag is
-    //                     not found.
-    // \return A vector of integers containing the values from the TIFF entry.
-    static std::vector<int> getIntVec(const TiffImage::IFD& ifd, Tag tag,
-      std::optional<std::vector<int>> defaultValue = std::nullopt)
+    //! \brief Gets a TIFF entry from an IFD by tag.
+    //! \param[in] ifd The IFD containing the entry.
+    //! \param[in] tag The tag to look for.
+    //! \return An optional containing the TIFF entry if found, or std::nullopt
+    //!         if not found.
+    static std::optional<TiffImage::IFD::Entry> getEntry(
+      const TiffImage::IFD& ifd, Tag tag)
     {
       auto it = ifd.entries().find(tag);
       if (it != ifd.entries().end()) {
-        const auto& entry = it->second;
-        return dispatchType(entry.type(), [&, entry]<Type type>() {
-            return makeIntVec<TypeTraits_t<type>>(entry);
-        });
+        return it->second;
       }
-      if (defaultValue.has_value()) {
-        return defaultValue.value();
-      }
-      throw std::runtime_error("Tag not found: " + std::to_string(static_cast<int>(tag)));
+      return std::nullopt;
     }
 
-    // Gets one value from a TIFF entry as an integer.
-    // \param ifd The IFD containing the entry.
-    // \param tag The tag to look for.
-    // \param defaultValue An optional default value to return if the tag is
-    //                     not found.
-    // \return The integer value from the TIFF entry, or the default value if
-    //         not found.
-    static int getInt(const TiffImage::IFD& ifd, Tag tag,
-      std::optional<int> defaultValue = std::nullopt)
+    //! \brief Gets a value from a TIFF entry as a specific type.
+    //! \tparam Value The type of the value to get. Must be a TagValue
+    //!               specialization.
+    //! \param[in] ifd The IFD containing the entry.
+    //! \return The value from the TIFF entry, or a default-constructed value if
+    //!         the tag is not found.
+    template <typename Value>
+    static Value get(const TiffImage::IFD& ifd)
     {
-      std::optional<std::vector<int>> defaultValueVec;
-      if (defaultValue.has_value()) {
-        defaultValueVec = std::vector<int>{ defaultValue.value() };
+      Value value; // create with default values
+      auto entry = getEntry(ifd, Value::tag);
+      if (entry.has_value()) {
+        // Tag found, copy the values to the value object
+        if (entry->count() != Value::size) {
+          throw std::runtime_error{
+            "Expected " + std::to_string(Value::size) +
+            " values for tag " + std::to_string(static_cast<int>(Value::tag))};
+        }
+        copy<typename Value::Type>(*entry, value.data());
       }
-      auto v = getIntVec(ifd, tag, defaultValueVec);
+      return value;
+    }
+
+    //! \brief Copies the values from a TIFF entry to a vector of the requested
+    //!        type.
+    //! \param[in] ifd The IFD containing the entry.
+    //! \param[in] tag The tag to look for.
+    //! \param[in] defaultValue An optional default value to return if the tag
+    //!                         is not found.
+    //! \return A vector of integers containing the values from the TIFF entry.
+    //! \throw std::runtime_error if the tag is not found and no default value
+    //!        is provided, or if the source type is rational and any
+    //!        denominator is zero.
+    template <typename DstType>
+    static std::vector<DstType> getVec(const TiffImage::IFD& ifd, Tag tag,
+      std::optional<std::vector<DstType>> defaultValue = std::nullopt)
+    {
+      auto entry = getEntry(ifd, tag);
+      if (!entry.has_value()) {
+        // Tag not found, return default value if provided
+        if (defaultValue.has_value()) {
+          return defaultValue.value();
+        }
+        throw std::runtime_error{
+          "Tag not found: " + std::to_string(static_cast<int>(tag))};
+      }
+      std::vector<DstType> v(entry->count());
+      copy<DstType>(*entry, v.data());
+      return v;
+    }
+
+    //! \brief Gets one value from a TIFF entry as an integer.
+    //! \param[in] ifd The IFD containing the entry.
+    //! \param[in] tag The tag to look for.
+    //! \param[in] defaultValue An optional default value to return if the tag
+    //!                         is not found.
+    //! \return The integer value from the TIFF entry, or the default value if
+    //!         not found.
+    //! \throw std::runtime_error if the tag is not found and no default value
+    //!        is provided, or if the entry contains more than one value.
+    template <typename DstType>
+    static DstType getValue(const TiffImage::IFD& ifd, Tag tag,
+      std::optional<DstType> defaultValue = std::nullopt)
+    {
+      std::optional<std::vector<DstType>> defaultValueVec;
+      if (defaultValue.has_value()) {
+        defaultValueVec = std::vector<DstType>{ defaultValue.value() };
+      }
+      auto v = getVec<DstType>(ifd, tag, defaultValueVec);
       if (v.size() != 1) {
-        throw std::runtime_error("Expected a single value for integer tag");
+        throw std::runtime_error{"Expected a single value for integer tag"};
       }
       return v[0];
     }
 
+    //! \brief Requires that a TIFF entry has a specific value, throwing an
+    //!        exception if it does not.
+    //! \tparam Comp A comparison functor to compare the actual and required
+    //!              values. Defaults to std::equal_to<>.
+    //! \param[in] ifd The IFD containing the entry.
+    //! \param[in] tag The tag to look for.
+    //! \param[in] defaultValue An optional default value to return if the tag
+    //!                         is not found.
+    //! \param[in] requiredValue The value that is required for the entry.
+    //! \param[in] comp A comparison functor to compare the actual and required
+    //!                 values. Defaults to std::equal_to<>.
+    //! \return The actual value of the entry if it matches the required value.
+    //! \throw FormatNotSupportedError if the actual value does not match the
+    //!        required value.
     template <typename Comp = std::equal_to<>>
     static int require(
       const TiffImage::IFD& ifd, Tag tag, std::optional<int> defaultValue,
       int requiredValue, Comp&& comp = {})
     {
-      const int value = getInt(ifd, tag, defaultValue);
+      const int value = getValue<int>(ifd, tag, defaultValue);
       if (!comp(value, requiredValue)) {
         throw FormatNotSupportedError(
           "Unsupported " + std::to_string(static_cast<int>(tag)) +
@@ -273,7 +459,7 @@ namespace TiffCraft {
       const TiffImage::IFD& ifd, const std::vector<int>& requiredValue,
       Comp&& comp = {})
     {
-      auto bitsPerSample = getIntVec(ifd, Tag::BitsPerSample);
+      auto bitsPerSample = getVec<int>(ifd, Tag::BitsPerSample);
       if (!comp(bitsPerSample, requiredValue)) {
         throw FormatNotSupportedError("Unsupported bits per sample");
       }
@@ -296,18 +482,18 @@ namespace TiffCraft {
 
     static int getWidth(const TiffImage::IFD& ifd)
     {
-      return getInt(ifd, Tag::ImageWidth);;
+      return getValue<int>(ifd, Tag::ImageWidth);;
     }
 
     static int getHeight(const TiffImage::IFD& ifd)
     {
-      return getInt(ifd, Tag::ImageLength);
+      return getValue<int>(ifd, Tag::ImageLength);
     }
 
     static std::vector<int> getBitsPerSample(const TiffImage::IFD& ifd)
     {
       if (ifd.entries().contains(Tag::BitsPerSample)) {
-        return getIntVec(ifd, Tag::BitsPerSample);
+        return getVec<int>(ifd, Tag::BitsPerSample);
       }
       return { 1 }; // default value if missing
     }
@@ -321,16 +507,16 @@ namespace TiffCraft {
          throw FormatNotSupportedError("Unsupported bits per sample");
       }
       const int bitsPerSample = bitsPerSampleVec.front();
-      const int samplesPerPixel = getInt(ifd, Tag::SamplesPerPixel, 1);
-      const int planarConfiguration = getInt(ifd, Tag::PlanarConfiguration, 1);
+      const int samplesPerPixel = getValue<int>(ifd, Tag::SamplesPerPixel, 1);
+      const int planarConfiguration = getValue<int>(ifd, Tag::PlanarConfiguration, 1);
 
       const int imageWidth = getWidth(ifd);
       const int imageHeight = getHeight(ifd);
 
-      const int rowsPerStrip = getInt(ifd, Tag::RowsPerStrip, imageHeight);
+      const int rowsPerStrip = getValue<int>(ifd, Tag::RowsPerStrip, imageHeight);
 
-      const int tileWidth = getInt(ifd, Tag::TileWidth, imageWidth);
-      const int tileHeight = getInt(ifd, Tag::TileLength, rowsPerStrip);
+      const int tileWidth = getValue<int>(ifd, Tag::TileWidth, imageWidth);
+      const int tileHeight = getValue<int>(ifd, Tag::TileLength, rowsPerStrip);
       const int tileChannels = (planarConfiguration == 1 ? samplesPerPixel : 1);
       const int tileStride = (tileWidth * tileChannels * bitsPerSample + 7) / 8;
 
@@ -506,7 +692,7 @@ namespace TiffCraft {
       const int compression = requireCompression(ifd, 1);
       const int fillOrder = requireFillOrder(ifd, 1);
 
-      const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
+      const int bitsPerSample = getValue<int>(ifd, Tag::BitsPerSample, 1);
 
       constexpr size_t maxDstValue = std::numeric_limits<DstType>::max();
       const size_t maxSrcValue = bitsPerSample < sizeof(size_t) * 8
@@ -550,10 +736,10 @@ namespace TiffCraft {
       const int compression = requireCompression(ifd, 1);
       const int fillOrder = requireFillOrder(ifd, 1);
 
-      const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
+      const int bitsPerSample = getValue<int>(ifd, Tag::BitsPerSample, 1);
 
       const auto numColors = (1 << bitsPerSample);
-      const auto colorMap = getIntVec(ifd, Tag::ColorMap);
+      const auto colorMap = getVec<int>(ifd, Tag::ColorMap);
       if (3 * numColors > colorMap.size()) {
         throw std::runtime_error("Color map size does not match bits per sample");
       }
@@ -604,7 +790,7 @@ namespace TiffCraft {
         });
       const bool isPlanar = (planarConfiguration == 2);
 
-      const auto bitsPerSampleVec = getIntVec(ifd, Tag::BitsPerSample);
+      const auto bitsPerSampleVec = getVec<int>(ifd, Tag::BitsPerSample);
       if (bitsPerSampleVec.size() != 3) {
         throw std::runtime_error("Expected 3 bits per sample for RGB image");
       }
@@ -638,6 +824,146 @@ namespace TiffCraft {
     }
   };
 
+  // TiffExporter implementation for YCbCr images ----------------------------
+  template <typename DstType, typename SrcType = DstType>
+  class TiffExporterYCbCr : public TiffExporter
+  {
+  public:
+    // Callback for TiffCraft::load() function
+    void operator()(
+      const TiffImage::Header& header,
+      const TiffImage::IFD& ifd,
+      TiffImage::ImageData imageData) override
+    {
+      const int samplesPerPixel = requireSamplesPerPixel(ifd, 3);
+      const int bitsPerSample = requireBitsPerSample(ifd, { 8, 8, 8 }).front();
+      const int compression = requireCompression(ifd, 1);
+      const int photometricInterpretation = requirePhotometricInterpretation(ifd, 6);
+
+      const auto yCbCrCoefficients = get<YCbCrCoefficients>(ifd);
+      const auto referenceBlackWhiteYCbCr = get<ReferenceBlackWhiteYCbCr>(ifd);
+
+      const auto yCbCrSubsampling = get<YCbCrSubSampling>(ifd);
+      const bool isCentered = get<YCbCrPositioning>(ifd).isCentered();
+      const bool isPlanar = get<PlanarConfiguration>(ifd).isPlanar();
+
+      if (yCbCrSubsampling.isSubsampled()) {
+        throw std::runtime_error{"YCbCrSubSampling must be 1,1"};
+      }
+      if (!isCentered) {
+        throw std::runtime_error{"YCbCrPositioning must be Centered"};
+      }
+
+      constexpr size_t maxDstValue = std::numeric_limits<DstType>::max();
+      const size_t maxSrcValue = bitsPerSample < sizeof(size_t) * 8
+        ? (size_t(1) << bitsPerSample) - 1 : std::numeric_limits<size_t>::max();
+
+      const auto rectInfo = getRectInfo(ifd);
+
+      // create the image and copy the pixel data
+      image_ = Image::make<DstType, 3>(getWidth(ifd), getHeight(ifd), isPlanar);
+      using UnaryOp = std::function<DstType(DstType)>;
+      copyRectangles<SrcType,DstType,UnaryOp>(
+        imageData, // source pixel data
+        rectInfo,  // rectangle info
+        isPlanar ? 1 : samplesPerPixel, // source image channels
+        isPlanar ? samplesPerPixel : 1, // source image planes
+        header.equalsHostByteOrder(),   // source data byte order
+        [&](DstType value) -> DstType {
+          return (value * maxDstValue) / maxSrcValue;
+        }
+      );
+
+      // Convert YCbCr to RGB
+      convertYCbCrToRgb_(yCbCrCoefficients, referenceBlackWhiteYCbCr);
+    }
+  private:
+    void convertYCbCrToRgb_(const YCbCrCoefficients& luma,
+                            const ReferenceBlackWhiteYCbCr& refBlackWhite)
+    {
+      if (image_.channels != 3) {
+        throw std::runtime_error("YCbCr to RGB conversion requires 3 channels");
+      }
+      if (image_.bitDepth != 8) {
+        throw std::runtime_error("YCbCr to RGB conversion requires 8-bit depth");
+      }
+      auto channel = [this](std::byte* pixel, size_t index) -> uint8_t& {
+        return *reinterpret_cast<uint8_t*>(pixel + index * image_.chanStride);
+      };
+
+      // Conversion formulas
+      // ===================
+      // R = Cr * (2-2*Lr) + Y
+      // B = Cb * (2-2*Lb) + Y
+      // G = (Y - Lb*B - Lr*R)/Lg
+      // Lr + Lg + Lb = 1
+      //
+      // Lr' = 2-2*Lr
+      // Lb' = 2-2*Lb
+      //
+      // R = Y + Cr*Lr'
+      // B = Y + Cb*Lb'
+      // G = (Y - Lb*(Y + Cb*Lb') - Lr*(Y + Cr*Lr'))/Lg
+      //
+      // G = (Y - Lb*Y - Cb*Lb*Lb' - Lr*Y - Cr*Lr*Lr')/Lg
+      // G = Y * (1-Lb-Lr)/Lg - Cb*Lb*Lb'/Lg  - Cr*Lr*Lr'/Lg
+      //
+      // Lg = 1-Lb-Lr
+      // G = Y + (-Lb*Lb'/Lg)*Cb + (-Lr*Lr'/Lg)*Cr
+      //
+      // --------------------------------
+      // R = yLUT[y] + crrLUT[cr]
+      // B = yLUT[y] + cbbLUT[cb]
+      // G = yLUT[y] + cbgLUT[cb] + crgLUT[cr]
+
+      // Create a lookup table for faster YCbCr to RGB conversion
+      const float Lr = luma.red();
+      const float Lg = luma.green();
+      const float Lb = luma.blue();
+      const float Lrr = 2 - 2*Lr;
+      const float Lbb = 2 - 2*Lb;
+      const float Lbg = -Lb*Lbb/Lg;
+      const float Lrg = -Lr*Lrr/Lg;
+
+      constexpr int BitShift = 16;
+      constexpr auto toFixed = [](float x) -> int32_t {
+        return static_cast<int32_t>(x * (1 << BitShift) + 0.5f);
+      };
+      constexpr auto fromFixed = [](int32_t x) -> uint8_t {
+        return static_cast<uint8_t>(std::clamp(x >> BitShift, 0, 255));
+      };
+
+      std::vector<int32_t> yLUT(256), cbbLUT(256), crrLUT(256);
+      std::vector<int32_t> cbgLUT(256), crgLUT(256);
+      for (int i = 0; i < 256; ++i) {
+        const uint8_t i8 = static_cast<uint8_t>(i & 0xff);
+        const int32_t y = refBlackWhite.map<0, 255.0f>(i8);
+        const int32_t cb = refBlackWhite.map<1, 127.0f>(i8);
+        const int32_t cr = refBlackWhite.map<2, 127.0f>(i8);
+        yLUT[i] = toFixed(y);
+        cbbLUT[i] = toFixed(cb * Lbb);
+        crrLUT[i] = toFixed(cr * Lrr);
+        cbgLUT[i] = toFixed(cb * Lbg);
+        crgLUT[i] = toFixed(cr * Lrg);
+      }
+
+      // Convert each pixel from YCbCr to RGB in place
+      std::byte* pixels = image_.dataPtr<std::byte>();
+      for (size_t h = 0; h < image_.height; ++h) {
+        std::byte* row = pixels + h * image_.rowStride;
+        for (size_t w = 0; w < image_.width; ++w) {
+          std::byte* pixelPtr = row + w * image_.colStride;
+          const uint8_t y = channel(pixelPtr, 0);
+          const uint8_t cb = channel(pixelPtr, 1);
+          const uint8_t cr = channel(pixelPtr, 2);
+          channel(pixelPtr, 0) = fromFixed(yLUT[y] + crrLUT[cr]);              // r
+          channel(pixelPtr, 1) = fromFixed(yLUT[y] + cbgLUT[cb] + crgLUT[cr]); // g
+          channel(pixelPtr, 2) = fromFixed(yLUT[y] + cbbLUT[cb]);              // b
+        }
+      }
+    }
+  };
+
   // TiffExporter implementation for all supported image types ---------------
   class TiffExporterAny : public TiffExporter
   {
@@ -650,11 +976,11 @@ namespace TiffCraft {
       TiffImage::ImageData imageData) override
     {
       exported_ = false;
-      const int photometricInterpretation = getInt(ifd, Tag::PhotometricInterpretation, 1);
+      const int photometricInterpretation = getValue<int>(ifd, Tag::PhotometricInterpretation, 1);
 
       if (photometricInterpretation >= 0 && photometricInterpretation <= 1) {
         // grayscale image types
-        const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
+        const int bitsPerSample = getValue<int>(ifd, Tag::BitsPerSample, 1);
         if (bitsPerSample <= 8) {
           tryToExport<TiffExporterGray<uint8_t>>(header, ifd, imageData);
         } else if (bitsPerSample <= 15) {
@@ -668,7 +994,7 @@ namespace TiffCraft {
         }
       } else if (photometricInterpretation == 2) {
         // RGB image types
-        std::vector<int> bitsPerSampleVec = getIntVec(ifd, Tag::BitsPerSample);
+        std::vector<int> bitsPerSampleVec = getVec<int>(ifd, Tag::BitsPerSample);
         if (bitsPerSampleVec.size() > 0
           && std::any_of(bitsPerSampleVec.begin(), bitsPerSampleVec.end(),
             [&](int n) { return n != bitsPerSampleVec.front(); })) {
@@ -688,12 +1014,16 @@ namespace TiffCraft {
         }
       } else if (photometricInterpretation == 3) {
         // palette-color image types
-        const int bitsPerSample = getInt(ifd, Tag::BitsPerSample, 1);
+        const int bitsPerSample = getValue<int>(ifd, Tag::BitsPerSample, 1);
         if (bitsPerSample <= 8) {
           tryToExport<TiffExporterPalette<uint8_t>>(header, ifd, imageData);
         } else if (bitsPerSample <= 16) {
           tryToExport<TiffExporterPalette<uint16_t>>(header, ifd, imageData);
         }
+      }
+      else if (photometricInterpretation == 6) {
+        // YCbCr image types
+        tryToExport<TiffExporterYCbCr<uint8_t>>(header, ifd, imageData);
       }
 
       if (!exported_ || image_.dataSize() == 0)
