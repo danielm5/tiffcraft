@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "chatcmpl-tool-bd240b21188fea54",
+  "agent_id": "ses_e0663f843ffeEEXR1XbzqadqF5",
+  "subagent_type": "general",
+  "task_description": "Write context artifact",
+  "token_usage": {
+    "input_tokens": 8769,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 11264,
+    "output_tokens": 3634,
+    "api_call_count": 2
+  },
+  "started_at": "2026-11-20T10:38:34.811-05:00",
+  "completed_at": "2026-11-20T10:38:58.119291937-05:00"
+}

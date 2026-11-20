@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "chatcmpl-tool-99b1db255719d4f4",
+  "agent_id": "ses_e0666eafaffekaMeEr6rMzllau",
+  "subagent_type": "explore",
+  "task_description": "TIFF tag audit",
+  "token_usage": {
+    "input_tokens": 29955,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 55296,
+    "output_tokens": 5314,
+    "api_call_count": 7
+  },
+  "started_at": "2026-11-20T10:35:21.603-05:00",
+  "completed_at": "2026-11-20T10:37:15.74589056-05:00"
+}
