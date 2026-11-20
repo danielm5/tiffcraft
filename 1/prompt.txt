@@ -1,0 +1,106 @@
+I merged the PR. What is required for support of YCbCr ?
+
+---
+
+yes, file an issue
+
+---
+
+does libtiff has additional test images for ycbcr images?
+
+---
+
+how can libtiff ensure correctness with different subsampling, and other specified parameters without test images? is ycbcr basically intested or unsupported?
+
+---
+
+what do you mean by " test/ also includes generated YVbVr images "? are there test images there I can use?
+
+---
+
+great info! but why you keep going around my questions? I didn't ask if it is worth supporting and you keep repeating that. I didn't ask how to generate images, I asked you to clarify your earlier statement about libtiff having test images in test/, was it a mistake and all images are made on the fly with rgb2ycbcr tool? or are there actual test images they use?
+
+---
+
+I don't mean if there are more images in this project. I've created this project and I know exactly which images I've already included, but I can include more. Please stop telling me obvius things. Answer what I ask instead. Are there other test images in libtiff library?
+
+---
+
+you sound like broken record
+
+---
+
+I know it isn't!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+---
+
+It is accessible on the web, it gitub and gitlab
+
+---
+
+was that so hard?
+
+---
+
+thank you for the info, and next time try not do drift from the conversation topic or deviate from my questions, specially if I ask again since it means the original answer left things unanswered
+
+---
+
+do you have access to the tiff 6.0 specification document where support for YCbCr is described?
+
+---
+
+Excellent! I want to create a child issue to #37 request to create a markdown document in test folder documenting the YCbCr support in TIFF (similar to what you just posted above) that we can use to implement and evaluate the implementation in TiffCraft. The issue must also request that a new folder tests/ycbcr_images be created with test images for a good coverage of this feature. For unit tests, we have used the folder reference_images to store the ground-truth pixel values for the test images, perhaps we should do the same here. DO NOT CREATE THE ISSUE YET! Discuss with me a plan based on my request in conversation, only move forward when I directly and unequivocally ask so.
+
+---
+
+1. I want to have the document and test images ready before I work on the implementation. That's why the reference pixel data cannot be generated with TiffCraft exporter as you suggested, they are for validating the exporter output later when complete.
+2. Spec defines subsampling values 1,2,4:
+
+---
+
+1. I want to have the document and test images ready before I work on the implementation. That's why the reference pixel data cannot be generated with TiffCraft exporter as you suggested, they are for validating the exporter output later when complete.
+2. Spec defines subsampling values 1,2,4:
+
+1 = ImageWidth of this chroma image is equal to the ImageWidth of the associated
+luma image.
+2 = ImageWidth of this chroma image is halfthe ImageWidth of the associated luma
+image.
+4 = ImageWidth of this chroma image is one-quarter the ImageWidth of the associ-
+ated luma image. 
+
+test images should cover them. I don't truly understand your format 1x2 nor 4:2:0
+3. I think is good to have one cases different from 8 bit in the images. I can decide later if I support it and when.
+4. Independent but I'm not sure if Pillow is a good reference. I have used magick for the others and I feel is closer to libtiff.
+
+Additionally, I'm not sure how to organize the folders of images and references. Should we propose some pattern that scales for other cases like lab color, or anything else?
+
+---
+
+1. No, it isn't too many if the image are small in number of pixels. Follow existing examples like depth/ ; determine a good image size but prefer quite small.
+2. I prefer to use magick command line for everything and skip Pillow.
+3. No, markdown should be only a description as in the spec document. Implementation ideas don't belong in this kind of document, unless is a true specification requirement, or if the implementation detail is used as a mean of describing something. I mean, it shouldn't be related to TiffCraft code.
+
+---
+
+It works but I've a question about non-divisible image sizes, is something like 61x47 allowed? If it is, we should test some of those.
+
+---
+
+Does it matter the actual number like 61,62,63,64? should we test all of them or just one is good coverage?
+
+---
+
+yes
+
+---
+
+create the child issue with the complete plan
+
+---
+
+the worker is using Pillow for #38, I've expressly told you to not use Pillow, is that reflected on this issue?
+
+---
+
+yes, but it was worng before then, why? wasn't I clear in my request? what can I do better?
