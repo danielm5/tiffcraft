@@ -1,0 +1,19 @@
+have you really: 
+
+tests/TEST_IMAGES.md — added the ## tests/ycbcr_images section (generated
+YCbCr test image format table) and the ### YCbCr ground-truth images table
+under ## tests/reference_images. 
+
+?
+
+---
+
+is that superseeded ? do we jsut leave the PR outdated? what's you opinion of how to handle this?
+
+---
+
+but it's outdated the text shown to me when I open the PR
+
+---
+
+I still see this text "It intentionally contains no TiffCraft implementation details; it describes the format only, so that the implementation (and its tests) can be validated against the published TIFF 6.0 behavior. "

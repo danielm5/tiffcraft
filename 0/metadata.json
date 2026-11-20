@@ -1,0 +1,56 @@
+{
+  "cli_version": "0.13.4-nightly.202611121940.ce16562b9",
+  "checkpoint_id": "01M7VM3NC59DH9385A79KWXDFM",
+  "session_id": "ses_e0a1bafe8ffe1Fa5mLqW7RmiKy",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-20T04:40:57.765568003Z",
+  "branch": "feature/issue-38",
+  "checkpoints_count": 4,
+  "files_touched": [
+    "tests/YCBCR_SUPPORT.md"
+  ],
+  "agent": "OpenCode",
+  "model": "hy4-flash-free",
+  "turn_id": "c324a61efd08",
+  "checkpoint_transcript_start": 176,
+  "transcript_lines_at_start": 176,
+  "compact_transcript_start": 175,
+  "token_usage": {
+    "input_tokens": 22835,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 3458560,
+    "output_tokens": 12002,
+    "api_call_count": 24
+  },
+  "session_token_usage": {
+    "input_tokens": 1324356,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 18655744,
+    "output_tokens": 205089,
+    "api_call_count": 172,
+    "subagent_tokens": {
+      "input_tokens": 1060738,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 7974784,
+      "output_tokens": 231845,
+      "api_call_count": 112
+    }
+  },
+  "redaction": {
+    "replacements": 4,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 4,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "session_metrics": {
+    "turn_count": 14
+  }
+}
