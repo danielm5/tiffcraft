@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "chatcmpl-tool-b0a5bbbc6ae7cd50",
+  "agent_id": "ses_e06d67dfbffeYtlWIdWYivMPZn",
+  "subagent_type": "explore",
+  "task_description": "Docs research for issue 40",
+  "token_usage": {
+    "input_tokens": 30751,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 91136,
+    "output_tokens": 4135,
+    "api_call_count": 6
+  },
+  "started_at": "2026-11-20T08:33:29.463-05:00",
+  "completed_at": "2026-11-20T08:34:39.781226177-05:00"
+}
