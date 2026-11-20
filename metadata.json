@@ -3,9 +3,45 @@
   "checkpoint_id": "01M7VKBGDYNFKDVQAK44CB87TV",
   "strategy": "manual-commit",
   "branch": "feature/issue-38",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
-    "tests/ycbcr_images/generate_ycbcr.py"
+    "tests/reference_images/ycbcr-16bit-1x1.ppm",
+    "tests/reference_images/ycbcr-1x1.ppm",
+    "tests/reference_images/ycbcr-1x2.ppm",
+    "tests/reference_images/ycbcr-1x4.ppm",
+    "tests/reference_images/ycbcr-2x1.ppm",
+    "tests/reference_images/ycbcr-2x2.ppm",
+    "tests/reference_images/ycbcr-2x4.ppm",
+    "tests/reference_images/ycbcr-4x1.ppm",
+    "tests/reference_images/ycbcr-4x2.ppm",
+    "tests/reference_images/ycbcr-4x4.ppm",
+    "tests/reference_images/ycbcr-cosited.ppm",
+    "tests/reference_images/ycbcr-custom-coeffs.ppm",
+    "tests/reference_images/ycbcr-custom-refbw.ppm",
+    "tests/reference_images/ycbcr-odd-2x2.ppm",
+    "tests/reference_images/ycbcr-odd-4x4.ppm",
+    "tests/reference_images/ycbcr-odd-mixed.ppm",
+    "tests/reference_images/ycbcr-planar-2x2.ppm",
+    "tests/reference_images/ycbcr-tiled-2x2.ppm",
+    "tests/ycbcr_images/generate_ycbcr.py",
+    "tests/ycbcr_images/ycbcr-16bit-1x1.tif",
+    "tests/ycbcr_images/ycbcr-1x1.tif",
+    "tests/ycbcr_images/ycbcr-1x2.tif",
+    "tests/ycbcr_images/ycbcr-1x4.tif",
+    "tests/ycbcr_images/ycbcr-2x1.tif",
+    "tests/ycbcr_images/ycbcr-2x2.tif",
+    "tests/ycbcr_images/ycbcr-2x4.tif",
+    "tests/ycbcr_images/ycbcr-4x1.tif",
+    "tests/ycbcr_images/ycbcr-4x2.tif",
+    "tests/ycbcr_images/ycbcr-4x4.tif",
+    "tests/ycbcr_images/ycbcr-cosited.tif",
+    "tests/ycbcr_images/ycbcr-custom-coeffs.tif",
+    "tests/ycbcr_images/ycbcr-custom-refbw.tif",
+    "tests/ycbcr_images/ycbcr-odd-2x2.tif",
+    "tests/ycbcr_images/ycbcr-odd-4x4.tif",
+    "tests/ycbcr_images/ycbcr-odd-mixed.tif",
+    "tests/ycbcr_images/ycbcr-planar-2x2.tif",
+    "tests/ycbcr_images/ycbcr-tiled-2x2.tif"
   ],
   "sessions": [
     {
@@ -14,24 +50,31 @@
       "compact_transcript": "/0/transcript.jsonl",
       "content_hash": "/0/content_hash.txt",
       "prompt": "/0/prompt.txt"
+    },
+    {
+      "metadata": "/1/metadata.json",
+      "transcript": "/1/full.jsonl",
+      "compact_transcript": "/1/transcript.jsonl",
+      "content_hash": "/1/content_hash.txt",
+      "prompt": "/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 301941,
+    "input_tokens": 307804,
     "cache_creation_tokens": 0,
-    "cache_read_tokens": 4205696,
-    "output_tokens": 59363,
-    "api_call_count": 53
+    "cache_read_tokens": 4637056,
+    "output_tokens": 59760,
+    "api_call_count": 55
   },
   "redaction": {
-    "replacements": 4,
+    "replacements": 104,
     "layers": {
       "betterleaks": 0,
       "connection_string": 0,
       "credential_key": 0,
       "credential_value": 0,
       "credentialed_uri": 0,
-      "entropy": 4,
+      "entropy": 104,
       "key_context": 0,
       "provider_token": 0,
       "shell_stdin": 0

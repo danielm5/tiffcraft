@@ -1,0 +1,1 @@
+does the github solve skill states that the new branch must be based on the latest main branch? this worker created from some other branch
