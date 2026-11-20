@@ -50,3 +50,7 @@ add_executable(tiffVersionTest tiffVersionTest.cpp)
 target_link_libraries(tiffVersionTest PRIVATE TiffCraft)
 target_compile_definitions(tiffVersionTest PRIVATE TICFCRAFT_EXPECTED_VERSION="${PROJECT_VERSION}")
 add_test(NAME tiffVersionTest COMMAND tiffVersionTest)
+
+add_executable(tiffStdOutTest tiffStdOutTest.cpp)
+target_link_libraries(tiffStdOutTest PRIVATE TiffCraft)
+add_test(NAME tiffStdOutTest COMMAND tiffStdOutTest)
