@@ -1,0 +1,17 @@
+What did you use to regenerate ycbcr-tiled.tif?
+
+---
+
+so the difference from the existing one is in the parameters you've used now?
+
+---
+
+so it isn't a true tiled image, just a single tile?
+
+---
+
+can those be generated with imagemagick?
+
+---
+
+rename ycbcr-tiled.tif more descriptively and make another tiled test image with more tiles, so that we covered both cases, update docs and everything to stay up-date on what they described

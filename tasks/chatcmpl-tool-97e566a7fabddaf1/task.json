@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "chatcmpl-tool-97e566a7fabddaf1",
+  "agent_id": "ses_e05e74920ffejOkLa2LHo7DwBd",
+  "subagent_type": "general",
+  "task_description": "Add multi-tile YCbCr fixture",
+  "files": [
+    "CHANGELOG.md",
+    "tests/YCBCR_SUPPORT.md",
+    "tests/ycbcr_images/generate_ycbcr.py"
+  ],
+  "token_usage": {
+    "input_tokens": 57595,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 930816,
+    "output_tokens": 12096,
+    "api_call_count": 35
+  },
+  "started_at": "2026-11-20T12:54:46.109-05:00",
+  "completed_at": "2026-11-20T12:58:22.833977883-05:00"
+}
