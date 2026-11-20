@@ -1,0 +1,13 @@
+exactly, so why do run them?
+
+---
+
+what did you do about the 16 bit test image?
+
+---
+
+do you know if libtiff would support that? maybe is not a thing people do
+
+---
+
+hwy on earth would you intentally commit something mislabeled?
