@@ -66,12 +66,40 @@ Notes on the individual tags:
 The `ReferenceBlackWhite` tag supplies, per component, a reference black value
 and a reference white value. These define the headroom/footroom range of the
 image data: the black value corresponds to the black end of the coding range and
-the white value to the white end, allowing scaling of the YCbCr codes into the
-full data range when converting to RGB.
+the white value to the white end. The values stored in the image are **codes**;
+`ReferenceBlackWhite` defines how those codes scale into full-range values when
+converting to RGB.
+
+For each component the forward scaling is:
+
+`FullRangeValue = (code - ReferenceBlack) * CodingRange / (ReferenceWhite - ReferenceBlack)`
+
+and the reverse scaling is:
+
+`code = (FullRangeValue * (ReferenceWhite - ReferenceBlack) / CodingRange) + ReferenceBlack`
+
+`CodingRange` is the range of full-range values: `2^BitsPerSample - 1` for Y and
+RGB (255 for 8-bit samples), but **127 for Cb and Cr**. That difference matters:
+with the default reference values Cb/Cr run from code 128 to code 255, so the
+chroma scaling reduces to `(code - 128) * 127 / (255 - 128) = code - 128`. This
+is why the no-headroom case amounts to simply subtracting 128, and why the `128`
+in `R = Y + 1.402 * (Cr - 128)` is the `ReferenceBlack` value for Cb/Cr in the
+no-headroom case, not a magic number.
 
 For YCbCr the default reference values are black = 0 and white = 255 for the
 luma component (Y), and black = 128 and white = 255 for the chroma components
-(Cb/Cr).
+(Cb/Cr). Merely subtracting 128 is correct only for these defaults. Images with
+headroom/footroom carry other reference values: for example, with
+`ReferenceBlackWhite = [15, 235, 128, 240, 128, 240]` a luma code of 235 maps to
+`255` and a luma code of 15 maps to `0`, using
+`(code - 15) * 255 / (235 - 15)`. The chroma white reference is 240 rather than
+the default 255, so subtracting 128 alone leaves chroma under-scaled. Readers
+must apply the tag's scaling instead of assuming the defaults.
+
+The TIFF 6.0 specification says the default `ReferenceBlackWhite` values are
+inappropriate for Class Y images and that the tag must be supplied explicitly.
+In practice many images omit it, so readers must fall back to the YCbCr-specific
+defaults above (Y 0/255, Cb/Cr 128/255).
 
 ## Subsampling
 
@@ -113,45 +141,71 @@ python3 tests/ycbcr_images/generate_ycbcr.py
 
 The script writes the YCbCr TIFFs to `tests/ycbcr_images/` and the matching
 Netpbm ASCII PPM (P3) ground-truth images to `tests/reference_images/`. It uses
-a fixed source pattern, so rerunning it reproduces the same files.
+a fixed source pattern, so rerunning it reproduces the same files. It emits only
+fixtures whose attributes ImageMagick can actually write into the TIFF; cases
+for attributes it cannot write were removed after the tag-level audit below.
+
+## ImageMagick limitations
+
+The following was verified with ImageMagick 7.1.2-35. Only attributes that
+ImageMagick really writes into the TIFF are represented in the fixture set. For
+every attribute it cannot write, the corresponding case was **removed** rather
+than kept with a false claim.
+
+- **YCbCrCoefficients (529):** ImageMagick uses the ITU-R BT.601 defaults;
+  `-define tiff:YCbCrCoefficients=...` does not write the tag. Custom
+  coefficients are not feasible with ImageMagick, so that case was removed.
+- **ReferenceBlackWhite (532):** ImageMagick does not write the tag;
+  `-define tiff:ReferenceBlackWhite=...` does not work. Custom or non-default
+  reference black/white values are not feasible, so that case was removed.
+- **YCbCrPositioning (531):** cosited positioning (`2`) cannot be set with
+  `-define` or `-set`. No alternative exists, so the co-sited case was removed.
+- **PlanarConfiguration (284):** separate planes (`2`) cannot be set with
+  `-interlace Plane` or `-define tiff:planar-configuration=separate`. The planar
+  case was removed rather than mislabeled.
+- **YCbCrSubSampling (530):** non-1x1 subsampling cannot be set; even
+  `-sampling-factor 2x2` leaves the tag at `[1, 1]`. The old generator used
+  `-resize`, which physically shrank the images instead of writing the tag —
+  misleading — so all subsampled cases were removed.
+- **Tiling:** tiling **can** be set with `-define tiff:tile-geometry=64x48`
+  (verified: writes `TileWidth` = 64, `TileLength` = 48, tile offsets and tile
+  byte counts, and no `RowsPerStrip`). This is the only variant attribute
+  ImageMagick can write, and it is used for the retained tiled fixture.
 
 ## Test image matrix
 
-The tables below list the YCbCr TIFFs in `tests/ycbcr_images/` and their
-attributes.
-
-### Subsampling coverage (all centered, default coefficients, default
-`ReferenceBlackWhite`, chunky, BitsPerSample 8, base image 64x48)
+The table below lists the two retained YCbCr TIFFs in `tests/ycbcr_images/`
+and their verified attributes.
 
 | Test image | Subsampling (h x v) | Positioning | Coefficients | RefBW | Planar | Bits | Dimensions | Validates |
 |---|---|---|---|---|---|---|---|---|
-| `ycbcr-1x1.tif` | 1x1 | centered (1) | default | default | chunky | 8 | 64x48 | No subsampling; full-resolution YCbCr. |
-| `ycbcr-2x1.tif` | 2x1 | centered (1) | default | default | chunky | 8 | 64x48 | Horizontal subsampling factor 2. |
-| `ycbcr-1x2.tif` | 1x2 | centered (1) | default | default | chunky | 8 | 64x48 | Vertical subsampling factor 2. |
-| `ycbcr-2x2.tif` | 2x2 | centered (1) | default | default | chunky | 8 | 64x48 | Quarter-resolution chroma (2x2 subsampling). |
-| `ycbcr-4x1.tif` | 4x1 | centered (1) | default | default | chunky | 8 | 64x48 | Horizontal subsampling factor 4. |
-| `ycbcr-1x4.tif` | 1x4 | centered (1) | default | default | chunky | 8 | 64x48 | Vertical subsampling factor 4. |
-| `ycbcr-4x2.tif` | 4x2 | centered (1) | default | default | chunky | 8 | 64x48 | Combined subsampling factors 4 and 2. |
-| `ycbcr-2x4.tif` | 2x4 | centered (1) | default | default | chunky | 8 | 64x48 | Combined subsampling factors 2 and 4. |
-| `ycbcr-4x4.tif` | 4x4 | centered (1) | default | default | chunky | 8 | 64x48 | Maximum subsampling factor 4 on both axes. |
+| `ycbcr-1x1.tif` | 1x1 | centered (1) | default | default | chunky | 8 | 64x48 | Full-resolution YCbCr; all YCbCr tags at their TIFF defaults; stripped organization. |
+| `ycbcr-tiled.tif` | 1x1 | centered (1) | default | default | chunky (tiled) | 8 | 64x48 | Tiled organization (TileWidth=64, TileLength=48); otherwise all defaults. |
 
-### Variants
+### Removed fixtures (audit results)
 
-| Test image | Subsampling (h x v) | Positioning | Coefficients | RefBW | Planar | Bits | Dimensions | Validates |
-|---|---|---|---|---|---|---|---|---|
-| `ycbcr-cosited.tif` | 2x2 | co-sited (2) | default | default | chunky | 8 | 64x48 | Co-sited positioning with subsampling. |
-| `ycbcr-custom-coeffs.tif` | 1x1 | centered (1) | custom | default | chunky | 8 | 64x48 | Non-default YCbCr coefficients (BT.709). |
-| `ycbcr-custom-refbw.tif` | 1x1 | centered (1) | default | custom | chunky | 8 | 64x48 | Non-default reference black/white values. |
-| `ycbcr-planar-2x2.tif` | 2x2 | centered (1) | default | default | separate | 8 | 64x48 | Separate planar configuration (PlanarConfig=2). |
-| `ycbcr-tiled-2x2.tif` | 2x2 | centered (1) | default | default | chunky (tiled) | 8 | 64x48 | Tiled image organization. |
+A tag-level audit showed that 16 of the original 17 images did not match their
+claimed attributes. Those cases were removed (or, for the tiled case, replaced)
+rather than kept with a false claim; the reasons are recorded here.
 
-### Odd (non-divisible) dimensions
-
-| Test image | Subsampling (h x v) | Positioning | Coefficients | RefBW | Planar | Bits | Dimensions | Validates |
-|---|---|---|---|---|---|---|---|---|
-| `ycbcr-odd-2x2.tif` | 2x2 | centered (1) | default | default | chunky | 8 | 61x47 | Chroma dimension ceiling with odd dimensions. |
-| `ycbcr-odd-4x4.tif` | 4x4 | centered (1) | default | default | chunky | 8 | 63x61 | Subsampling 4 with odd dimensions. |
-| `ycbcr-odd-mixed.tif` | 2x1 | centered (1) | default | default | chunky | 8 | 62x47 | Mixed subsampling and odd dimension handling. |
+| Removed image | Claimed attribute | Audit result / reason |
+|---|---|---|
+| `ycbcr-2x1.tif` | 2x1 subsampling | Physically downscaled to 32x48; `YCbCrSubSampling = [1, 1]`. ImageMagick cannot set subsampling. |
+| `ycbcr-1x2.tif` | 1x2 subsampling | Physically downscaled to 64x24; `YCbCrSubSampling = [1, 1]`. ImageMagick cannot set subsampling. |
+| `ycbcr-2x2.tif` | 2x2 subsampling | Physically downscaled to 32x24; `YCbCrSubSampling = [1, 1]`. ImageMagick cannot set subsampling. |
+| `ycbcr-4x1.tif` | 4x1 subsampling | Physically downscaled to 16x48; `YCbCrSubSampling = [1, 1]`. ImageMagick cannot set subsampling. |
+| `ycbcr-1x4.tif` | 1x4 subsampling | Physically downscaled to 64x12; `YCbCrSubSampling = [1, 1]`. ImageMagick cannot set subsampling. |
+| `ycbcr-4x2.tif` | 4x2 subsampling | Physically downscaled to 16x24; `YCbCrSubSampling = [1, 1]`. ImageMagick cannot set subsampling. |
+| `ycbcr-2x4.tif` | 2x4 subsampling | Physically downscaled to 32x12; `YCbCrSubSampling = [1, 1]`. ImageMagick cannot set subsampling. |
+| `ycbcr-4x4.tif` | 4x4 subsampling | Physically downscaled to 16x12; `YCbCrSubSampling = [1, 1]`. ImageMagick cannot set subsampling. |
+| `ycbcr-cosited.tif` | co-sited positioning (2) | `YCbCrPositioning` tag absent (defaults to 1); ImageMagick cannot set cosited=2. |
+| `ycbcr-custom-coeffs.tif` | custom BT.709 coefficients | `YCbCrCoefficients` tag absent (BT.601 default); ImageMagick cannot write custom coefficients. |
+| `ycbcr-custom-refbw.tif` | custom reference black/white | `ReferenceBlackWhite` tag absent; ImageMagick cannot write the tag (the fixture was effectively a 1x1/default image). |
+| `ycbcr-planar-2x2.tif` | separate planar configuration (2) | `PlanarConfiguration = 1` (chunky), not 2; ImageMagick cannot write separate planar. |
+| `ycbcr-odd-2x2.tif` | 2x2 subsampling, odd dimensions 61x47 | Actually 31x24 and physically downscaled, with no subsampling tag; odd-dimension chroma-ceiling claims are only meaningful with real subsampling. |
+| `ycbcr-odd-4x4.tif` | 4x4 subsampling, odd dimensions 63x61 | Actually 16x16 and physically downscaled, with no subsampling tag; odd-dimension chroma-ceiling claims are only meaningful with real subsampling. |
+| `ycbcr-odd-mixed.tif` | 2x1 subsampling, odd dimensions 62x47 | Actually 31x47 and physically downscaled, with no subsampling tag; odd-dimension chroma-ceiling claims are only meaningful with real subsampling. |
+| `ycbcr-tiled-2x2.tif` | tiled organization with 2x2 subsampling | Had no tile tags (used `RowsPerStrip = 24`) and falsely claimed 2x2 subsampling; replaced by regenerated `ycbcr-tiled.tif` (64x48, real tile tags). |
 
 ## Ground-truth reference images
 
