@@ -1,0 +1,21 @@
+all images must be now re generated with the real script, otherwise they'll be stale
+
+---
+
+see why is important to keep the scripts and actually dog food them?
+
+---
+
+discard the original images
+
+---
+
+correct, stop wasting time on that work not meeting the issue request
+
+---
+
+the request is to write the md file, to create the script usign magick, and to use the script to create the images
+
+---
+
+are the reference images also created with magick and with the test images as input?
