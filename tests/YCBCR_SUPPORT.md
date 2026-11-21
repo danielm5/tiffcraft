@@ -1,11 +1,11 @@
 # YCbCr (PhotometricInterpretation = 6) Support Reference
 
 This document describes YCbCr (`PhotometricInterpretation = 6`) images as
-defined by the TIFF 6.0 specification.
+defined by Section 21 of the TIFF 6.0 specification.
 
 ## Scope
 
-- YCbCr image encoding as defined by the TIFF 6.0 specification.
+- YCbCr image encoding as defined by TIFF 6.0 Section 21.
 - Conversion between RGB and YCbCr.
 - Chroma subsampling, positioning, and reference black/white handling.
 - Minimum requirements for a valid YCbCr TIFF.
@@ -15,7 +15,8 @@ defined by the TIFF 6.0 specification.
 ## Tag definitions
 
 The following TIFF tags describe the color information of an image whose
-`PhotometricInterpretation = 6` (YCbCr).
+`PhotometricInterpretation = 6` (YCbCr). They are defined in TIFF 6.0
+Section 21.
 
 | Tag | Name | TIFF value | Type | Count | Default | Description |
 |---|---|---|---|---|---|---|
@@ -129,93 +130,123 @@ In addition to the general Baseline TIFF requirements, a YCbCr file must have:
 - `Compression = 1` (none), `5` (LZW) or `7` (JPEG; TIFF Technical Note 2).
 - `PhotometricInterpretation = 6` (YCbCr).
 - `PlanarConfig = 1` (chunky) or `2` (separate).
+- `ReferenceBlackWhite`: required by the TIFF 6.0 specification. Readers must
+  nevertheless handle its absence by falling back to the YCbCr-specific
+  defaults above (Y 0/255, Cb/Cr 128/255), because many real-world files omit
+  tag 532.
 
 ## Generating the test images
 
 `tests/ycbcr_images/generate_ycbcr.py` recreates the fixture set. It requires
-Python 3 and ImageMagick (`magick` on `PATH`). From the repository root, run:
+Python 3 and the libtiff and netpbm command-line tools (`pnmtotiff`,
+`rgb2ycbcr`, `tiffset`, `tiffcp`, `tiff2rgba`, `tifftopnm`). From the repository
+root, run:
 
 ```sh
 python3 tests/ycbcr_images/generate_ycbcr.py
 ```
 
-The script writes the YCbCr TIFFs to `tests/ycbcr_images/` and the matching
-Netpbm ASCII PPM (P3) ground-truth images to `tests/reference_images/`. It uses
-a fixed source pattern, so rerunning it reproduces the same files. It emits
-three fixtures — one stripped full-resolution image and two tiled images (a
-single-tile variant and a 12-tile variant) — whose attributes ImageMagick can
-actually write into the TIFF; cases for attributes it cannot write were removed
-after the tag-level audit below.
+The pipeline for each fixture is:
+
+1. Write a deterministic binary P6 source PPM in pure Python (standard-library
+   `bytes` and `zlib.crc32`; no external imaging library).
+2. `pnmtotiff < src.ppm > src.tif` creates an RGB TIFF.
+3. `rgb2ycbcr -c none -h H -v V -r HEIGHT src.tif out.tif` writes the YCbCr
+   image. This writes all four YCbCr tags (529, 530, 531, 532) with the BT.601
+   coefficients, centered positioning and default reference values.
+4. Attributes that `rgb2ycbcr` cannot produce directly are applied with
+   `tiffset`. RATIONAL tags are set without a count, e.g.
+   `tiffset -s YCbCrCoefficients 0.2126 0.7152 0.0722 file`. Tiled organization
+   uses `tiffcp -t -w 16 -l 16 -c none`; because `tiffcp` refuses subsampled
+   input it tiles a 1x1 image and the four YCbCr tags plus
+   `PhotometricInterpretation` are restored afterwards.
+5. `tiff2rgba -n -c none <tif> <rgba.tif>` followed by
+   `tifftopnm <rgba.tif> > ycbcr-*.ppm` produces each ground-truth P6 PPM.
+
+The 17 fixtures are described in the matrix below. Five of them (the variants)
+are tag-reading tests only: `tiffset` changes tag values without reorganizing
+pixel data. The tiled fixture is additionally limited in that its pixel data is
+**not** subsampled — the `YCbCrSubsampling` tag is set to `2 2` after tiling —
+so it is not usable for conversion verification.
 
 ## ImageMagick limitations
 
-The following was verified with ImageMagick 7.1.2-35. Only attributes that
-ImageMagick really writes into the TIFF are represented in the fixture set. For
-every attribute it cannot write, the corresponding case was **removed** rather
-than kept with a false claim.
+ImageMagick is a general-purpose image converter, but its TIFF writer has a
+fixed set of capabilities that matter for YCbCr coverage:
 
-- **YCbCrCoefficients (529):** ImageMagick uses the ITU-R BT.601 defaults;
-  `-define tiff:YCbCrCoefficients=...` does not write the tag. Custom
-  coefficients are not feasible with ImageMagick, so that case was removed.
-- **ReferenceBlackWhite (532):** ImageMagick does not write the tag;
-  `-define tiff:ReferenceBlackWhite=...` does not work. Custom or non-default
-  reference black/white values are not feasible, so that case was removed.
-- **YCbCrPositioning (531):** cosited positioning (`2`) cannot be set with
-  `-define` or `-set`. No alternative exists, so the co-sited case was removed.
-- **PlanarConfiguration (284):** separate planes (`2`) cannot be set with
-  `-interlace Plane` or `-define tiff:planar-configuration=separate`. The planar
-  case was removed rather than mislabeled.
-- **YCbCrSubSampling (530):** non-1x1 subsampling cannot be set; even
-  `-sampling-factor 2x2` leaves the tag at `[1, 1]`. The old generator used
-  `-resize`, which physically shrank the images instead of writing the tag —
-  misleading — so all subsampled cases were removed.
-- **Tiling:** tiling **can** be set with `-define tiff:tile-geometry=<value>`
-  using any 16-multiple tile geometry (verified with ImageMagick 7.1.2-35):
-  `-define tiff:tile-geometry=64x48` yields a single 64x48 tile (`TileWidth` =
-  64, `TileLength` = 48, one tile offset, no `RowsPerStrip`), and
-  `-define tiff:tile-geometry=16x16` yields a 4x3 grid of 16x16 tiles
-  (`TileWidth` = 16, `TileLength` = 16, 12 tile offsets). This is the only
-  variant attribute ImageMagick can write, and both geometries are used for
-  the retained tiled fixtures.
+- It does **not** write `YCbCrCoefficients` (529), `YCbCrSubsampling` (530),
+  `YCbCrPositioning` (531), or `ReferenceBlackWhite` (532). Requests through
+  `-define` or `-sampling-factor` do not create those tags; subsampling through
+  image resizing changes the pixel dimensions instead of writing the tag.
+- It does **not** support separate planar configuration
+  (`PlanarConfiguration = 2`).
+- It can write only basic YCbCr TIFFs: `PhotometricInterpretation = 6`,
+  `SamplesPerPixel = 3`, 8-bit samples, uncompressed data, and default or absent
+  YCbCr tags. Tiling is available through
+  `-define tiff:tile-geometry=<value>`.
+
+These limits are why the fixtures in this repository are generated with
+libtiff's `rgb2ycbcr` rather than ImageMagick.
 
 ## Test image matrix
 
-The table below lists the three retained YCbCr TIFFs in `tests/ycbcr_images/`
-and their verified attributes.
+All files are in `tests/ycbcr_images/`. The "Kind" column marks a fixture as a
+**conversion** test (tags and pixel data agree) or a **tag-reading** test.
 
-| Test image | Subsampling (h x v) | Positioning | Coefficients | RefBW | Planar | Bits | Dimensions | Validates |
-|---|---|---|---|---|---|---|---|---|
-| `ycbcr-1x1.tif` | 1x1 | centered (1) | default | default | chunky | 8 | 64x48 | Full-resolution YCbCr; all YCbCr tags at their TIFF defaults; stripped organization. |
-| `ycbcr-tiled-single.tif` | 1x1 | centered (1) | default | default | chunky (tiled, 1 tile) | 8 | 64x48 | Tiled organization with a single 64x48 tile; verifies the tile tag path. |
-| `ycbcr-tiled-multi.tif` | 1x1 | centered (1) | default | default | chunky (tiled, 12 tiles) | 8 | 64x48 | Tiled organization with a 4x3 grid of 16x16 tiles; verifies multi-tile traversal. |
+### Subsampling fixtures
 
-### Removed fixtures (audit results)
+Nine 64x48 images with default BT.601 coefficients, centered positioning,
+default reference values, 8-bit contiguous planes and no compression. Each
+carries a real `YCbCrSubsampling` value written by `rgb2ycbcr`.
 
-A tag-level audit showed that 16 of the original 17 images did not match their
-claimed attributes. Those cases were removed (or, for the tiled case, replaced
-by two truthful tiled fixtures) rather than kept with a false claim; the reasons
-are recorded here.
+| Test image | Subsampling | Kind | Validates |
+|---|---|---|---|
+| `ycbcr-1x1.tif` | 1x1 | conversion | Full-resolution YCbCr with all four tags at their defaults; stripped organization. |
+| `ycbcr-2x1.tif` | 2x1 | conversion | Horizontal-only chroma subsampling. |
+| `ycbcr-1x2.tif` | 1x2 | conversion | Vertical-only chroma subsampling. |
+| `ycbcr-2x2.tif` | 2x2 | conversion | Half-resolution chroma on both axes. |
+| `ycbcr-4x1.tif` | 4x1 | conversion | Quarter-resolution horizontal chroma. |
+| `ycbcr-1x4.tif` | 1x4 | conversion | Quarter-resolution vertical chroma. |
+| `ycbcr-4x2.tif` | 4x2 | conversion | Mixed 4x2 chroma grid. |
+| `ycbcr-2x4.tif` | 2x4 | conversion | Mixed 2x4 chroma grid. |
+| `ycbcr-4x4.tif` | 4x4 | conversion | Quarter-resolution chroma on both axes. |
 
-| Removed image | Claimed attribute | Audit result / reason |
-|---|---|---|
-| `ycbcr-2x1.tif` | 2x1 subsampling | Physically downscaled to 32x48; `YCbCrSubSampling = [1, 1]`. ImageMagick cannot set subsampling. |
-| `ycbcr-1x2.tif` | 1x2 subsampling | Physically downscaled to 64x24; `YCbCrSubSampling = [1, 1]`. ImageMagick cannot set subsampling. |
-| `ycbcr-2x2.tif` | 2x2 subsampling | Physically downscaled to 32x24; `YCbCrSubSampling = [1, 1]`. ImageMagick cannot set subsampling. |
-| `ycbcr-4x1.tif` | 4x1 subsampling | Physically downscaled to 16x48; `YCbCrSubSampling = [1, 1]`. ImageMagick cannot set subsampling. |
-| `ycbcr-1x4.tif` | 1x4 subsampling | Physically downscaled to 64x12; `YCbCrSubSampling = [1, 1]`. ImageMagick cannot set subsampling. |
-| `ycbcr-4x2.tif` | 4x2 subsampling | Physically downscaled to 16x24; `YCbCrSubSampling = [1, 1]`. ImageMagick cannot set subsampling. |
-| `ycbcr-2x4.tif` | 2x4 subsampling | Physically downscaled to 32x12; `YCbCrSubSampling = [1, 1]`. ImageMagick cannot set subsampling. |
-| `ycbcr-4x4.tif` | 4x4 subsampling | Physically downscaled to 16x12; `YCbCrSubSampling = [1, 1]`. ImageMagick cannot set subsampling. |
-| `ycbcr-cosited.tif` | co-sited positioning (2) | `YCbCrPositioning` tag absent (defaults to 1); ImageMagick cannot set cosited=2. |
-| `ycbcr-custom-coeffs.tif` | custom BT.709 coefficients | `YCbCrCoefficients` tag absent (BT.601 default); ImageMagick cannot write custom coefficients. |
-| `ycbcr-custom-refbw.tif` | custom reference black/white | `ReferenceBlackWhite` tag absent; ImageMagick cannot write the tag (the fixture was effectively a 1x1/default image). |
-| `ycbcr-planar-2x2.tif` | separate planar configuration (2) | `PlanarConfiguration = 1` (chunky), not 2; ImageMagick cannot write separate planar. |
-| `ycbcr-odd-2x2.tif` | 2x2 subsampling, odd dimensions 61x47 | Actually 31x24 and physically downscaled, with no subsampling tag; odd-dimension chroma-ceiling claims are only meaningful with real subsampling. |
-| `ycbcr-odd-4x4.tif` | 4x4 subsampling, odd dimensions 63x61 | Actually 16x16 and physically downscaled, with no subsampling tag; odd-dimension chroma-ceiling claims are only meaningful with real subsampling. |
-| `ycbcr-odd-mixed.tif` | 2x1 subsampling, odd dimensions 62x47 | Actually 31x47 and physically downscaled, with no subsampling tag; odd-dimension chroma-ceiling claims are only meaningful with real subsampling. |
-| `ycbcr-tiled-2x2.tif` | tiled organization with 2x2 subsampling | Had no tile tags (used `RowsPerStrip = 24`) and falsely claimed 2x2 subsampling; replaced by the regenerated `ycbcr-tiled-single.tif` and the newly added `ycbcr-tiled-multi.tif` (both with real tile tags). |
+### Variant fixtures
+
+Five 64x48 images with one non-default attribute each. These are tag-reading
+tests: `tiffset` changes the tag without reorganizing pixel data.
+
+| Test image | Attribute | Kind | Validates |
+|---|---|---|---|
+| `ycbcr-cosited.tif` | Positioning = 2 (co-sited) on a 2x2 base | tag-reading | Co-sited chroma positioning. |
+| `ycbcr-custom-coeffs.tif` | Coefficients = 0.2126/0.7152/0.0722 on a 1x1 base | tag-reading | Non-default luma coefficients (tag 529). |
+| `ycbcr-custom-refbw.tif` | RefBW = 15/235/128/240/128/240 on a 1x1 base | tag-reading | Headroom/footroom reference values (tag 532). |
+| `ycbcr-planar-2x2.tif` | PlanarConfig = 2 on a 2x2 base | tag-reading | Separate-plane configuration (tag 284). |
+| `ycbcr-tiled-2x2.tif` | 16x16 tiles, 4x3 grid (12 tiles) | tag-reading | Tile tag path together with all four YCbCr tags. |
+
+`ycbcr-tiled-2x2.tif` is a special case: `tiffcp` cannot tile subsampled input,
+so the image was tiled while still 1x1 and the `YCbCrSubsampling` tag was set to
+`2 2` afterwards. Its pixel data is therefore not subsampled; the fixture
+exercises tag reading and tile traversal only.
+
+### Odd-dimension fixtures
+
+Three images whose width and height are not multiples of the subsampling
+factors, so the chroma dimensions use the ceiling rule. Tags and pixel data
+agree, so all three are conversion tests.
+
+| Test image | Dimensions | Subsampling | Kind | Validates |
+|---|---|---|---|---|
+| `ycbcr-odd-2x2.tif` | 61x47 | 2x2 | conversion | Ceiling of odd luma dimensions for 2x2 chroma. |
+| `ycbcr-odd-4x4.tif` | 63x61 | 4x4 | conversion | Ceiling of odd luma dimensions for 4x4 chroma. |
+| `ycbcr-odd-mixed.tif` | 62x47 | 2x1 | conversion | Ceiling on one axis only for mixed subsampling. |
 
 ## Ground-truth reference images
 
 `tests/reference_images/ycbcr-*.ppm` holds the RGB ground-truth images
-corresponding to the YCbCr test images, in Netpbm ASCII PPM (P3) format.
+corresponding to the 17 YCbCr test images, in binary Netpbm PPM (P6) format.
+Each is produced with `tiff2rgba` followed by `tifftopnm`, and each P6 header
+matches the dimensions of its TIFF (64x48, or the odd dimensions 61x47, 63x61
+and 62x47). libtiff's YCbCr RGBA reader cannot decode 1x4 and 2x4 subsampling,
+so those two references are rendered from the matching RGB source TIFF through
+the same `tiff2rgba` + `tifftopnm` pipeline.

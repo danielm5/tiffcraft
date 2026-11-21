@@ -28,11 +28,11 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
 - Version-consistency test between the CMake `PROJECT_VERSION` and the header
   version constants (`TiffCraft::version()`), failing with both values named on
   mismatch.
-- YCbCr (PI=6) test coverage: added the TIFF 6.0 `tests/YCBCR_SUPPORT.md`
-  specification reference, 3 generated YCbCr test images under
-  `tests/ycbcr_images/` (including single-tile and multi-tile variants), and
-  the corresponding `ycbcr-*.ppm` ground-truth reference images (child issue of
-  the YCbCr support effort, #38).
+- YCbCr (PI=6) test coverage: added the TIFF 6.0 Section 21
+  `tests/YCBCR_SUPPORT.md` specification reference, 17 generated YCbCr test
+  images under `tests/ycbcr_images/` (nine subsampling, five variant and three
+  odd-dimension cases), and the corresponding `ycbcr-*.ppm` ground-truth
+  reference images (child issue of the YCbCr support effort, #38).
 
 ### Changed
 
@@ -41,11 +41,14 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
 
 ### Fixed
 
-- Expanded the `ReferenceBlackWhite` scaling documentation in
-  `tests/YCBCR_SUPPORT.md` with the full code-to-full-range formulas, documented
-  ImageMagick's tag-writing limitations, and removed or relabeled inaccurate
-  YCbCr fixtures after a tag-level audit, retaining two truthful tiled fixtures
-  with a single 64x48 tile and a 12-tile 16x16 grid (#42).
+- Completed the YCbCr documentation and test data in `tests/YCBCR_SUPPORT.md`
+  and rebuilt the full 17-image fixture set with libtiff's `rgb2ycbcr`, so all
+  four YCbCr tags are written into every TIFF; matching ground-truth PPMs come
+  from `tiff2rgba` + `tifftopnm`. The document now carries the full
+  `ReferenceBlackWhite` scaling formula with `code` terminology, the
+  spec-versus-practice note on default reference values, ImageMagick's
+  tag-writing limitations, and a 17-row matrix distinguishing conversion tests
+  from tag-reading tests (#42).
 - `TiffExporter.hpp` no longer includes the umbrella header `TiffCraft.hpp`;
   it now includes `TiffImage.hpp` directly, resolving the include cycle and
   making the exporter header standalone.
