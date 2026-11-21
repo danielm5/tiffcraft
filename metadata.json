@@ -1,0 +1,87 @@
+{
+  "cli_version": "0.13.4-nightly.202611121940.ce16562b9",
+  "checkpoint_id": "01M7Y9T9FC5CG5P3KV1PH1YCSJ",
+  "strategy": "manual-commit",
+  "branch": "feature/issue-42",
+  "checkpoints_count": 5,
+  "files_touched": [
+    "CHANGELOG.md",
+    "tests/YCBCR_SUPPORT.md",
+    "tests/reference_images/ycbcr-1x1.ppm",
+    "tests/reference_images/ycbcr-1x2.ppm",
+    "tests/reference_images/ycbcr-1x4.ppm",
+    "tests/reference_images/ycbcr-2x1.ppm",
+    "tests/reference_images/ycbcr-2x2.ppm",
+    "tests/reference_images/ycbcr-2x4.ppm",
+    "tests/reference_images/ycbcr-4x1.ppm",
+    "tests/reference_images/ycbcr-4x2.ppm",
+    "tests/reference_images/ycbcr-4x4.ppm",
+    "tests/reference_images/ycbcr-cosited.ppm",
+    "tests/reference_images/ycbcr-custom-coeffs.ppm",
+    "tests/reference_images/ycbcr-custom-refbw.ppm",
+    "tests/reference_images/ycbcr-odd-2x2.ppm",
+    "tests/reference_images/ycbcr-odd-4x4.ppm",
+    "tests/reference_images/ycbcr-odd-mixed.ppm",
+    "tests/reference_images/ycbcr-planar-2x2.ppm",
+    "tests/reference_images/ycbcr-tiled-2x2.ppm",
+    "tests/reference_images/ycbcr-tiled-multi.ppm",
+    "tests/reference_images/ycbcr-tiled-single.ppm",
+    "tests/ycbcr_images/generate_ycbcr.py",
+    "tests/ycbcr_images/ycbcr-1x1.tif",
+    "tests/ycbcr_images/ycbcr-1x2.tif",
+    "tests/ycbcr_images/ycbcr-1x4.tif",
+    "tests/ycbcr_images/ycbcr-2x1.tif",
+    "tests/ycbcr_images/ycbcr-2x2.tif",
+    "tests/ycbcr_images/ycbcr-2x4.tif",
+    "tests/ycbcr_images/ycbcr-4x1.tif",
+    "tests/ycbcr_images/ycbcr-4x2.tif",
+    "tests/ycbcr_images/ycbcr-4x4.tif",
+    "tests/ycbcr_images/ycbcr-cosited.tif",
+    "tests/ycbcr_images/ycbcr-custom-coeffs.tif",
+    "tests/ycbcr_images/ycbcr-custom-refbw.tif",
+    "tests/ycbcr_images/ycbcr-odd-2x2.tif",
+    "tests/ycbcr_images/ycbcr-odd-4x4.tif",
+    "tests/ycbcr_images/ycbcr-odd-mixed.tif",
+    "tests/ycbcr_images/ycbcr-planar-2x2.tif",
+    "tests/ycbcr_images/ycbcr-tiled-2x2.tif",
+    "tests/ycbcr_images/ycbcr-tiled-multi.tif",
+    "tests/ycbcr_images/ycbcr-tiled-single.tif"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 304661,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 5661440,
+    "output_tokens": 25659,
+    "api_call_count": 42,
+    "subagent_tokens": {
+      "input_tokens": 63984,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 294144,
+      "output_tokens": 7545,
+      "api_call_count": 14
+    }
+  },
+  "redaction": {
+    "replacements": 0,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 0,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}

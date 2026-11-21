@@ -1,0 +1,9 @@
+Since you've removed most test images what's left isn't enough for testing, so we've updated the task. Address again.
+
+---
+
+same as before write a script to make the images, and the use the script to make them, leave script as audit artifact for reproducibility
+
+---
+
+I mean, you can reuse the document, do not need to discard and rewrite, just that the final result is without all the noise of the updates

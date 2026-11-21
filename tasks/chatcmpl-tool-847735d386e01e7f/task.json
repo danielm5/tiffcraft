@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "chatcmpl-tool-847735d386e01e7f",
+  "agent_id": "ses_e03697505ffe59zy0bH52ob7e0",
+  "subagent_type": "general",
+  "task_description": "Rebuild fixtures with rgb2ycbcr",
+  "token_usage": {
+    "input_tokens": 43255,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 211200,
+    "output_tokens": 1967,
+    "api_call_count": 8
+  },
+  "started_at": "2026-11-21T00:31:26.839-05:00",
+  "completed_at": "2026-11-21T00:37:41.970525252-05:00"
+}

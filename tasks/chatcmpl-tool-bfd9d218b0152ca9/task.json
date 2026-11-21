@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "chatcmpl-tool-bfd9d218b0152ca9",
+  "agent_id": "ses_e036b5a0dffeHhkEIkpCDxoJsf",
+  "subagent_type": "general",
+  "task_description": "Rewrite context and plan",
+  "token_usage": {
+    "input_tokens": 20729,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 82944,
+    "output_tokens": 5578,
+    "api_call_count": 6
+  },
+  "started_at": "2026-11-21T00:29:22.671-05:00",
+  "completed_at": "2026-11-21T00:30:55.518661966-05:00"
+}

@@ -1,0 +1,8 @@
+{
+  "tool_use_id": "chatcmpl-tool-82e912e537e6453c",
+  "agent_id": "ses_e036b5a0dffeHhkEIkpCDxoJsf",
+  "subagent_type": "general",
+  "task_description": "Check artifact progress",
+  "started_at": "2026-11-21T00:30:20.711-05:00",
+  "transcript_unavailable_reason": "transcript path unresolvable"
+}
