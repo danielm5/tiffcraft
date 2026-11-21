@@ -1,0 +1,15 @@
+{
+  "tool_use_id": "chatcmpl-tool-82e912e537e6453c",
+  "agent_id": "ses_e036b5a0dffeHhkEIkpCDxoJsf",
+  "subagent_type": "general",
+  "task_description": "Check artifact progress",
+  "token_usage": {
+    "input_tokens": 11589,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 85504,
+    "output_tokens": 5556,
+    "api_call_count": 3
+  },
+  "started_at": "2026-11-21T00:30:20.711-05:00",
+  "completed_at": "2026-11-21T01:48:13.164047716-05:00"
+}
