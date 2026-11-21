@@ -1,0 +1,237 @@
+PR is ready for review
+
+---
+
+yes, you shouldn't ask that, just follow pr review skill if I ask you to review a PR
+
+---
+
+PR is ready for review
+
+---
+
+do I have an app or example that takes an image and displays its tags or similar?
+
+---
+
+is TiffStdOut.hpp tested?
+
+---
+
+I think is a gap. I'd like the following:
+1. TiffStdOut.hpp to contain a minimal example code and docs to describe how to use it. I'm looking at it now after some time and I don't remember...
+2. TiffStdOut.hpp to have a dedicate unit test
+3. A new app that takes a tiff image and it displays its tags in a human friendly readable format
+4. Add a small section in README showing a small example of how to use this functionality
+
+---
+
+1. tiff_info is good
+2. It'd be nice to print an info section if we call tiff_info, I'm thinking now that could be the default and using --tags to dump all tags
+3. It should preferrably reuse the ones we have. It could create a small few new ones if helps to make the test better.
+4. Definitely one issue, there isn't any value for me to split in tiny bites
+
+---
+
+file it, make sure to include all details for a worker to be accurate
+
+---
+
+I see in the docs that ReferenceBlackWhite is tag 0x214 but in the file dump appears to be 0x13f, can you confirm?
+
+---
+
+I see it as required:
+
+Minimum Requirements for YCbCr Images
+In addition to satisfying the general Baseline TIFF requirements, a YCbCr file
+must have the following characteristics:
+• SamplesPerPixel = 3. SHORT. Three components representing Y, Cb and Cr.
+• BitsPerSample = 8,8,8. SHORT.
+• Compression = none (1), LZW (5) or JPEG (6). SHORT.
+• PhotometricInterpretation = YCbCr (6). SHORT.
+• ReferenceBlackWhite = 6 RATIONALS. Specify the reference values for
+black and white.
+
+---
+
+no, thanks for clarifying
+
+---
+
+I've noticed this now:
+
+Class Y requires use of the ReferenceBlackWhite field. This field expands the
+coding range by describing the reference black and white values for the different
+components that allow headroom and footroom for digital video images. Since the
+TIFF 6.0 Specification Final—June 3, 1992
+90
+default for ReferenceBlackWhite is inappropriate for Class Y, it must be used
+explicitly 
+
+Can you explain?
+
+---
+
+Is that really true/correct? I mean can we set a different default value just for YCbCr images and possibly for other types? Is this approach usual for other tiff tags too?
+
+---
+
+I've found more info:
+
+Specifies a pair of headroom and footroom image data values (codes) for each
+pixel component. The first component code within a pair is associated with
+ReferenceBlack, and the second is associated with ReferenceWhite. The ordering
+of pairs is the same as those for pixel components of the PhotometricInterpretation
+type. ReferenceBlackWhite can be applied to images with a
+PhotometricInterpretation value of RGB or YCbCr. ReferenceBlackWhite is not
+used with other PhotometricInterpretation values.
+Computer graphics commonly places black and white at the extremities of the
+binary representation of image data; for example, black at code 0 and white at
+code 255. In other disciplines, such as printing, film, and video, there are practical
+reasons to provide footroom codes below ReferenceBlack and headroom codes
+above ReferenceWhite.
+In film applications, they correspond to the densities Dmax and Dmin. In video
+applications, ReferenceBlack corresponds to 7.5 IRE and 0 IRE in systems with
+and without setup respectively, and ReferenceWhite corresponds to 100 IRE
+units.
+Using YCbCr (See Section 21) and the CCIR Recommendation 601.1 video stan-
+dard as an example, code 16 represents ReferenceBlack, and code 235 represents
+ReferenceWhite for the luminance component (Y). For the chrominance compo-
+nents, Cb and Cr, code 128 represents ReferenceBlack, and code 240 represents
+ReferenceWhite. With Cb and Cr, the ReferenceWhite value is used to code
+reference blue and reference red respectively.
+The full range component value is converted from the code by:
+FullRangeValue = (code - ReferenceBlack) * CodingRange
+/ (ReferenceWhite - ReferenceBlack);
+The code is converted from the full-range component value by:
+code = (FullRangeValue * (ReferenceWhite - ReferenceBlack)
+/ CodingRange) + ReferenceBlack;
+For RGB images and the Y component of YCbCr images, CodingRange is de-
+fined as:
+CodingRange = 2 ** BitsPerSample - 1;
+For the Cb and Cr components of YCbCr images, CodingRange is defined as:
+CodingRange = 127;
+For RGB images, in the default special case of no headroom or footroom, this
+conversion can be skipped because the scaling multiplier equals 1.0 and the value
+equals the code.
+For YCbCr images, in the case of no headroom or footroom, the conversion for Y
+can be skipped because the value equals the code. For Cb and Cr, ReferenceBlack
+must still be subtracted from the code. In the general case, the scaling multiplica-
+tion for the Cb and Cr component codes can be factored into the YCbCr transform
+matrix.
+Useful ReferenceBlackWhite values for YCbCr images are:
+[0/1, 255/1,128/1, 255/1, 128/1, 255/1]
+no headroom/footroom
+[15/1, 235/1, 128/1, 240/1, 128/1, 240/1] 
+
+Useful ReferenceBlackWhite values for BitsPerSample = 8,8,8 Class R images
+are:
+[0/1, 255/1,0/1, 255/1, 0/1, 255/1]
+no headroom/footroom
+[16/1, 235/1, 16/1, 235/1, 16/1, 235/1]
+CCIR Recommendation 601.1 headroom/footroom
+Default is [0/,NV/1, 0/1, NV/1, 0/1, NV/1] where NV = 2 ** BitsPerSample - 1. 
+
+I don't quite understand what it me by "codes" like "code 128" (isn't that just the value for reference black?, why is it called "a code"); but it seems to have precise instructions of how to interpret this rather than a more loose "use a different default for YCbCr"
+
+---
+
+I've already merged and close that. Should we reopen it? or create a new one?
+
+---
+
+wait, other discrepancies is that in that section is listed as RATIONAL:
+
+ReferenceBlackWhite
+Tag =532 (214.H)
+Type = RATIONAL
+N = 6 
+
+but in the tag list as LONG
+
+which one is it? I feel RATIONAL is correct but I'm a bit surprise about an error like that in a spec
+
+---
+
+OK, do we have test images with non-default ReferenceBlackWhite?
+
+---
+
+will Pillow correctly set the pixel values too? or just the tag?
+
+---
+
+ycbcr-custom-refbw.tif is innacurate now? How can I use it for testing?
+
+---
+
+file the issue to update the document with the information about how to use ReferenceBlackWhite with YCbCr images, request that  ycbcr-custom-refbw.tif is removed from disk and script and document as is not accurate, while you are at it, request an independent review of the generated test images to find other false test images, I cannot have those as my results will be wrong!! No silent skipping! Document in the doc the limitations for generating test images for those cases with imagemagick; do not request using Pillow for test image generation at this time! Did I miss anything?
+
+---
+
+I'm reviewing the PR for #42. Almost all test images were removed. Help me understand why
+
+---
+
+It is good that we verified and we found the errors, but removing isn
+
+---
+
+'t satisfactory for my goal.
+
+---
+
+If imagemagick doesn't support ycbcr well, we need an alternative for generating ground-truth
+
+---
+
+3. That is the problem I want to avoid. If I let a not so bright agent to use Pillow, it'll set tags as it wants to satisfy weak requirements and call it passing. I don't to set any custom tag, I do need correct images which whatever tag they require. This isn't a tag reading test, it's an image converter test.
+
+---
+
+I have built and made available rgb2ycbcr tool. Can we use this to create test images as originally planned?
+
+---
+
+I still think cannot acomplish what you say with Python struct here. I don't it isn't generally possible but you have to implement the TIFF specificationg your self, this isn't a small script you can write here, it's basically libtiff or tiffcraft whole point.
+
+---
+
+how are you going to generate the reference decoded pixel values for all of those?
+
+---
+
+it's even worst than that, if you have downsampled chroma, decoder cannot regenerate original data, this isn't lossless
+
+---
+
+how certain can we be that Pillow will reproduce the rgb pixel data exactly as we want without adding it's own processing like gamma or other things?
+
+---
+
+good! You keep trying to interject Pillow when I said many times to not use it!
+
+---
+
+OK, update the issue with the new plan for test images and document. Result must be as if we were doing this from scratch not the as current PR where the document list deleted files and things like that. Then post a PR review for the worker.
+
+---
+
+but then your review is bullshit! this isn't mergeable
+
+---
+
+you didn't even need to verify, we new it won't satisfy the issue we just been talking for an hour about the changes, be smarter!
+
+---
+
+review PR for #40
+
+---
+
+remember that review comments are always requests, so your non-blocker and merge ready are contradictions
+
+---
+
+that's right, but I'm worry that I need to remind you this, do we need to update your instructions in any place to avoid this?
