@@ -34,6 +34,7 @@
 
 #include <tiffcraft/TiffStdOut.hpp>
 
+#include <cstdint>
 #include <filesystem>
 #include <sstream>
 #include <string>
@@ -115,4 +116,41 @@ TEST_CASE("operator<< streams Header, Entry, IFD, and TiffImage") {
   imageStream << image;
   CHECK(contains(imageStream.str(), "TIFF IMAGE START"));
   CHECK(contains(imageStream.str(), "TIFF IMAGE END"));
+}
+
+TEST_CASE("operator<<(Entry) marks truncation only when values are omitted") {
+  // Build a minimal TIFF-like stream: 8-byte preamble, 12-byte IFD entry,
+  // then the out-of-line values, so Entry::read can parse the synthetic entry.
+  const auto makeByteEntry = [](std::uint32_t count) {
+    std::string bytes(20, '\0');
+    const auto writeU16 = [&bytes](std::size_t pos, std::uint16_t value) {
+      bytes[pos] = static_cast<char>(value & 0xFF);
+      bytes[pos + 1] = static_cast<char>((value >> 8) & 0xFF);
+    };
+    const auto writeU32 = [&bytes](std::size_t pos, std::uint32_t value) {
+      for (int b = 0; b < 4; ++b) {
+        bytes[pos + b] = static_cast<char>((value >> (8 * b)) & 0xFF);
+      }
+    };
+    writeU16(8, static_cast<std::uint16_t>(Tag::ImageWidth));
+    writeU16(10, static_cast<std::uint16_t>(Type::BYTE));
+    writeU32(12, count);
+    writeU32(16, 20);  // even offset, within the stream
+    bytes.resize(20 + count);
+    for (std::uint32_t i = 0; i < count; ++i) {
+      bytes[20 + i] = static_cast<char>(i + 1);
+    }
+    std::istringstream stream(bytes);
+    stream.seekg(8);
+    return TiffImage::IFD::Entry::read(stream);
+  };
+
+  std::ostringstream exact;
+  exact << makeByteEntry(7);
+  CHECK(contains(exact.str(), "Value: 1 2 3 4 5 6 7"));
+  CHECK_FALSE(contains(exact.str(), "..."));
+
+  std::ostringstream truncated;
+  truncated << makeByteEntry(8);
+  CHECK(contains(truncated.str(), "Value: 1 2 3 4 5 6 7 ..."));
 }

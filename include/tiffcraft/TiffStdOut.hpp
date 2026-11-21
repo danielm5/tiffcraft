@@ -57,6 +57,8 @@
 
 #include "TiffImage.hpp"
 
+#include <cstdio>
+#include <cstdint>
 #include <string>
 #include <iostream>
 #include <iomanip>
@@ -198,8 +200,10 @@ namespace TiffCraft {
           os << " <Unsupported Type>";
       }
       if (i > 5) {
-        // if there are more than 5 values, skip the rest
-        os << " ...";
+        // Show at most seven values; mark the omission only if values remain.
+        if (static_cast<std::uint32_t>(i) + 1u < entry.count()) {
+          os << " ...";
+        }
         break;
       }
     }
