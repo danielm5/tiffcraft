@@ -96,6 +96,31 @@ int main() {
 }
 ```
 
+# Printing image metadata
+
+Include `TiffStdOut.hpp` to print TIFF metadata and IFD entries with the
+standard library streams:
+
+```C++
+#include <tiffcraft/TiffStdOut.hpp>
+#include <iostream>
+
+int main() {
+  TiffCraft::load("image.tiff",
+    [](const TiffCraft::TiffImage::Header& header,
+        const TiffCraft::TiffImage::IFD& ifd,
+        TiffCraft::TiffImage::ImageData imageData) {
+      std::cout << header << "\n";
+      std::cout << ifd << "\n";
+    });
+
+  return 0;
+}
+```
+
+`toString(Tag)` and `toString(Type)` are also available as standalone helpers;
+stream operators exist for `Header`, `Entry`, `IFD`, and `TiffImage`.
+
 # Features
 
 TiffCraft supports the following features:

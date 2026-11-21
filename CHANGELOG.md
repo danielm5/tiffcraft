@@ -16,6 +16,9 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
 ### Added
 
 - Code examples
+- `TiffStdOut` documentation and tooling: a header usage example, a README
+  section, a new `tiff_info` app for printing metadata and IFD tags, and the
+  `tiffStdOutTest` doctest suite.
 - README now documents which headers are needed and the copy-only
   consumption path (header-only; copy the headers into the project, no build
   step required).

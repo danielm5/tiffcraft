@@ -29,11 +29,36 @@
 // This file contains the standard output functionality for TIFF images. This
 // is intended to provide easy output of TIFF image metadata and structure
 // information to standard output for debugging and exploration.
+//
+// Code like the following could be used to print TIFF image metadata and
+// structure information to standard output:
+//
+//     #include <tiffcraft/TiffStdOut.hpp>
+//     #include <iostream>
+//
+//     int main(int argc, char* argv[]) {
+//       if (argc < 2) { return 1; }
+//       TiffCraft::load(argv[1],
+//         [](const TiffCraft::TiffImage::Header& header,
+//             const TiffCraft::TiffImage::IFD& ifd,
+//             TiffCraft::TiffImage::ImageData imageData) {
+//           std::cout << header << "\n";
+//           std::cout << ifd << "\n";
+//         });
+//
+//       std::cout << TiffCraft::toString(TiffCraft::Tag::ImageWidth) << "\n";
+//       std::cout << TiffCraft::toString(TiffCraft::Type::LONG) << "\n";
+//
+//       return 0;
+//     }
+//
 
 #pragma once
 
 #include "TiffImage.hpp"
 
+#include <cstdio>
+#include <cstdint>
 #include <string>
 #include <iostream>
 #include <iomanip>
@@ -180,8 +205,10 @@ namespace TiffCraft {
           os << " <Unsupported Type>";
       }
       if (i > 5) {
-        // if there are more than 5 values, skip the rest
-        os << " ...";
+        // Show at most seven values; mark the omission only if values remain.
+        if (static_cast<std::uint32_t>(i) + 1u < entry.count()) {
+          os << " ...";
+        }
         break;
       }
     }
