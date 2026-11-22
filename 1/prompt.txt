@@ -1,0 +1,75 @@
+PR #42 is ready again, review
+
+---
+
+PR #40 is ready again, review
+
+---
+
+worker for #42 rejected your claims
+
+---
+
+Are all the YCbCr test images chunky?
+
+---
+
+I've requested additional work because I've found problems, review this PR: https://github.com/danielm5/tiffcraft/pull/44
+
+---
+
+I se the new planar image in the PR, I requested to remove imagemagick sections since we aren't using imagemagick at all! It's irreleavnt
+
+---
+
+Let's say you were mistaken as you looked at the wrong commit, nothing has changed in the PR
+
+---
+
+nothing changed at all the PR but you posted two different reviews, you're first review was wrong, ack that
+
+---
+
+so nothing has been resolved, because there was nothing to resolve
+
+---
+
+Create a subissue of #37 to cover only 1x1 images, I've implemented this already and I'd like to open a PR with an issue associated
+
+---
+
+I've checkout my changes, please review the changes and give me a summary here
+
+---
+
+what are you talking about?
+
+---
+
+I've asked you to review my changes in the branch here locally for #45 and you replied:
+
+Review posted to PR #44. All findings from the previous review are resolved:
+- ycbcr-planar-1x1.tif exists with genuine separate planes (6 strips, 2 per plane)
+- ycbcr-planar-2x2.tif has genuine separate planes (3 strips, 1 per plane)
+- write_planar_subsampled_tiff and validate_fixture are in the generator script
+- The document is accurate (18 images, correct planar classification, Kind column, no ImageMagick section)
+- All 18 TIFFs verified by tag inspection, no tiffinfo warnings
+- CI green. Merge-ready. 
+
+which is a PR already merged
+
+---
+
+do a change surgically limited to the range and the missing toString
+
+---
+
+worker said that 2. was already present
+
+---
+
+you're sloppy today!
+
+---
+
+let's compact your session
