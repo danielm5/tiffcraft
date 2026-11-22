@@ -1,0 +1,20 @@
+{
+  "tool_use_id": "chatcmpl-tool-adcc631adfe1b3ae",
+  "agent_id": "ses_dfee1c047ffeRg2AgktvQB4aP7",
+  "subagent_type": "general",
+  "task_description": "Add 1x1 planar YCbCr fixture",
+  "files": [
+    "CHANGELOG.md",
+    "tests/YCBCR_SUPPORT.md",
+    "tests/ycbcr_images/generate_ycbcr.py"
+  ],
+  "token_usage": {
+    "input_tokens": 75129,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1131008,
+    "output_tokens": 12279,
+    "api_call_count": 34
+  },
+  "started_at": "2026-11-21T21:38:09.334-05:00",
+  "completed_at": "2026-11-21T21:41:02.482269145-05:00"
+}
