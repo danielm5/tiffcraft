@@ -1,0 +1,47 @@
+how many rectangles or stripes are in that TIFF? please describe the actual image data stored
+
+---
+
+it doesn't look planar
+
+---
+
+squash with last commit when done
+
+---
+
+review the other planar image too
+
+---
+
+we must fix the other too, but I'm a bit worry that previous review of generated images didn't catch that
+
+---
+
+The conversion formulas section wasn't very useful since the formulas don't use the luma values from TIFF but you hardcoded some fixed values. Ammend to have actual formulas like :
+
+// Conversion formulas
+      // ===================
+      // R = Cr * (2-2*Lr) + Y
+      // B = Cb * (2-2*Lb) + Y
+      // G = (Y - Lb*B - Lr*R)/Lg
+      // Lr + Lg + Lb = 1
+      //
+      // Lr' = 2-2*Lr
+      // Lb' = 2-2*Lb
+      //
+      // R = Y + Cr*Lr'
+      // B = Y + Cb*Lb'
+      // G = (Y - Lb*(Y + Cb*Lb') - Lr*(Y + Cr*Lr'))/Lg
+      //
+      // G = (Y - Lb*Y - Cb*Lb*Lb' - Lr*Y - Cr*Lr*Lr')/Lg
+      // G = Y * (1-Lb-Lr)/Lg - Cb*Lb*Lb'/Lg  - Cr*Lr*Lr'/Lg
+      //
+      // Lg = 1-Lb-Lr
+      // G = Y + (-Lb*Lb'/Lg)*Cb + (-Lr*Lr'/Lg)*Cr 
+
+Then pose the defualt luma values for reference.
+
+---
+
+don't use my formulas verbatim, format them for the document, I gave them as example

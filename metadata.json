@@ -1,0 +1,51 @@
+{
+  "cli_version": "0.13.4-nightly.202611121940.ce16562b9",
+  "checkpoint_id": "01M80KRSPQCTMTD86JDQ86BKCD",
+  "strategy": "manual-commit",
+  "branch": "feature/issue-42",
+  "checkpoints_count": 8,
+  "files_touched": [
+    "CHANGELOG.md",
+    "tests/YCBCR_SUPPORT.md",
+    "tests/ycbcr_images/generate_ycbcr.py",
+    "tests/ycbcr_images/ycbcr-planar-1x1.tif",
+    "tests/ycbcr_images/ycbcr-planar-2x2.tif"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 43278,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 6574080,
+    "output_tokens": 29268,
+    "api_call_count": 34,
+    "subagent_tokens": {
+      "input_tokens": 160802,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 3386368,
+      "output_tokens": 23106,
+      "api_call_count": 83
+    }
+  },
+  "redaction": {
+    "replacements": 0,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 0,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}

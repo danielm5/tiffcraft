@@ -1,0 +1,68 @@
+{
+  "cli_version": "0.13.4-nightly.202611121940.ce16562b9",
+  "checkpoint_id": "01M80KRSPQCTMTD86JDQ86BKCD",
+  "session_id": "ses_e0668011cffeu83czokeecwFze",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-22T03:11:09.266766611Z",
+  "branch": "feature/issue-42",
+  "checkpoints_count": 8,
+  "save_step_count": 5,
+  "files_touched": [
+    "CHANGELOG.md",
+    "tests/YCBCR_SUPPORT.md",
+    "tests/ycbcr_images/generate_ycbcr.py",
+    "tests/ycbcr_images/ycbcr-planar-1x1.tif",
+    "tests/ycbcr_images/ycbcr-planar-2x2.tif"
+  ],
+  "agent": "OpenCode",
+  "model": "hy4-flash-free",
+  "turn_id": "1a201df3dea5",
+  "checkpoint_transcript_start": 161,
+  "transcript_lines_at_start": 161,
+  "compact_transcript_start": 161,
+  "token_usage": {
+    "input_tokens": 43278,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 6574080,
+    "output_tokens": 29268,
+    "api_call_count": 34,
+    "subagent_tokens": {
+      "input_tokens": 160802,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 3386368,
+      "output_tokens": 23106,
+      "api_call_count": 83
+    }
+  },
+  "session_token_usage": {
+    "input_tokens": 814242,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 20421632,
+    "output_tokens": 115064,
+    "api_call_count": 167,
+    "subagent_tokens": {
+      "input_tokens": 719216,
+      "cache_creation_tokens": 0,
+      "cache_read_tokens": 11090688,
+      "output_tokens": 119000,
+      "api_call_count": 269
+    }
+  },
+  "redaction": {
+    "replacements": 0,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 0,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "session_metrics": {
+    "turn_count": 29
+  }
+}
