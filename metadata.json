@@ -1,0 +1,50 @@
+{
+  "cli_version": "0.13.4-nightly.202611121940.ce16562b9",
+  "checkpoint_id": "01M80RYJF9NBN9E41QXZEQGTFG",
+  "strategy": "manual-commit",
+  "branch": "feature/issue-45",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "CHANGELOG.md",
+    "README.md",
+    "include/tiffcraft/TiffExporter.hpp",
+    "include/tiffcraft/TiffImage.hpp",
+    "include/tiffcraft/TiffStdOut.hpp",
+    "tests/TEST_IMAGES.md",
+    "tests/doctest.h",
+    "tests/netpbm.hpp",
+    "tests/readmeUsageTest.cpp",
+    "tests/tiffExporterTest.cpp",
+    "tests/tiffImageTest.cpp"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 9827,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1243136,
+    "output_tokens": 4022,
+    "api_call_count": 9
+  },
+  "redaction": {
+    "replacements": 0,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 0,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}

@@ -1,0 +1,5 @@
+you said that 16 bit cmyk images are now marked unsupported in doc but I don't see them newly commented out in the test, are they tested or not? were they claimed as tested before?
+
+---
+
+I think we're ready for a PR, squash all commits and write a good commit message and open a PR (no code changes!)
