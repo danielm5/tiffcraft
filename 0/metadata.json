@@ -1,0 +1,50 @@
+{
+  "cli_version": "0.13.4-nightly.202611121940.ce16562b9",
+  "checkpoint_id": "01M80RHQGV4RY7RV00TPBT5PV8",
+  "session_id": "ses_dfe992450ffewQ2rAKMuMkuBZ8",
+  "strategy": "manual-commit",
+  "created_at": "2026-11-22T04:34:40.757914104Z",
+  "branch": "feature/issue-45",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "CHANGELOG.md",
+    "tests/readmeUsageTest.cpp"
+  ],
+  "agent": "OpenCode",
+  "model": "hy4-flash-free",
+  "turn_id": "041dcff110e3",
+  "checkpoint_transcript_start": 104,
+  "transcript_lines_at_start": 104,
+  "compact_transcript_start": 104,
+  "token_usage": {
+    "input_tokens": 3199,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 805632,
+    "output_tokens": 1661,
+    "api_call_count": 6
+  },
+  "session_token_usage": {
+    "input_tokens": 154304,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 8132096,
+    "output_tokens": 56718,
+    "api_call_count": 97
+  },
+  "redaction": {
+    "replacements": 0,
+    "layers": {
+      "betterleaks": 0,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 0,
+      "credentialed_uri": 0,
+      "entropy": 0,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "session_metrics": {
+    "turn_count": 10
+  }
+}
