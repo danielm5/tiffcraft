@@ -127,9 +127,12 @@ TiffCraft supports the following features:
 
 - Reading TIFF images
   - Read and display image metadata
-  - Bilevel, grayscale, palette-color, and RGB images
+  - Bilevel, grayscale, palette-color, RGB, and YCbCr images
     - Varying number of bits per sample
     - RGB images are supported only for 3-channel images (no extra samples)
+    - YCbCr images are supported only with 1x1 subsampling and centered
+      positioning; they are converted to RGB on export. Subsampled, co-sited,
+      tiled and compressed YCbCr images are not supported yet.
 - Compression is NOT supported yet.
 - Writing TIFF images is NOT supported yet.
 

@@ -36,14 +36,36 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
   images under `tests/ycbcr_images/` (nine subsampling, six variant and three
   odd-dimension cases), and the corresponding `ycbcr-*.ppm` ground-truth
   reference images (child issue of the YCbCr support effort, #38).
+- YCbCr (PI=6) export support for 1x1 subsampling (#45): new `TiffExporterYCbCr`
+  class converts Y, Cb and Cr samples to RGB using `YCbCrCoefficients` and
+  `ReferenceBlackWhite` (default ITU-R BT.601 values), for both chunky and
+  separate-plane data. Coefficients are validated to sum to 1. `TiffExporterAny`
+  dispatches PI=6 images to it, and `TiffStdOut` prints the four YCbCr tag
+  names. Conversion tests cover `ycbcr-1x1.tif` and `ycbcr-planar-1x1.tif`
+  against their PPM ground truth.
 
 ### Changed
 
+- Corrected `tests/YCBCR_SUPPORT.md` against TIFF 6.0 / Technical Note 2:
+  generic `ReferenceBlackWhite` default, no-headroom YCbCr profile,
+  subsampling constraints and default, and legacy vs new-style JPEG codes.
+- Vendored `doctest` test framework upgraded from 2.4.12 to 2.5.0.
+- Test-image documentation now lists the YCbCr fixtures and explains why the
+  8-bit CMYK images are excluded from the exporter tests.
 - CMake project version bumped to `0.2.0` to match the header version
   constants and the `[0.2.0-Unreleased]` changelog section.
 
 ### Fixed
 
+- `readmeUsageTest` now catches exceptions and reports them on stderr instead
+  of aborting, so IDE test-discovery probes (e.g. VS Code TestMate C++) no
+  longer pop up error dialogs while running the executable.
+- `TestExporter` returned after the first successful reference comparison, so
+  only the first TIFF/reference pair in each test list was actually verified.
+  It now continues through every pair. With all images exercised, the 4-channel
+  CMYK fixtures were confirmed unsupported by the RGB exporter; their test cases
+  were removed, and `tests/TEST_IMAGES.md` lists them as not supported and now
+  explains why they are excluded from the exporter tests.
 - Completed the YCbCr documentation and test data in `tests/YCBCR_SUPPORT.md`
   and rebuilt the full 18-image fixture set with libtiff's `rgb2ycbcr`, so all
   four YCbCr tags are written into every TIFF; matching ground-truth PPMs come

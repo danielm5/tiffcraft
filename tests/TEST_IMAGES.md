@@ -93,3 +93,48 @@ The following table lists the test images.
 | `flower-separated-contig-16.tif` | 73x43 | 16 bpp x4 | CMYK (4 samples) | None | Chunky | No | ❌ Not supported |
 | `flower-separated-planar-08.tif` | 73x43 | 8 bpp x4 | CMYK (4 samples) | None | Separate | No | ❌ Not supported |
 | `flower-separated-planar-16.tif` | 73x43 | 16 bpp x4 | CMYK (4 samples) | None | Separate | No | ❌ Not supported |
+
+The 8-bit CMYK images (`flower-separated-contig-08.tif` and
+`flower-separated-planar-08.tif`) were removed from the exporter test lists
+after the test helper was fixed to check every file pair: four samples per
+pixel are not supported by the RGB exporter.
+
+## `tests/ycbcr_images`
+
+Generated YCbCr (`PhotometricInterpretation = 6`) fixtures with matching
+ground-truth PPMs in `tests/reference_images/ycbcr-*.ppm`. See
+`YCBCR_SUPPORT.md` for the TIFF 6.0 Section 21 specification background, the
+generation pipeline and the attributes exercised by each fixture.
+
+TiffCraft's `TiffExporterYCbCr` (and the `TiffExporterAny` dispatch) currently
+exports only 1x1-subsampled, centered YCbCr images, in chunky or separate-plane
+organization. Subsampled, co-sited, tiled and compressed YCbCr images are not
+supported.
+
+### Test image format table
+
+| Image | Dimensions | Bits per sample | Samples / Photometric | Compression | Planar config | Subsampling | Tiled | TiffCraft support |
+|---|---|---|---|---|---|---|---|---|
+| `ycbcr-1x1.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 1x1 | No | ✅ Supported |
+| `ycbcr-2x1.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 2x1 | No | ❌ Not supported |
+| `ycbcr-1x2.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 1x2 | No | ❌ Not supported |
+| `ycbcr-2x2.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 2x2 | No | ❌ Not supported |
+| `ycbcr-4x1.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 4x1 | No | ❌ Not supported |
+| `ycbcr-1x4.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 1x4 | No | ❌ Not supported |
+| `ycbcr-4x2.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 4x2 | No | ❌ Not supported |
+| `ycbcr-2x4.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 2x4 | No | ❌ Not supported |
+| `ycbcr-4x4.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 4x4 | No | ❌ Not supported |
+| `ycbcr-cosited.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 2x2 | No | ❌ Not supported |
+| `ycbcr-custom-coeffs.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 1x1 | No | ❌ Not supported |
+| `ycbcr-custom-refbw.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 1x1 | No | ❌ Not supported |
+| `ycbcr-planar-1x1.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Separate | 1x1 | No | ✅ Supported |
+| `ycbcr-planar-2x2.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Separate | 2x2 | No | ❌ Not supported |
+| `ycbcr-tiled-2x2.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 2x2 | Yes (Tile 16x16) | ❌ Not supported |
+| `ycbcr-odd-2x2.tif` | 61x47 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 2x2 | No | ❌ Not supported |
+| `ycbcr-odd-4x4.tif` | 63x61 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 4x4 | No | ❌ Not supported |
+| `ycbcr-odd-mixed.tif` | 62x47 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 2x1 | No | ❌ Not supported |
+
+The `ycbcr-custom-coeffs.tif` and `ycbcr-custom-refbw.tif` fixtures are
+tag-reading tests only. The exporter reads `YCbCrCoefficients` and
+`ReferenceBlackWhite`, but conversion with non-default tag values is not
+covered by the current test suite.

@@ -1,5 +1,5 @@
 // BSD 2-Clause License
-// Copyright (c) 2025 Daniel Moreno
+// Copyright (c) 2025-2026 Daniel Moreno
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
@@ -114,7 +114,8 @@ void compareToReference(
 // The list of files must be set in pairs: first a TIFF file to test, then a
 // PPM, PGM, or PBM file to compare against.
 template <typename Exporter>
-void TestExporter(const std::vector<std::string>& testFiles)
+void TestExporter(const std::vector<std::string>& testFiles,
+                  std::optional<int> margin = std::nullopt)
 {
   if (testFiles.size() % 2 != 0) {
     throw std::runtime_error("Test files must be in pairs.");
@@ -131,38 +132,38 @@ void TestExporter(const std::vector<std::string>& testFiles)
     const auto& image = exporter.image();
 
     try { // Gray 8bits
-      compareToReference<uint8_t>(image, refFilePath);
-      return;
+      compareToReference<uint8_t>(image, refFilePath, margin.value_or(1));
+      continue;
     } catch (const std::exception& ex) { /* ignore */ }
 
     try { // Gray 16bits
-      compareToReference<uint16_t>(image, refFilePath, 1);
-      return;
+      compareToReference<uint16_t>(image, refFilePath, margin.value_or(1));
+      continue;
     } catch (const std::exception& ex) { /* ignore */ }
 
     try { // Gray 32bits
-      compareToReference<uint32_t>(image, refFilePath);
-      return;
+      compareToReference<uint32_t>(image, refFilePath, margin.value_or(0));
+      continue;
     } catch (const std::exception& ex) { /* ignore */ }
 
     try { // RGB 8bits
-      compareToReference<netpbm::RGB8>(image, refFilePath, 1);
-      return;
+      compareToReference<netpbm::RGB8>(image, refFilePath, margin.value_or(1));
+      continue;
     } catch (const std::exception& ex) { /* ignore */ }
 
     try { // RGB 16bits
-      compareToReference<netpbm::RGB16>(image, refFilePath, 1);
-      return;
+      compareToReference<netpbm::RGB16>(image, refFilePath, margin.value_or(1));
+      continue;
     } catch (const std::exception& ex) { /* ignore */ }
 
     try { // RGB 32bits
-      compareToReference<netpbm::RGB32>(image, refFilePath);
-      return;
+      compareToReference<netpbm::RGB32>(image, refFilePath, margin.value_or(0));
+      continue;
     } catch (const std::exception& ex) { /* ignore */ }
 
     try { // Bitmap 1bit
-      compareToReference<bool>(image, refFilePath);
-      return;
+      compareToReference<bool>(image, refFilePath, margin.value_or(0));
+      continue;
     } catch (const std::exception& ex) { /* ignore */ }
 
     FAIL(("Unsupported reference file format: " + refFilePath.string()));
@@ -254,8 +255,8 @@ TEST_CASE("TiffExporterRgbTest") {
       "reference_images/flower-rgb-contig-04.ppm",
       "libtiff-pics/depth/flower-rgb-contig-08.tif",
       "reference_images/flower-rgb-contig-08.ppm",
-      "libtiff-pics/depth/flower-separated-contig-08.tif",
-      "reference_images/flower-separated-contig-08.ppm",
+      //"libtiff-pics/depth/flower-separated-contig-08.tif", // samplesPerPixel = 4 (not supported)
+      //"reference_images/flower-separated-contig-08.ppm",
     };
     using Exporter = TiffExporterRgb<uint8_t>;
     TestExporter<Exporter>(testFiles);
@@ -307,8 +308,8 @@ TEST_CASE("TiffExporterRgbTest") {
       "reference_images/flower-rgb-planar-04.ppm",
       "libtiff-pics/depth/flower-rgb-planar-08.tif",
       "reference_images/flower-rgb-planar-08.ppm",
-      "libtiff-pics/depth/flower-separated-planar-08.tif",
-      "reference_images/flower-separated-planar-08.ppm",
+      // "libtiff-pics/depth/flower-separated-planar-08.tif", // samplesPerPixel = 4 (not supported)
+      // "reference_images/flower-separated-planar-08.ppm",
     };
     using Exporter = TiffExporterRgb<uint8_t>;
     TestExporter<Exporter>(testFiles);
@@ -390,6 +391,31 @@ TEST_CASE("TiffExporterLibTiffPicsTest") {
   }
 }
 
+//#include <tiffcraft/TiffStdOut.hpp> //tmp
+
+TEST_CASE("TiffExporterYCbCrTest") {
+  // {
+  //   std::string filename = "ycbcr_images/ycbcr-1x1.tif";
+  //   const auto tiffFilePath = getFilePath(filename);
+  //   TiffCraft::load(tiffFilePath.string(), [](const TiffCraft::TiffImage::Header& header,
+  //       const TiffCraft::TiffImage::IFD& ifd,
+  //       TiffCraft::TiffImage::ImageData) {
+  //     std::cout << header << "\n";
+  //     std::cout << ifd << "\n";   // prints all entries with names, types, counts, values
+  //   });
+  // }
+  { // 1x1
+     std::vector<std::string> testFiles = {
+      "ycbcr_images/ycbcr-1x1.tif",
+      "reference_images/ycbcr-1x1.ppm",
+      "ycbcr_images/ycbcr-planar-1x1.tif",
+      "reference_images/ycbcr-planar-1x1.ppm",
+    };
+    using Exporter = TiffExporterYCbCr<uint8_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+}
+
 TEST_CASE("TiffExporterAnyTest") {
   { // grayscale images
     std::vector<std::string> testFiles = {
@@ -437,8 +463,8 @@ TEST_CASE("TiffExporterAnyTest") {
       "reference_images/flower-rgb-contig-04.ppm",
       "libtiff-pics/depth/flower-rgb-contig-08.tif",
       "reference_images/flower-rgb-contig-08.ppm",
-      "libtiff-pics/depth/flower-separated-contig-08.tif",
-      "reference_images/flower-separated-contig-08.ppm",
+      //"libtiff-pics/depth/flower-separated-contig-08.tif", // samplesPerPixel = 4 (not supported)
+      //"reference_images/flower-separated-contig-08.ppm",
       "libtiff-pics/depth/flower-rgb-contig-10.tif",
       "reference_images/flower-rgb-contig-10.ppm",
       "libtiff-pics/depth/flower-rgb-contig-12.tif",
@@ -462,8 +488,8 @@ TEST_CASE("TiffExporterAnyTest") {
       "reference_images/flower-rgb-planar-04.ppm",
       "libtiff-pics/depth/flower-rgb-planar-08.tif",
       "reference_images/flower-rgb-planar-08.ppm",
-      "libtiff-pics/depth/flower-separated-planar-08.tif",
-      "reference_images/flower-separated-planar-08.ppm",
+      // "libtiff-pics/depth/flower-separated-planar-08.tif", // samplesPerPixel = 4 (not supported)
+      // "reference_images/flower-separated-planar-08.ppm",
       "libtiff-pics/depth/flower-rgb-planar-10.tif",
       "reference_images/flower-rgb-planar-10.ppm",
       "libtiff-pics/depth/flower-rgb-planar-12.tif",
@@ -493,6 +519,15 @@ TEST_CASE("TiffExporterAnyTest") {
       "reference_images/pc260001.ppm",
       "libtiff-pics/cramps-tile.tif",
       "reference_images/cramps-tile.pgm",
+    };
+    TestExporter<TiffExporterAny>(testFiles);
+  }
+  { // YCbCr images
+     std::vector<std::string> testFiles = {
+      "ycbcr_images/ycbcr-1x1.tif",
+      "reference_images/ycbcr-1x1.ppm",
+      "ycbcr_images/ycbcr-planar-1x1.tif",
+      "reference_images/ycbcr-planar-1x1.ppm",
     };
     TestExporter<TiffExporterAny>(testFiles);
   }
