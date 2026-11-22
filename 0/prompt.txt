@@ -1,0 +1,76 @@
+there are fails in the PR, but in my windows PC everything looks fine:
+
+Daniel@Andromeda MINGW64 /c/Daniel/dev/tiff-craft (feature/issue-45)
+$ ./run_test.sh
+Host OS: Windows_NTcygwin
+Host Type: x86_64
+Host Id: windows_ntcygwin-x86_64
+Testing msvc-win64-release
+Test project C:/Daniel/dev/tiff-craft/build/release
+Problem reading file: C:/Daniel/dev/tiff-craft/build/release/Testing/Temporary/ while generating list of previously failed tests.
+    Start 1: tiffImageTest
+1/6 Test #1: tiffImageTest ....................   Passed    0.12 sec
+    Start 2: tiffExporterTest
+2/6 Test #2: tiffExporterTest .................   Passed    1.41 sec
+    Start 3: twoTuLinkTest
+3/6 Test #3: twoTuLinkTest ....................   Passed    0.06 sec
+    Start 4: readmeUsageTest
+4/6 Test #4: readmeUsageTest ..................   Passed    0.07 sec
+    Start 5: tiffVersionTest
+5/6 Test #5: tiffVersionTest ..................   Passed    0.09 sec
+    Start 6: tiffStdOutTest
+6/6 Test #6: tiffStdOutTest ...................   Passed    0.11 sec
+
+100% tests passed out of 6
+
+Total Test time (real) =   2.24 sec
+
+Daniel@Andromeda MINGW64 /c/Daniel/dev/tiff-craft (feature/issue-45)
+$ ./build/release/bin/
+readmeUsageTest.exe        tiff_exporter_example.exe  tiff_info.exe              tiffImageTest.exe          tiffVersionTest.exe
+tiff_exporter.exe          tiff_image_example.exe     tiffExporterTest.exe       tiffStdOutTest.exe         twoTuLinkTest.exe
+
+Daniel@Andromeda MINGW64 /c/Daniel/dev/tiff-craft (feature/issue-45)
+$ ./build/release/bin/tiffExporterTest.exe
+[doctest] doctest version is "2.5.0"
+[doctest] run with "--help" for options
+===============================================================================
+[doctest] test cases:       9 |       9 passed | 0 failed | 0 skipped
+[doctest] assertions: 4972043 | 4972043 passed | 0 failed |
+[doctest] Status: SUCCESS!
+
+Daniel@Andromeda MINGW64 /c/Daniel/dev/tiff-craft (feature/issue-45)
+
+---
+
+how exactly to strip?
+
+---
+
+Let's say I want to skip all empty lines ignoring spaces, tabs, etc. what it would look like?
+
+---
+
+It seems a bit excessive. Are you sure these files actually allow for spaces before comments and spaces before P1 and others?
+
+---
+
+ok, if the spec says it's legal, do the robust version since it costs nothing and it might avoid problems with other files in the future
+
+---
+
+I've got this review:Observations — YCbCrSubSampling default 2,2 (spec-correct, issue text says 1,1 but that's wrong); no sum-to-1 validation on coefficients (minor); doctest upgrade bundled in (not a code concern).
+
+---
+
+1. Fix doc, and review the doc for other errors from spec
+2. Add check
+
+---
+
+why do you squash and force push each time? It's hard to know what you've changed
+
+---
+
+same error as before, you noted in changelog: `YCbCrCoefficients` now rejects coefficient triples that do not sum to 1,
+  since the RGB -> YCbCr conversion assumes normalized luma coefficients.
