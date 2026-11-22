@@ -1,5 +1,5 @@
 // BSD 2-Clause License
-// Copyright (c) 2025 Daniel Moreno
+// Copyright (c) 2025-2026 Daniel Moreno
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
@@ -135,6 +135,7 @@ namespace TiffCraft {
     PlanarConfiguration = 0x011C,
     PageName = 0x011D,
     ResolutionUnit = 0x0128,
+    PageNumber = 0x0129,
     Software = 0x0131,
     DateTime = 0x0132,
     Artist = 0x013B,
@@ -145,6 +146,10 @@ namespace TiffCraft {
     TileOffsets = 0x0144,
     TileByteCounts = 0x0145,
     SampleFormat = 0x0153,
+    YCbCrCoefficients = 0x211,
+    YCbCrSubSampling = 0x212,
+    YCbCrPositioning = 0x213,
+    ReferenceBlackWhite = 0x0214,
   };
 
   template <typename T>

@@ -26,17 +26,25 @@
 //
 // readmeUsageTest.cpp
 // ===================
-// Keep in sync with README.md (the Usage quick-start). If this file and
-// README diverge, update both.
+// Keep in sync with README.md (the Usage quick-start). The try/catch is the
+// only intentional difference: it stops IDE test-discovery probes (e.g. VS
+// Code TestMate C++) from raising error dialogs while running this executable.
 
 #include <tiffcraft/TiffExporter.hpp>
+#include <exception>
 #include <functional>
+#include <iostream>
 
 int main(int argc, char* argv[]) {
   if (argc < 2) { return 1; }
-  TiffCraft::TiffExporterAny tiffExporter;
-  TiffCraft::load(argv[1], std::ref(tiffExporter));
-  auto image = tiffExporter.takeImage();
+  try {
+    TiffCraft::TiffExporterAny tiffExporter;
+    TiffCraft::load(argv[1], std::ref(tiffExporter));
+    auto image = tiffExporter.takeImage();
 
-  return image.data.empty() ? 1 : 0;
+    return image.data.empty() ? 1 : 0;
+  } catch (const std::exception& error) {
+    std::cerr << error.what() << '\n';
+    return 1;
+  }
 }

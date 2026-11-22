@@ -20,18 +20,18 @@ Section 21.
 
 | Tag | Name | TIFF value | Type | Count | Default | Description |
 |---|---|---|---|---|---|---|
-| 529 | YCbCrCoefficients | 0x0211 | RATIONAL (5) / SRATIONAL (10) | 3 | ITU-R BT.601 luma coefficients | Coefficients used for the transformation from RGB to YCbCr. |
+| 529 | YCbCrCoefficients | 0x0211 | RATIONAL (5) | 3 | ITU-R BT.601 luma coefficients | Coefficients used for the transformation from RGB to YCbCr. |
 | 530 | YCbCrSubsampling | 0x0212 | SHORT (3) | 2 | 2, 2 | Horizontal and vertical subsampling factors of the chroma components. |
 | 531 | YCbCrPositioning | 0x0213 | SHORT (3) | 1 | 1 | Positioning of the chroma samples relative to the luminance samples. |
-| 532 | ReferenceBlackWhite | 0x0214 | RATIONAL (5) | 6 | (0, 255, 128, 255, 128, 255) | Reference black and white data values (headroom/footroom) per component. |
+| 532 | ReferenceBlackWhite | 0x0214 | RATIONAL (5) | 6 | (0, NV, 0, NV, 0, NV) | Reference black and white data values (headroom/footroom) per component; NV = 2^BitsPerSample - 1. |
 
 Notes on the individual tags:
 
-- **YCbCrCoefficients (529 / 0x0211):** Type RATIONAL (TIFF data type 5) or
-  SRATIONAL (TIFF data type 10), with **3 values** (the RGB -> YCbCr
-  transformation coefficients, e.g. the luma row). Defaults to the ITU-R BT.601
-  coefficients (approximately 0.299, 0.587, 0.114 for the red, green and blue
-  contributions to luma).
+- **YCbCrCoefficients (529 / 0x0211):** Type RATIONAL (TIFF data type 5), with
+  **3 values** (the RGB -> YCbCr transformation coefficients, e.g. the luma
+  row). They are proportions and must sum to 1. Defaults to the CCIR Rec. 601-1
+  coefficients (299/1000, 587/1000, 114/1000 for LumaRed, LumaGreen and
+  LumaBlue).
 - **YCbCrSubsampling (530 / 0x0212):** Type SHORT (TIFF data type 3), **2
   values** — the horizontal subsampling factor and the vertical subsampling
   factor. Default is **2, 2** (chroma subsampled by 2 on both axes). Legal
@@ -45,8 +45,11 @@ Notes on the individual tags:
 - **ReferenceBlackWhite (532 / 0x0214):** Type RATIONAL (TIFF data type 5), **6
   values**. The values are grouped in pairs of (reference black, reference
   white) per pixel component, ordered like the components of the
-  `PhotometricInterpretation = 6` image (Y, Cb, Cr). Default value set:
-  Y black/white = 0/255, Cb black/white = 128/255, Cr black/white = 128/255.
+  `PhotometricInterpretation = 6` image (Y, Cb, Cr). The TIFF default is
+  `(0, NV, 0, NV, 0, NV)` with `NV = 2^BitsPerSample - 1` for every component;
+  this is inappropriate for YCbCr. The no-headroom/footroom YCbCr profile is
+  `(0, 255, 128, 255, 128, 255)` for 8-bit samples, and the CCIR Rec. 601-1
+  profile is `(15, 235, 128, 240, 128, 240)`.
 
 ## Conversion formulas
 
@@ -120,32 +123,45 @@ the traditional `R = Y + 1.402 * (Cr - 128)` is exactly the default-coefficient
 case (`Lr = 0.299`, hence `Lr' = 1.402`): the `128` is the Cb/Cr
 `ReferenceBlack` code in that special case, not a magic number.
 
-For YCbCr the default reference values are black = 0 and white = 255 for the
-luma component (Y), and black = 128 and white = 255 for the chroma components
-(Cb/Cr). Merely subtracting 128 is correct only for these defaults. Images with
-headroom/footroom carry other reference values: for example, with
+For YCbCr images with no headroom/footroom, the commonly used reference values
+are black = 0 and white = 255 for luma (Y), and black = 128 and white = 255 for
+chroma (Cb/Cr). Merely subtracting 128 is correct only for these values. Images
+with headroom/footroom carry other reference values: for example, with
 `ReferenceBlackWhite = [15, 235, 128, 240, 128, 240]` a luma code of 235 maps to
 `255` and a luma code of 15 maps to `0`, using
 `(code - 15) * 255 / (235 - 15)`. The chroma white reference is 240 rather than
-the default 255, so subtracting 128 alone leaves chroma under-scaled. Readers
-must apply the tag's scaling instead of assuming the defaults.
+255, so subtracting 128 alone leaves chroma under-scaled. Readers must apply the
+tag's scaling instead of assuming fixed values.
 
-The TIFF 6.0 specification says the default `ReferenceBlackWhite` values are
+The TIFF 6.0 specification says the generic `ReferenceBlackWhite` default is
 inappropriate for Class Y images and that the tag must be supplied explicitly.
-In practice many images omit it, so readers must fall back to the YCbCr-specific
-defaults above (Y 0/255, Cb/Cr 128/255).
+In practice many images omit it, so readers commonly fall back to the
+no-headroom/footroom YCbCr values above (Y 0/255, Cb/Cr 128/255), as does
+libtiff's JPEG subset.
 
 ## Subsampling
 
 - The `YCbCrSubsampling` factors describe how the chroma components are
-  subsampled relative to the luma component.
-- Legal subsampling factors are **1, 2 and 4**.
-- The chroma image dimensions are computed by rounding **up** (ceiling) the
-  luma dimensions divided by the subsampling factor, so that no chroma sample is
-  dropped for images whose dimensions are not evenly divisible.
-- For images using subsampling, strip organization (`RowsPerStrip`) must be
-  consistent with the luma/chroma grid; `RowsPerStrip` is expressed in luma
-  rows.
+  subsampled relative to the luma component. Both Cb and Cr use the same
+  factors, and the vertical factor must not exceed the horizontal factor.
+- Legal subsampling factors are **1, 2 and 4**. The spec default is **2, 2** —
+  YCbCr is subsampled by default; an image without tag 530 is not implicitly
+  1x1. TiffCraft's exporter currently supports only explicit 1x1 subsampling,
+  so files that omit the tag are rejected rather than treated as full
+  resolution.
+- All TIFF dimensions (`ImageWidth`, `ImageLength`, `RowsPerStrip`,
+  `TileWidth`, `TileLength`) are measured in luma samples. TIFF 6.0 originally
+  required image dimensions to be multiples of the subsampling factors;
+  Technical Note 2 relaxes this: the source is padded to the next multiple
+  before downsampling, so the number of stored chroma samples is the **ceiling**
+  of the luma dimension divided by the factor, and readers ignore the extra
+  samples after upsampling. That is the source of the ceiling rule used by the
+  odd-dimension fixtures below.
+- `RowsPerStrip` must be an integer multiple of the vertical subsampling factor
+  (unless the image is a single strip), and for tiled images `TileWidth` and
+  `TileLength` must be multiples of the horizontal and vertical factors.
+- With `PlanarConfig = 1`, samples are stored in data units: a block of
+  `horizontal x vertical` Y samples followed by one Cb and one Cr sample.
 
 ## Positioning
 
@@ -160,13 +176,16 @@ In addition to the general Baseline TIFF requirements, a YCbCr file must have:
 
 - `SamplesPerPixel = 3` (Y, Cb, Cr).
 - `BitsPerSample = 8, 8, 8`.
-- `Compression = 1` (none), `5` (LZW) or `7` (JPEG; TIFF Technical Note 2).
+- `Compression = 1` (none), `5` (LZW) or JPEG: TIFF 6.0 listed `6`, which
+  Technical Note 2 replaced with `7` for new-style JPEG.
 - `PhotometricInterpretation = 6` (YCbCr).
 - `PlanarConfig = 1` (chunky) or `2` (separate).
+- `YCbCrCoefficients`: required if the RGB -> YCbCr conversion is not the
+  CCIR Rec. 601-1 default.
 - `ReferenceBlackWhite`: required by the TIFF 6.0 specification. Readers must
-  nevertheless handle its absence by falling back to the YCbCr-specific
-  defaults above (Y 0/255, Cb/Cr 128/255), because many real-world files omit
-  tag 532.
+  nevertheless handle its absence by falling back to the no-headroom/footroom
+  YCbCr values above (Y 0/255, Cb/Cr 128/255), because many real-world files
+  omit tag 532.
 
 ## Generating the test images
 

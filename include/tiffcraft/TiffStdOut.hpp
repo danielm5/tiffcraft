@@ -91,8 +91,9 @@ namespace TiffCraft {
       case TiffCraft::Tag::XResolution: return "XResolution";
       case TiffCraft::Tag::YResolution: return "YResolution";
       case TiffCraft::Tag::PlanarConfiguration: return "PlanarConfiguration";
-      case TiffCraft::Tag::ResolutionUnit: return "ResolutionUnit";
       case TiffCraft::Tag::PageName: return "PageName";
+      case TiffCraft::Tag::ResolutionUnit: return "ResolutionUnit";
+      case TiffCraft::Tag::PageNumber: return "PageNumber";
       case TiffCraft::Tag::Software: return "Software";
       case TiffCraft::Tag::DateTime: return "DateTime";
       case TiffCraft::Tag::Artist: return "Artist";
@@ -103,6 +104,10 @@ namespace TiffCraft {
       case TiffCraft::Tag::TileOffsets: return "TileOffsets";
       case TiffCraft::Tag::TileByteCounts: return "TileByteCounts";
       case TiffCraft::Tag::SampleFormat: return "SampleFormat";
+      case TiffCraft::Tag::YCbCrCoefficients: return "YCbCrCoefficients";
+      case TiffCraft::Tag::YCbCrSubSampling: return "YCbCrSubSampling";
+      case TiffCraft::Tag::YCbCrPositioning: return "YCbCrPositioning";
+      case TiffCraft::Tag::ReferenceBlackWhite: return "ReferenceBlackWhite";
       default: /* unknown tag */ break;
     }
     char buf[8] = "0x0000";

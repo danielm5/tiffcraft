@@ -1,5 +1,5 @@
 // BSD 2-Clause License
-// Copyright (c) 2025 Daniel Moreno
+// Copyright (c) 2025-2026 Daniel Moreno
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
@@ -576,7 +576,7 @@ TEST_CASE("Malformed TIFF input") {
     // Entry::read does not divide rationals, so reading the image must not throw
     TiffImage image = TiffImage::read(stream);
     REQUIRE(image.ifds().size() == 1);
-    CHECK_THROWS_AS(TiffExporter::getIntVec(image.ifds()[0], Tag::XResolution), std::runtime_error);
+    CHECK_THROWS_AS(TiffExporter::getVec<int>(image.ifds()[0], Tag::XResolution), std::runtime_error);
   }
 }
 
