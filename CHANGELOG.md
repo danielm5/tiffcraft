@@ -39,9 +39,10 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
 - YCbCr (PI=6) export support for 1x1 subsampling (#45): new `TiffExporterYCbCr`
   class converts Y, Cb and Cr samples to RGB using `YCbCrCoefficients` and
   `ReferenceBlackWhite` (default ITU-R BT.601 values), for both chunky and
-  separate-plane data. `TiffExporterAny` dispatches PI=6 images to it, and
-  `TiffStdOut` prints the four YCbCr tag names. Conversion tests cover
-  `ycbcr-1x1.tif` and `ycbcr-planar-1x1.tif` against their PPM ground truth.
+  separate-plane data. Coefficients are validated to sum to 1. `TiffExporterAny`
+  dispatches PI=6 images to it, and `TiffStdOut` prints the four YCbCr tag
+  names. Conversion tests cover `ycbcr-1x1.tif` and `ycbcr-planar-1x1.tif`
+  against their PPM ground truth.
 
 ### Changed
 
@@ -56,8 +57,6 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
 
 ### Fixed
 
-- `YCbCrCoefficients` now rejects coefficient triples that do not sum to 1,
-  since the RGB -> YCbCr conversion assumes normalized luma coefficients.
 - `readmeUsageTest` now catches exceptions and reports them on stderr instead
   of aborting, so IDE test-discovery probes (e.g. VS Code TestMate C++) no
   longer pop up error dialogs while running the executable.
