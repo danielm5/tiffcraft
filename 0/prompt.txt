@@ -1,0 +1,25 @@
+you must use the main branch in the remote origin, not the one locally which had some extra commits, sync main first, and do it gain
+
+---
+
+you forgot to describe in changelog that there was a bug in testing and that's why some test images which 4 channels are now correctly documented as not supported
+
+---
+
+are you sure they are cmyk? I thought they were depth
+
+---
+
+are they correct in test doc?
+
+---
+
+tell me more about black==white guard?
+
+---
+
+apply the change without commit for me to review
+
+---
+
+it looks good! commit
