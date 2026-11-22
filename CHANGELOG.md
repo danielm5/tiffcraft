@@ -32,8 +32,8 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
   version constants (`TiffCraft::version()`), failing with both values named on
   mismatch.
 - YCbCr (PI=6) test coverage: added the TIFF 6.0 Section 21
-  `tests/YCBCR_SUPPORT.md` specification reference, 17 generated YCbCr test
-  images under `tests/ycbcr_images/` (nine subsampling, five variant and three
+  `tests/YCBCR_SUPPORT.md` specification reference, 18 generated YCbCr test
+  images under `tests/ycbcr_images/` (nine subsampling, six variant and three
   odd-dimension cases), and the corresponding `ycbcr-*.ppm` ground-truth
   reference images (child issue of the YCbCr support effort, #38).
 
@@ -45,13 +45,16 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
 ### Fixed
 
 - Completed the YCbCr documentation and test data in `tests/YCBCR_SUPPORT.md`
-  and rebuilt the full 17-image fixture set with libtiff's `rgb2ycbcr`, so all
+  and rebuilt the full 18-image fixture set with libtiff's `rgb2ycbcr`, so all
   four YCbCr tags are written into every TIFF; matching ground-truth PPMs come
-  from `tiff2rgba` + `tifftopnm`. The document now carries the full
-  `ReferenceBlackWhite` scaling formula with `code` terminology, the
-  spec-versus-practice note on default reference values, ImageMagick's
-  tag-writing limitations, and a 17-row matrix distinguishing conversion tests
-  from tag-reading tests (#42).
+  from `tiff2rgba` + `tifftopnm`. The document now carries generalized
+  RGB/YCbCr conversion formulas parameterized by the luma coefficients in
+  `YCbCrCoefficients`, the full `ReferenceBlackWhite` scaling formula with
+  `code` terminology, the spec-versus-practice note on default reference
+  values, and an 18-row matrix distinguishing conversion tests from
+  tag-reading tests. Both planar fixtures contain genuine separate planes
+  (six strips for the 1x1 base and three for the 2x2 base), and the generator
+  automatically validates the structure of every TIFF it emits (#42).
 - `TiffExporter.hpp` no longer includes the umbrella header `TiffCraft.hpp`;
   it now includes `TiffImage.hpp` directly, resolving the include cycle and
   making the exporter header standalone.

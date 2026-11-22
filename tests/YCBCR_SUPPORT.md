@@ -50,17 +50,48 @@ Notes on the individual tags:
 
 ## Conversion formulas
 
-### Forward conversion (RGB -> YCbCr), ITU-R BT.601
+### Generalized RGB <-> YCbCr
 
-- `Y  = 0.299 * R + 0.587 * G + 0.114 * B`
-- `Cb = -0.168736 * R - 0.331264 * G + 0.5 * B + 128`
-- `Cr = 0.5 * R - 0.418688 * G - 0.081312 * B + 128`
+The conversion is parameterized by the luma coefficients `Lr`, `Lg` and `Lb`
+from `YCbCrCoefficients` (tag 529), which satisfy `Lr + Lg + Lb = 1`. Two
+helper constants give the chroma scale factors:
 
-### Reverse conversion (YCbCr -> RGB), ITU-R BT.601
+- `Lr' = 2 * (1 - Lr)`
+- `Lb' = 2 * (1 - Lb)`
 
-- `R = Y + 1.402 * (Cr - 128)`
-- `G = Y - 0.344136 * (Cb - 128) - 0.714136 * (Cr - 128)`
-- `B = Y + 1.772 * (Cb - 128)`
+All `Y`, `Cb` and `Cr` values below are **full-range** values obtained from
+the stored codes by the `ReferenceBlackWhite` scaling described later. The
+forward relations are:
+
+- `Y = Lr*R + Lg*G + Lb*B`
+- `Cb_full = (B - Y) / Lb'`
+- `Cr_full = (R - Y) / Lr'`
+
+They produce zero chroma at neutral; the chroma neutral offset (128 for
+8-bit samples) is added when the codes are stored.
+
+The inverse follows by substituting the red and blue relations into
+`G = (Y - Lr*R - Lb*B) / Lg` and simplifying with `Lg = 1 - Lr - Lb`:
+
+```text
+R = Y + Cr_full * Lr'
+B = Y + Cb_full * Lb'
+G = (Y - Lr*(Y + Cr_full*Lr') - Lb*(Y + Cb_full*Lb')) / Lg
+  = Y - (Lb*Lb'/Lg)*Cb_full - (Lr*Lr'/Lg)*Cr_full
+```
+
+**Default coefficients (ITU-R BT.601, the default for tag 529):** `Lr =
+0.299`, `Lg = 0.587`, `Lb = 0.114`. Then `Lr' = 1.402`, `Lb' = 1.772`,
+`Lr*Lr'/Lg ≈ 0.714136` and `Lb*Lb'/Lg ≈ 0.344136`, giving the familiar
+
+- `R = Y + 1.402*Cr_full`
+- `B = Y + 1.772*Cb_full`
+- `G = Y - 0.344136*Cb_full - 0.714136*Cr_full`
+
+Under the default reference values the neutral chroma code 128 maps to a
+full-range value of zero, so `Cb_full = Cb_code - 128` and `Cr_full =
+Cr_code - 128`; the traditional `R = Y + 1.402 * (Cr - 128)` is exactly
+this default-coefficient case written with stored codes.
 
 ### Reference black/white / headroom and footroom
 
@@ -82,10 +113,12 @@ and the reverse scaling is:
 `CodingRange` is the range of full-range values: `2^BitsPerSample - 1` for Y and
 RGB (255 for 8-bit samples), but **127 for Cb and Cr**. That difference matters:
 with the default reference values Cb/Cr run from code 128 to code 255, so the
-chroma scaling reduces to `(code - 128) * 127 / (255 - 128) = code - 128`. This
-is why the no-headroom case amounts to simply subtracting 128, and why the `128`
-in `R = Y + 1.402 * (Cr - 128)` is the `ReferenceBlack` value for Cb/Cr in the
-no-headroom case, not a magic number.
+chroma scaling reduces to `(code - 128) * 127 / (255 - 128) = code - 128`. In
+other words `Cb_full = Cb_code - 128` and `Cr_full = Cr_code - 128` under the
+defaults. The generalized formulas above consume these full-range values, so
+the traditional `R = Y + 1.402 * (Cr - 128)` is exactly the default-coefficient
+case (`Lr = 0.299`, hence `Lr' = 1.402`): the `128` is the Cb/Cr
+`ReferenceBlack` code in that special case, not a magic number.
 
 For YCbCr the default reference values are black = 0 and white = 255 for the
 luma component (Y), and black = 128 and white = 255 for the chroma components
@@ -159,34 +192,26 @@ The pipeline for each fixture is:
    `tiffset -s YCbCrCoefficients 0.2126 0.7152 0.0722 file`. Tiled organization
    uses `tiffcp -t -w 16 -l 16 -c none`; because `tiffcp` refuses subsampled
    input it tiles a 1x1 image and the four YCbCr tags plus
-   `PhotometricInterpretation` are restored afterwards.
+   `PhotometricInterpretation` are restored afterwards. Separate-plane coverage
+   for `ycbcr-planar-1x1.tif` uses `tiffcp -p separate` followed by restoring
+   `PhotometricInterpretation` and the four YCbCr tags with `tiffset`, giving
+   real separate-plane data. `ycbcr-planar-2x2.tif` is written by a pure-Python
+   `struct`-based TIFF writer that gives each of the three plane segments its
+   own strip, with consistent strip offset and byte-count arrays.
 5. `tiff2rgba -n -c none <tif> <rgba.tif>` followed by
    `tifftopnm <rgba.tif> > ycbcr-*.ppm` produces each ground-truth P6 PPM.
+6. Every emitted TIFF is checked by the generator's `validate_fixture`
+   routine: it parses the IFD with `struct`, verifies the YCbCr tags and
+   values, checks the strip/tile array lengths against the image geometry
+   (catching inconsistent planar strip arrays), and rejects any `tiffinfo`
+   warning or error.
 
-The 17 fixtures are described in the matrix below. Five of them (the variants)
-are tag-reading tests only: `tiffset` changes tag values without reorganizing
-pixel data. The tiled fixture is additionally limited in that its pixel data is
-**not** subsampled — the `YCbCrSubsampling` tag is set to `2 2` after tiling —
-so it is not usable for conversion verification.
-
-## ImageMagick limitations
-
-ImageMagick is a general-purpose image converter, but its TIFF writer has a
-fixed set of capabilities that matter for YCbCr coverage:
-
-- It does **not** write `YCbCrCoefficients` (529), `YCbCrSubsampling` (530),
-  `YCbCrPositioning` (531), or `ReferenceBlackWhite` (532). Requests through
-  `-define` or `-sampling-factor` do not create those tags; subsampling through
-  image resizing changes the pixel dimensions instead of writing the tag.
-- It does **not** support separate planar configuration
-  (`PlanarConfiguration = 2`).
-- It can write only basic YCbCr TIFFs: `PhotometricInterpretation = 6`,
-  `SamplesPerPixel = 3`, 8-bit samples, uncompressed data, and default or absent
-  YCbCr tags. Tiling is available through
-  `-define tiff:tile-geometry=<value>`.
-
-These limits are why the fixtures in this repository are generated with
-libtiff's `rgb2ycbcr` rather than ImageMagick.
+The 18 fixtures are described in the matrix below. Of the six variant fixtures,
+four are tag-reading tests only: `tiffset` changes tag values without
+reorganizing pixel data. The two planar fixtures are conversion tests with
+genuinely separate planes. The tiled fixture is additionally limited in that
+its pixel data is **not** subsampled — the `YCbCrSubsampling` tag is set to
+`2 2` after tiling — so it is not usable for conversion verification.
 
 ## Test image matrix
 
@@ -213,16 +238,23 @@ carries a real `YCbCrSubsampling` value written by `rgb2ycbcr`.
 
 ### Variant fixtures
 
-Five 64x48 images with one non-default attribute each. These are tag-reading
-tests: `tiffset` changes the tag without reorganizing pixel data.
+Six 64x48 images with one non-default attribute each. Of these, four are
+tag-reading tests: `tiffset` changes the tag without reorganizing pixel data.
+The two planar fixtures instead hold genuine separate planes.
 
 | Test image | Attribute | Kind | Validates |
 |---|---|---|---|
 | `ycbcr-cosited.tif` | Positioning = 2 (co-sited) on a 2x2 base | tag-reading | Co-sited chroma positioning. |
 | `ycbcr-custom-coeffs.tif` | Coefficients = 0.2126/0.7152/0.0722 on a 1x1 base | tag-reading | Non-default luma coefficients (tag 529). |
 | `ycbcr-custom-refbw.tif` | RefBW = 15/235/128/240/128/240 on a 1x1 base | tag-reading | Headroom/footroom reference values (tag 532). |
-| `ycbcr-planar-2x2.tif` | PlanarConfig = 2 on a 2x2 base | tag-reading | Separate-plane configuration (tag 284). |
+| `ycbcr-planar-1x1.tif` | PlanarConfig = 2, separate planes on a 1x1 base | conversion | Genuine separate planes: Y, Cb and Cr each in their own strips (6 strips total), with all four YCbCr tags. |
+| `ycbcr-planar-2x2.tif` | PlanarConfig = 2, separate planes on a 2x2 base | conversion | Genuine separate planes: Y, Cb and Cr each in their own strips (3 strips total), with consistent strip arrays and all four YCbCr tags. |
 | `ycbcr-tiled-2x2.tif` | 16x16 tiles, 4x3 grid (12 tiles) | tag-reading | Tile tag path together with all four YCbCr tags. |
+
+libtiff's RGBA helper (`tiff2rgba`) cannot decode planar + subsampled YCbCr,
+so the ground-truth PPM for `ycbcr-planar-2x2.tif` is rendered from the
+equivalent chunky 2x2 YCbCr TIFF through the same `tiff2rgba` + `tifftopnm`
+pipeline used for the other fixtures.
 
 `ycbcr-tiled-2x2.tif` is a special case: `tiffcp` cannot tile subsampled input,
 so the image was tiled while still 1x1 and the `YCbCrSubsampling` tag was set to
@@ -244,7 +276,7 @@ agree, so all three are conversion tests.
 ## Ground-truth reference images
 
 `tests/reference_images/ycbcr-*.ppm` holds the RGB ground-truth images
-corresponding to the 17 YCbCr test images, in binary Netpbm PPM (P6) format.
+corresponding to the 18 YCbCr test images, in binary Netpbm PPM (P6) format.
 Each is produced with `tiff2rgba` followed by `tifftopnm`, and each P6 header
 matches the dimensions of its TIFF (64x48, or the odd dimensions 61x47, 63x61
 and 62x47). libtiff's YCbCr RGBA reader cannot decode 1x4 and 2x4 subsampling,
