@@ -1,0 +1,21 @@
+I've implemented #45 in the currect branch in this folder. A reviewer found the following:
+
+1. Fix CodingRange in include/tiffcraft/TiffExporter.hpp
+In convertYCbCrToRgb_, find:
+const int32_t cb = refBlackWhite.map<1, 128.0f>(i8);
+const int32_t cr = refBlackWhite.map<2, 128.0f>(i8);
+Change to:
+const int32_t cb = refBlackWhite.map<1, 127.0f>(i8);
+const int32_t cr = refBlackWhite.map<2, 127.0f>(i8);
+2. Add YCbCr tag names to include/tiffcraft/TiffStdOut.hpp
+In toString(Tag tag), before default: /* unknown tag */ break;, add:
+case TiffCraft::Tag::YCbCrCoefficients: return "YCbCrCoefficients";
+case TiffCraft::Tag::YCbCrSubSampling: return "YCbCrSubSampling";
+case TiffCraft::Tag::YCbCrPositioning: return "YCbCrPositioning";
+case TiffCraft::Tag::ReferenceBlackWhite: return "ReferenceBlackWhite"; 
+
+make those changes exactly as described
+
+---
+
+good! without making code changes, review the branch w.r.t main and update changelog and doc of supported test images, remove the ones I had to comment out from supported, add a new table for the YCbCr test images, do everything else required to get ready for a PR
