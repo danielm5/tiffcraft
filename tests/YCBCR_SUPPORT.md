@@ -190,9 +190,9 @@ In addition to the general Baseline TIFF requirements, a YCbCr file must have:
 ## Generating the test images
 
 `tests/ycbcr_images/generate_ycbcr.py` recreates the fixture set. It requires
-Python 3 and the libtiff and netpbm command-line tools (`pnmtotiff`,
-`rgb2ycbcr`, `tiffset`, `tiffcp`, `tiff2rgba`, `tifftopnm`). From the repository
-root, run:
+Python 3, gcc with libtiff development headers, and the libtiff and netpbm
+command-line tools (`pnmtotiff`, `rgb2ycbcr`, `tiffset`, `tiffcp`, `tiff2rgba`,
+`tifftopnm`). From the repository root, run:
 
 ```sh
 python3 tests/ycbcr_images/generate_ycbcr.py
@@ -208,17 +208,29 @@ The pipeline for each fixture is:
    coefficients, centered positioning and default reference values.
 4. Attributes that `rgb2ycbcr` cannot produce directly are applied with
    `tiffset`. RATIONAL tags are set without a count, e.g.
-   `tiffset -s YCbCrCoefficients 0.2126 0.7152 0.0722 file`. Tiled organization
-   uses `tiffcp -t -w 16 -l 16 -c none`; because `tiffcp` refuses subsampled
-   input it tiles a 1x1 image and the four YCbCr tags plus
-   `PhotometricInterpretation` are restored afterwards. Separate-plane coverage
-   for `ycbcr-planar-1x1.tif` uses `tiffcp -p separate` followed by restoring
-   `PhotometricInterpretation` and the four YCbCr tags with `tiffset`, giving
-   real separate-plane data. `ycbcr-planar-2x2.tif` is written by a pure-Python
-   `struct`-based TIFF writer that gives each of the three plane segments its
-   own strip, with consistent strip offset and byte-count arrays.
-5. `tiff2rgba -n -c none <tif> <rgba.tif>` followed by
-   `tifftopnm <rgba.tif> > ycbcr-*.ppm` produces each ground-truth P6 PPM.
+   `tiffset -s YCbCrCoefficients 0.2126 0.7152 0.0722 file`. Separate-plane
+   coverage for `ycbcr-planar-1x1.tif` uses `tiffcp -p separate` followed by
+   restoring `PhotometricInterpretation` and the four YCbCr tags with
+   `tiffset`, giving real separate-plane data. `ycbcr-planar-2x2.tif` and
+   `ycbcr-tiled-2x2.tif` are written by pure-Python `struct`-based TIFF
+   writers: the first de-interleaves the cell-interleaved chunky strip into
+   three real Y/Cb/Cr planes with consistent strip arrays, and the second lays
+   the same stripped 2x2 cell data out as 16x16 tiles in a 4x3 grid (12 tiles
+   of 384 bytes) with all four YCbCr tags and `PhotometricInterpretation = 6`
+   written into the tiled TIFF itself. `tiffcp` is not used for tiled output:
+   it refuses subsampled input and would leave a tag-reading-only fixture.
+5. Every ground-truth P6 PPM is produced by libtiff decoding the SAME TIFF it
+   belongs to. For 15 fixtures that is `tiff2rgba -n -c none <tif> <rgba.tif>`
+   followed by `tifftopnm <rgba.tif> > ycbcr-*.ppm`. For `ycbcr-1x4.tif`,
+   `ycbcr-2x4.tif` and `ycbcr-planar-2x2.tif`, libtiff's `TIFFRGBAImage` /
+   `tiff2rgba` path rejects the image (4x vertical subsampling, or planar +
+   subsampled), while `TIFFReadScanline` decodes their pixels. The generator
+   compiles the in-repo C helper
+   `tests/ycbcr_images/ycbcr_scanline_dump.c`, runs it on each final TIFF, and
+   converts the libtiff scanline bytes to RGB with the TIFF's own
+   `YCbCrCoefficients` and `ReferenceBlackWhite` values, using nearest-cell
+   chroma replication and writing the pixels in PPM raster order. No reference
+   is ever rendered from an equivalent or substitute image.
 6. Every emitted TIFF is checked by the generator's `validate_fixture`
    routine: it parses the IFD with `struct`, verifies the YCbCr tags and
    values, checks the strip/tile array lengths against the image geometry
@@ -226,11 +238,10 @@ The pipeline for each fixture is:
    warning or error.
 
 The 18 fixtures are described in the matrix below. Of the six variant fixtures,
-four are tag-reading tests only: `tiffset` changes tag values without
-reorganizing pixel data. The two planar fixtures are conversion tests with
-genuinely separate planes. The tiled fixture is additionally limited in that
-its pixel data is **not** subsampled — the `YCbCrSubsampling` tag is set to
-`2 2` after tiling — so it is not usable for conversion verification.
+three are tag-reading tests only: `tiffset` changes tag values without
+reorganizing pixel data. The two planar fixtures hold genuinely separate
+planes and the tiled fixture holds genuine 2x2-subsampled tile data, so all
+three are conversion tests.
 
 ## Test image matrix
 
@@ -257,9 +268,10 @@ carries a real `YCbCrSubsampling` value written by `rgb2ycbcr`.
 
 ### Variant fixtures
 
-Six 64x48 images with one non-default attribute each. Of these, four are
+Six 64x48 images with one non-default attribute each. Of these, three are
 tag-reading tests: `tiffset` changes the tag without reorganizing pixel data.
-The two planar fixtures instead hold genuine separate planes.
+The two planar fixtures instead hold genuine separate planes, and the tiled
+fixture holds genuine tiled, subsampled pixel data.
 
 | Test image | Attribute | Kind | Validates |
 |---|---|---|---|
@@ -268,17 +280,13 @@ The two planar fixtures instead hold genuine separate planes.
 | `ycbcr-custom-refbw.tif` | RefBW = 15/235/128/240/128/240 on a 1x1 base | tag-reading | Headroom/footroom reference values (tag 532). |
 | `ycbcr-planar-1x1.tif` | PlanarConfig = 2, separate planes on a 1x1 base | conversion | Genuine separate planes: Y, Cb and Cr each in their own strips (6 strips total), with all four YCbCr tags. |
 | `ycbcr-planar-2x2.tif` | PlanarConfig = 2, separate planes on a 2x2 base | conversion | Genuine separate planes: Y, Cb and Cr each in their own strips (3 strips total), with consistent strip arrays and all four YCbCr tags. |
-| `ycbcr-tiled-2x2.tif` | 16x16 tiles, 4x3 grid (12 tiles) | tag-reading | Tile tag path together with all four YCbCr tags. |
+| `ycbcr-tiled-2x2.tif` | 16x16 tiles, 4x3 grid (12 tiles of 384 bytes), real 2x2 subsampling | conversion | Tile tag path with genuinely subsampled tiled YCbCr data and all four tags; its PPM matches the stripped 2x2 reference byte-for-byte. |
 
-libtiff's RGBA helper (`tiff2rgba`) cannot decode planar + subsampled YCbCr,
-so the ground-truth PPM for `ycbcr-planar-2x2.tif` is rendered from the
-equivalent chunky 2x2 YCbCr TIFF through the same `tiff2rgba` + `tifftopnm`
-pipeline used for the other fixtures.
-
-`ycbcr-tiled-2x2.tif` is a special case: `tiffcp` cannot tile subsampled input,
-so the image was tiled while still 1x1 and the `YCbCrSubsampling` tag was set to
-`2 2` afterwards. Its pixel data is therefore not subsampled; the fixture
-exercises tag reading and tile traversal only.
+`ycbcr-tiled-2x2.tif` is a genuine conversion fixture: a pure-Python TIFF tile
+writer lays the stripped 2x2 cell-interleaved strip out into 16x16 luma tiles,
+with all four YCbCr tags and `PhotometricInterpretation = 6` written into the
+tiled TIFF itself. `tiffcp` cannot tile subsampled input, so it is not used
+for this fixture.
 
 ### Odd-dimension fixtures
 
@@ -296,8 +304,14 @@ agree, so all three are conversion tests.
 
 `tests/reference_images/ycbcr-*.ppm` holds the RGB ground-truth images
 corresponding to the 18 YCbCr test images, in binary Netpbm PPM (P6) format.
-Each is produced with `tiff2rgba` followed by `tifftopnm`, and each P6 header
-matches the dimensions of its TIFF (64x48, or the odd dimensions 61x47, 63x61
-and 62x47). libtiff's YCbCr RGBA reader cannot decode 1x4 and 2x4 subsampling,
-so those two references are rendered from the matching RGB source TIFF through
-the same `tiff2rgba` + `tifftopnm` pipeline.
+Every reference is produced by libtiff decoding the SAME TIFF fixture it
+belongs to: 15 with `tiff2rgba` followed by `tifftopnm`, and three with the
+in-repo libtiff `TIFFReadScanline` helper
+`tests/ycbcr_images/ycbcr_scanline_dump.c` (`ycbcr-1x4.tif`, `ycbcr-2x4.tif`
+and `ycbcr-planar-2x2.tif`). The helper's raw YCbCr bytes are converted to RGB
+with each TIFF's own coefficients and reference values, using nearest-cell
+chroma replication and PPM raster order. `tiff2rgba` cannot decode those three
+images (4x vertical subsampling, or planar + subsampled), but
+`TIFFReadScanline` decodes their pixels correctly. No reference is rendered
+from an equivalent or substitute image. Each P6 header matches the dimensions
+of its TIFF (64x48, or the odd dimensions 61x47, 63x61 and 62x47).

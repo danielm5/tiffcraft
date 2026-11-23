@@ -68,15 +68,21 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
   explains why they are excluded from the exporter tests.
 - Completed the YCbCr documentation and test data in `tests/YCBCR_SUPPORT.md`
   and rebuilt the full 18-image fixture set with libtiff's `rgb2ycbcr`, so all
-  four YCbCr tags are written into every TIFF; matching ground-truth PPMs come
-  from `tiff2rgba` + `tifftopnm`. The document now carries generalized
-  RGB/YCbCr conversion formulas parameterized by the luma coefficients in
-  `YCbCrCoefficients`, the full `ReferenceBlackWhite` scaling formula with
-  `code` terminology, the spec-versus-practice note on default reference
-  values, and an 18-row matrix distinguishing conversion tests from
-  tag-reading tests. Both planar fixtures contain genuine separate planes
-  (six strips for the 1x1 base and three for the 2x2 base), and the generator
-  automatically validates the structure of every TIFF it emits (#42).
+  four YCbCr tags are written into every TIFF. Every ground-truth PPM now comes
+  from libtiff decoding of the SAME TIFF: `tiff2rgba` + `tifftopnm` for 15
+  fixtures, and an in-repo libtiff `TIFFReadScanline` helper for the
+  1x4/2x4/planar-2x2 references that the `tiff2rgba` RGBA path rejects — no
+  equivalent or substitute image is used.
+  The document now carries generalized RGB/YCbCr conversion formulas
+  parameterized by the luma coefficients in `YCbCrCoefficients`, the full
+  `ReferenceBlackWhite` scaling formula with `code` terminology, the
+  spec-versus-practice note on default reference values, and an 18-row matrix
+  distinguishing conversion tests from tag-reading tests. Both planar fixtures
+  contain genuine separate
+  planes (six strips for the 1x1 base and three for the 2x2 base), the tiled 2x2
+  fixture carries real subsampled data in 16x16 tiles (4x3 grid, 12 tiles), and
+  the generator automatically validates the structure of every TIFF it emits
+  (#42, #48).
 - `TiffExporter.hpp` no longer includes the umbrella header `TiffCraft.hpp`;
   it now includes `TiffImage.hpp` directly, resolving the include cycle and
   making the exporter header standalone.
