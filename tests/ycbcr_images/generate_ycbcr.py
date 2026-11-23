@@ -1,28 +1,40 @@
 #!/usr/bin/env python3
 """Deterministic generator for the YCbCr test-image matrix.
 
-This script produces 18 YCbCr (``PhotometricInterpretation = 6``) TIFF
+This script produces 17 YCbCr (``PhotometricInterpretation = 6``) TIFF
 fixtures in ``tests/ycbcr_images/`` and one matching ground-truth P6 PPM
 per fixture in ``tests/reference_images/``.
 
-The 18-case matrix
+The 17-case matrix
 ------------------
 * 9 subsampling fixtures (64x48): 1x1, 2x1, 1x2, 2x2, 4x1, 1x4, 4x2,
   2x4 and 4x4. These exercise real chroma subsampling written by
-  ``rgb2ycbcr``; tags and pixel data agree, so they are conversion-verified.
-* 6 variant fixtures (64x48): ``ycbcr-cosited`` (positioning = 2),
-  ``ycbcr-custom-coeffs`` (BT.709 coefficients), ``ycbcr-custom-refbw``
-  (headroom/footroom reference values), ``ycbcr-planar-1x1`` (genuine
-  separate planes on a 1x1 base), ``ycbcr-planar-2x2`` (genuine separate
-  planes on a 2x2 base) and ``ycbcr-tiled-2x2`` (genuine chunky tiles on a
-  2x2 base). ``ycbcr-cosited``, ``ycbcr-custom-coeffs`` and
-  ``ycbcr-custom-refbw`` are tag-reading-only fixtures: ``tiffset`` changes
-  tag values without reorganizing the pixel data. The two planar fixtures and
-  the tiled fixture hold real subsampled/reorganized pixel data and are
-  conversion-verified.
+  ``rgb2ycbcr``; tags and pixel data agree.
+* 5 variant fixtures (64x48): ``ycbcr-custom-coeffs`` (BT.709 luma
+  coefficients), ``ycbcr-custom-refbw`` (headroom/footroom reference values),
+  ``ycbcr-planar-1x1`` (genuine separate planes on a 1x1 base),
+  ``ycbcr-planar-2x2`` (genuine separate planes on a 2x2 base) and
+  ``ycbcr-tiled-2x2`` (genuine chunky tiles on a 2x2 base).
 * 3 odd-dimension fixtures: ``ycbcr-odd-2x2`` (61x47),
   ``ycbcr-odd-4x4`` (63x61) and ``ycbcr-odd-mixed`` (62x47, 2x1).
-  Tags and pixel data agree, so these are conversion-verified.
+  Tags and pixel data agree.
+
+There is no co-sited (``YCbCrPositioning = 2``) fixture. libtiff 4.7.2 stores
+the tag but never consults it while decoding: ``tiff2rgba`` output for the
+same TIFF is byte-for-byte identical with positioning 1 and 2. Such a fixture
+could only test tag reading rather than a real conversion, so it was removed.
+
+Non-default tag fixtures
+------------------------
+``ycbcr-custom-coeffs`` and ``ycbcr-custom-refbw`` are built by
+``encode_ycbcr_codes`` and ``write_stripped_ycbcr_tiff``: the forward
+YCbCr transform (the inverse of libtiff's ``TIFFYCbCrtoRGB``) is applied to
+the deterministic source pixels using exactly the values written into tags
+529 and 532. Coding ranges are 255 for Y and 127 for Cb/Cr, matching
+libtiff's ``Code2V``. The writer emits a valid stripped chunky 1x1 TIFF with
+PI = 6 and all four YCbCr tags, so no tag is patched on afterwards.
+``verify_ground_truth`` checks the libtiff-decoded PPM against the source
+pixels (mean absolute per-channel difference well below one code value).
 
 The tiled fixture
 -----------------
@@ -55,7 +67,7 @@ C helper, never from an equivalent chunky image.
 Ground-truth provenance
 -----------------------
 Every reference PPM is produced by libtiff decoding the SAME TIFF fixture:
-15 via ``tiff2rgba`` + ``tifftopnm``, and 3 (``ycbcr-1x4``, ``ycbcr-2x4`` and
+14 via ``tiff2rgba`` + ``tifftopnm``, and 3 (``ycbcr-1x4``, ``ycbcr-2x4`` and
 ``ycbcr-planar-2x2``) via the libtiff ``TIFFReadScanline`` C helper, whose
 raw YCbCr bytes are converted to RGB with the TIFF's own
 ``YCbCrCoefficients`` and ``ReferenceBlackWhite`` values. libtiff's
@@ -64,7 +76,7 @@ subsampled YCbCr even though ``TIFFReadScanline`` decodes those pixels.
 
 Automatic structural validation
 -------------------------------
-At the end of every run ``validate_fixture`` checks all 18 emitted TIFFs: it
+At the end of every run ``validate_fixture`` checks all 17 emitted TIFFs: it
 parses the first IFD with ``struct``, verifies the YCbCr tag set and values,
 checks that strip/tile array lengths and byte counts match the image geometry
 (this catches inconsistent planar strip arrays and validates the 12-tile
@@ -75,19 +87,22 @@ Toolchain
 libtiff and netpbm command-line tools are used: ``pnmtotiff``, ``rgb2ycbcr``,
 ``tiffset``, ``tiffcp``, ``tiff2rgba`` and ``tifftopnm``. Source PPMs are
 written as binary P6 with the standard library (``bytes`` plus ``zlib.crc32``
-for the deterministic seed); the planar rewrite, the tiled writer and the
-structural validation use ``struct`` and ``pathlib``. The small C helper
-``ycbcr_scanline_dump.c`` is compiled with gcc at generation time.
+for the deterministic seed); the pure-Python encoder/writer, the planar and
+tiled writers and the structural validation use ``struct``, ``fractions``,
+``math`` and ``pathlib``. The small C helper ``ycbcr_scanline_dump.c`` is
+compiled with gcc at generation time.
 
 Usage (from the repository root)::
 
     python3 tests/ycbcr_images/generate_ycbcr.py
 """
 
+import math
 import shutil
 import struct
 import subprocess
 import zlib
+from fractions import Fraction
 from pathlib import Path
 
 BASE_W, BASE_H = 64, 48
@@ -119,7 +134,6 @@ ODD_CASES = [
 ]
 
 VARIANT_NAMES = [
-    "ycbcr-cosited",
     "ycbcr-custom-coeffs",
     "ycbcr-custom-refbw",
     "ycbcr-planar-1x1",
@@ -533,6 +547,184 @@ def write_tiled_ycbcr_tiff(stripped_tif, out_tif, w, h, hs, vs, tile):
     out_tif.write_bytes(out)
 
 
+# --- Pure-Python RGB -> YCbCr encoding for non-default tag values ------------
+
+
+def as_tiff_rational(value):
+    """Return an exact ``(numerator, denominator)`` pair for a tag value."""
+    fraction = Fraction(str(value))
+    return fraction.numerator, fraction.denominator
+
+
+def encode_ycbcr_codes(pixels, w, h, hs, vs, coeffs, refbw):
+    """Compute cell-interleaved 8-bit YCbCr codes from RGB source pixels.
+
+    The forward transform is the inverse of libtiff's ``TIFFYCbCrtoRGB``
+    (``tif_color.c``), parameterized by the very tag values written into the
+    TIFF: ``coeffs`` = YCbCrCoefficients (Lr, Lg, Lb) and ``refbw`` =
+    ReferenceBlackWhite (Yb, Yw, Cbb, Cbw, Crb, Crw). Full-range codes are
+    ``Y = Lr*R + Lg*G + Lb*B``, ``Cb = (B - Y) / (2 - 2*Lb)`` and
+    ``Cr = (R - Y) / (2 - 2*Lr)``. Stored codes use CodingRange 255 for Y and
+    127 for Cb/Cr, exactly as libtiff's ``Code2V`` does. Chroma is sampled at
+    the origin luma pixel of each ``hs x vs`` cell; for the 1x1 fixtures used
+    here that is the pixel itself, so Y/Cb/Cr all come from one RGB triple.
+
+    Returns ``(cells, chroma_w, chroma_h)``: ``cells`` is a byte string with
+    ``hs*vs`` luma codes followed by one Cb and one Cr code per chroma cell,
+    in raster order (the chunky data-unit layout required by TIFF 6.0).
+    """
+    Lr, Lg, Lb = coeffs
+    Yb, Yw, Cbb, Cbw, Crb, Crw = refbw
+    if not (Lr > 0 and Lg > 0 and Lb > 0):
+        raise ValueError("YCbCrCoefficients must be positive")
+    Lrp, Lbp = 2 - 2 * Lr, 2 - 2 * Lb
+    if not (Yw > Yb and Cbw > Cbb and Crw > Crb):
+        raise ValueError("ReferenceBlackWhite white values must exceed black")
+
+    chroma_w, chroma_h = (w + hs - 1) // hs, (h + vs - 1) // vs
+
+    def code(value, black, white, coding_range):
+        stored = black + value * (white - black) / coding_range
+        return max(0, min(255, int(math.floor(stored + 0.5))))
+
+    cells = bytearray()
+    for cy in range(chroma_h):
+        for cx in range(chroma_w):
+            # Chroma comes from the luma sample at the cell origin. The extra
+            # luma samples in an odd-sized edge cell are edge-replicated.
+            r, g, b = pixels[min(cy * vs, h - 1)][min(cx * hs, w - 1)]
+            Yc = Lr * r + Lg * g + Lb * b
+            Cb_code = code((b - Yc) / Lbp, Cbb, Cbw, 127)
+            Cr_code = code((r - Yc) / Lrp, Crb, Crw, 127)
+            for j in range(hs * vs):
+                yy, xx = cy * vs + j // hs, cx * hs + j % hs
+                r, g, b = pixels[min(yy, h - 1)][min(xx, w - 1)]
+                cells.append(code(Lr * r + Lg * g + Lb * b, Yb, Yw, 255))
+            cells.append(Cb_code)
+            cells.append(Cr_code)
+    return bytes(cells), chroma_w, chroma_h
+
+
+def write_stripped_ycbcr_tiff(out_tif, w, h, hs, vs, cells, coeffs, refbw,
+                              positioning=1):
+    """Write a stripped, chunky YCbCr TIFF from computed YCbCr codes.
+
+    ``cells`` is the cell-interleaved byte string returned by
+    ``encode_ycbcr_codes``. Every YCbCr tag (529-532) and PI=6 are written
+    into the new TIFF itself: no tiffset patch is applied afterwards, so the
+    tag values and the pixel data are guaranteed to describe the same image.
+    One strip is used, with RowsPerStrip = ImageLength, as in the other
+    stripped fixtures.
+    """
+    out_tif = Path(out_tif)
+    cell_size = hs * vs + 2
+    chroma_w, chroma_h = (w + hs - 1) // hs, (h + vs - 1) // vs
+    if len(cells) != chroma_w * chroma_h * cell_size:
+        raise ValueError(
+            f"{out_tif.name}: {len(cells)} code bytes, expected "
+            f"{chroma_w * chroma_h * cell_size}")
+
+    specs = [
+        (256, _TIFF_SHORT, [w]),
+        (257, _TIFF_SHORT, [h]),
+        (258, _TIFF_SHORT, [8, 8, 8]),
+        (259, _TIFF_SHORT, [1]),
+        (262, _TIFF_SHORT, [6]),
+        (266, _TIFF_SHORT, [1]),
+        (273, _TIFF_LONG, None),          # StripOffsets, patched below
+        (277, _TIFF_SHORT, [3]),
+        (278, _TIFF_SHORT, [h]),          # one strip per image
+        (279, _TIFF_LONG, None),          # StripByteCounts, patched below
+        (284, _TIFF_SHORT, [1]),          # PlanarConfiguration = chunky
+        (529, _TIFF_RATIONAL, [as_tiff_rational(v) for v in coeffs]),
+        (530, _TIFF_SHORT, [hs, vs]),
+        (531, _TIFF_SHORT, [positioning]),
+        (532, _TIFF_RATIONAL, [as_tiff_rational(v) for v in refbw]),
+    ]
+    specs.sort(key=lambda spec: spec[0])
+    n = len(specs)
+    ext_off = 8 + 2 + n * 12 + 4
+
+    # Placeholders determine external payload sizes; the strip arrays are
+    # single LONGs and therefore stay inline in the IFD.
+    placeholder = [(tag, typ, values if values is not None else [0])
+                   for tag, typ, values in specs]
+    encoded = [(tag, typ, len(values), _encode_values(values, typ))
+               for tag, typ, values in placeholder]
+    ext_sizes = {tag: len(payload) + (len(payload) % 2)
+                 for tag, _, _, payload in encoded if len(payload) > 4}
+    pix_off = ext_off + sum(ext_sizes.values())
+    specs = [(tag, typ, [pix_off] if tag == 273 else
+              [len(cells)] if tag == 279 else values)
+             for tag, typ, values in specs]
+    encoded = [(tag, typ, len(values), _encode_values(values, typ))
+               for tag, typ, values in specs]
+
+    ext_offsets = {}
+    cursor = ext_off
+    for tag, _, _, payload in encoded:
+        if tag in ext_sizes:
+            ext_offsets[tag] = cursor
+            cursor += ext_sizes[tag]
+    if cursor != pix_off:
+        raise AssertionError("external payload layout mismatch")
+
+    out = bytearray(b"II*\x00" + struct.pack("<I", 8) + struct.pack("<H", n))
+    for tag, typ, count, payload in encoded:
+        out += struct.pack("<HHI", tag, typ, count)
+        if len(payload) <= 4:
+            out += payload.ljust(4, b"\0")
+        else:
+            out += struct.pack("<I", ext_offsets[tag])
+    out += struct.pack("<I", 0)              # no next IFD
+    for tag, _, _, payload in encoded:
+        if tag in ext_offsets:
+            out += payload + (b"\0" if len(payload) % 2 else b"")
+    out += cells
+    if len(out) != pix_off + len(cells):
+        raise AssertionError(f"{out_tif.name}: unexpected output size {len(out)}")
+    out_tif.write_bytes(out)
+
+
+def verify_ground_truth(name, w, h, max_mean_diff):
+    """Assert that libtiff's decoded PPM is close to this fixture's RGB source.
+
+    Prints the first source/decoded pixel and the mean absolute per-channel
+    difference, then fails if the reference is not the conversion of the
+    fixture's own source. Used for the non-default-coefficient/RefBW fixtures,
+    where the pixel data is computed in Python and decoded by libtiff.
+    """
+    seed = zlib.crc32(name.encode()) & 0xFFFFFFFF
+    source = source_pixels(w, h, seed)
+
+    def read_ppm(path):
+        data = Path(path).read_bytes()
+        # P6\n<w> <h>\n255\n<pixels>
+        parts = data.split(b"\n", 3)
+        if parts[0] != b"P6":
+            raise ValueError(f"{Path(path).name}: not a binary P6 PPM")
+        dims = parts[1].split()
+        if (int(dims[0]), int(dims[1])) != (w, h) or parts[2] != b"255":
+            raise ValueError(f"{Path(path).name}: unexpected PPM header")
+        body = parts[3]
+        if len(body) != w * h * 3:
+            raise ValueError(f"{Path(path).name}: unexpected PPM payload size")
+        return [[tuple(body[(y * w + x) * 3:(y * w + x + 1) * 3])
+                 for x in range(w)] for y in range(h)]
+
+    decoded = read_ppm(REFERENCE_DIR / f"{name}.ppm")
+    diffs = [abs(a - b) for y in range(h) for x in range(w)
+             for a, b in zip(source[y][x], decoded[y][x])]
+    mean = sum(diffs) / len(diffs)
+    print(f"  {name}: source first pixel {source[0][0]}, "
+          f"libtiff-decoded first pixel {decoded[0][0]}, "
+          f"mean abs diff {mean:.3f} (limit {max_mean_diff})")
+    if mean > max_mean_diff:
+        raise ValueError(
+            f"{name}: decoded reference differs from source (mean abs diff "
+            f"{mean:.3f} > {max_mean_diff})")
+
+
 def validate_fixture(path):
     """Structurally validate one emitted YCbCr TIFF fixture.
 
@@ -643,7 +835,7 @@ def validate_fixture(path):
 def make_ground_truth(name, tif):
     """Produce the P6 PPM ground truth with tiff2rgba + tifftopnm.
 
-    Used for the 15 fixtures libtiff's RGBA helper can decode. The 1x4, 2x4
+    Used for the 14 fixtures libtiff's RGBA helper can decode. The 1x4, 2x4
     and planar-2x2 cases use the libtiff TIFFReadScanline helper instead.
     """
     rgba = TMP_DIR / f"{name}-rgba.tif"
@@ -864,7 +1056,7 @@ NEEDS_LIBTIFF_SCANLINE = {(1, 4), (2, 4)}
 
 
 def remove_stale_fixtures():
-    """Remove fixtures that are not part of the current 18-case matrix."""
+    """Remove fixtures that are not part of the current 17-case matrix."""
     expected_tifs = {f"{name}.tif" for name in ALL_NAMES}
     expected_ppms = {f"{name}.ppm" for name in ALL_NAMES}
     for path in IMAGE_DIR.glob("ycbcr-*.tif"):
@@ -901,31 +1093,39 @@ def main():
         make_ycbcr_tiff(name, rgb, w, h, hs, vs, out)
         make_ground_truth(name, out)
 
-    # 6 variants: three tag-reading only, two genuine planar conversion tests
-    # and one genuine tiled conversion test.
-    # cosited -- patch positioning on a 2x2 base.
-    name = "ycbcr-cosited"
-    rgb = make_rgb_tiff(name, BASE_W, BASE_H)
-    out = IMAGE_DIR / f"{name}.tif"
-    make_ycbcr_tiff(name, rgb, BASE_W, BASE_H, 2, 2, out)
-    set_tag(out, "YCbCrPositioning", 2)
-    make_ground_truth(name, out)
+    # 5 variants: two non-default-tag conversion tests, two genuine
+    # separate-plane conversion tests and one genuine tiled conversion test.
+    # There is no co-sited fixture: libtiff 4.7.2 stores YCbCrPositioning but
+    # never consults it while decoding (tiff2rgba output is byte-identical for
+    # positioning 1 and 2), so such an image could only test tag reading.
 
-    # custom coefficients -- patch tag 529 on a 1x1 base.
+    # BT.709 luma coefficients are computed into the Y/Cb/Cr codes and written
+    # into tag 529 by the same writer; no tag is patched on afterwards.
     name = "ycbcr-custom-coeffs"
-    rgb = make_rgb_tiff(name, BASE_W, BASE_H)
+    pixels = source_pixels(BASE_W, BASE_H,
+                           zlib.crc32(name.encode()) & 0xFFFFFFFF)
+    coeffs = (0.2126, 0.7152, 0.0722)
+    refbw = (0, 255, 128, 255, 128, 255)
+    cells, _, _ = encode_ycbcr_codes(pixels, BASE_W, BASE_H, 1, 1,
+                                     coeffs, refbw)
     out = IMAGE_DIR / f"{name}.tif"
-    make_ycbcr_tiff(name, rgb, BASE_W, BASE_H, 1, 1, out)
-    set_tag(out, "YCbCrCoefficients", 0.2126, 0.7152, 0.0722)
+    write_stripped_ycbcr_tiff(out, BASE_W, BASE_H, 1, 1, cells, coeffs, refbw)
     make_ground_truth(name, out)
+    verify_ground_truth(name, BASE_W, BASE_H, 3.0)
 
-    # custom reference black/white -- patch tag 532 on a 1x1 base.
+    # Headroom/footroom ReferenceBlackWhite values are applied in the encoder
+    # and written into tag 532 by the same writer.
     name = "ycbcr-custom-refbw"
-    rgb = make_rgb_tiff(name, BASE_W, BASE_H)
+    pixels = source_pixels(BASE_W, BASE_H,
+                           zlib.crc32(name.encode()) & 0xFFFFFFFF)
+    coeffs = (0.299, 0.587, 0.114)
+    refbw = (15, 235, 128, 240, 128, 240)
+    cells, _, _ = encode_ycbcr_codes(pixels, BASE_W, BASE_H, 1, 1,
+                                     coeffs, refbw)
     out = IMAGE_DIR / f"{name}.tif"
-    make_ycbcr_tiff(name, rgb, BASE_W, BASE_H, 1, 1, out)
-    set_tag(out, "ReferenceBlackWhite", 15, 235, 128, 240, 128, 240)
+    write_stripped_ycbcr_tiff(out, BASE_W, BASE_H, 1, 1, cells, coeffs, refbw)
     make_ground_truth(name, out)
+    verify_ground_truth(name, BASE_W, BASE_H, 3.0)
 
     # genuine separate planes on a 1x1 base -- tiffcp -p separate reorganizes
     # the pixels into Y/Cb/Cr strips; tiffcp drops the YCbCr tags and resets

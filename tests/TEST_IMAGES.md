@@ -124,7 +124,6 @@ supported.
 | `ycbcr-4x2.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 4x2 | No | ❌ Not supported |
 | `ycbcr-2x4.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 2x4 | No | ❌ Not supported |
 | `ycbcr-4x4.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 4x4 | No | ❌ Not supported |
-| `ycbcr-cosited.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 2x2 | No | ❌ Not supported |
 | `ycbcr-custom-coeffs.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 1x1 | No | ❌ Not supported |
 | `ycbcr-custom-refbw.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 1x1 | No | ❌ Not supported |
 | `ycbcr-planar-1x1.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Separate | 1x1 | No | ✅ Supported |
@@ -134,7 +133,7 @@ supported.
 | `ycbcr-odd-4x4.tif` | 63x61 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 4x4 | No | ❌ Not supported |
 | `ycbcr-odd-mixed.tif` | 62x47 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 2x1 | No | ❌ Not supported |
 
-The `ycbcr-custom-coeffs.tif` and `ycbcr-custom-refbw.tif` fixtures are
-tag-reading tests only. The exporter reads `YCbCrCoefficients` and
-`ReferenceBlackWhite`, but conversion with non-default tag values is not
-covered by the current test suite.
+The `ycbcr-custom-coeffs.tif` and `ycbcr-custom-refbw.tif` fixtures encode
+their Y/Cb/Cr pixel data with the non-default `YCbCrCoefficients` and
+`ReferenceBlackWhite` values they carry. The exporter reads those tags, but
+conversion with non-default values is not covered by the current test suite.
