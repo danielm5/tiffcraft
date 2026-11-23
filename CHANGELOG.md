@@ -32,8 +32,8 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
   version constants (`TiffCraft::version()`), failing with both values named on
   mismatch.
 - YCbCr (PI=6) test coverage: added the TIFF 6.0 Section 21
-  `tests/YCBCR_SUPPORT.md` specification reference, 18 generated YCbCr test
-  images under `tests/ycbcr_images/` (nine subsampling, six variant and three
+  `tests/YCBCR_SUPPORT.md` specification reference, 17 generated YCbCr test
+  images under `tests/ycbcr_images/` (nine subsampling, five variant and three
   odd-dimension cases), and the corresponding `ycbcr-*.ppm` ground-truth
   reference images (child issue of the YCbCr support effort, #38).
 - YCbCr (PI=6) export support for 1x1 subsampling (#45): new `TiffExporterYCbCr`
@@ -67,16 +67,22 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
   were removed, and `tests/TEST_IMAGES.md` lists them as not supported and now
   explains why they are excluded from the exporter tests.
 - Completed the YCbCr documentation and test data in `tests/YCBCR_SUPPORT.md`
-  and rebuilt the full 18-image fixture set with libtiff's `rgb2ycbcr`, so all
-  four YCbCr tags are written into every TIFF; matching ground-truth PPMs come
-  from `tiff2rgba` + `tifftopnm`. The document now carries generalized
-  RGB/YCbCr conversion formulas parameterized by the luma coefficients in
-  `YCbCrCoefficients`, the full `ReferenceBlackWhite` scaling formula with
-  `code` terminology, the spec-versus-practice note on default reference
-  values, and an 18-row matrix distinguishing conversion tests from
-  tag-reading tests. Both planar fixtures contain genuine separate planes
-  (six strips for the 1x1 base and three for the 2x2 base), and the generator
-  automatically validates the structure of every TIFF it emits (#42).
+  and rebuilt the 17-image fixture set. Every ground-truth PPM now comes
+  from libtiff decoding of the SAME TIFF: `tiff2rgba` + `tifftopnm` for 14
+  fixtures, and an in-repo libtiff `TIFFReadScanline` helper for the
+  1x4/2x4/planar-2x2 references that the `tiff2rgba` RGBA path rejects — no
+  equivalent or substitute image is used.
+  The document now carries generalized RGB/YCbCr conversion formulas
+  parameterized by the luma coefficients in `YCbCrCoefficients`, the full
+  `ReferenceBlackWhite` scaling formula with `code` terminology, the
+  spec-versus-practice note on default reference values, and a 17-row matrix
+  of conversion tests. The custom-coefficient and custom-reference-value
+  fixtures encode their pixel data with the tag values they carry. Both planar
+  fixtures contain genuine separate
+  planes (six strips for the 1x1 base and three for the 2x2 base), the tiled 2x2
+  fixture carries real subsampled data in 16x16 tiles (4x3 grid, 12 tiles), and
+  the generator automatically validates the structure of every TIFF it emits
+  (#42, #48).
 - `TiffExporter.hpp` no longer includes the umbrella header `TiffCraft.hpp`;
   it now includes `TiffImage.hpp` directly, resolving the include cycle and
   making the exporter header standalone.
