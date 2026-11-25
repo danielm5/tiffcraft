@@ -218,16 +218,22 @@ The pipeline for each fixture is:
    the deterministic source pixels using exactly the values written into
    `YCbCrCoefficients` (BT.709 luma) or `ReferenceBlackWhite` (headroom/
    footroom), and the writer writes those tag values into the TIFF itself.
-   Separate-plane coverage for `ycbcr-planar-1x1.tif` uses `tiffcp -p separate`
-   followed by restoring `PhotometricInterpretation` and the four YCbCr tags
-   with `tiffset`, giving real separate-plane data. `ycbcr-planar-2x2.tif` and
-   `ycbcr-tiled-2x2.tif` are written by pure-Python `struct`-based TIFF
-   writers: the first de-interleaves the cell-interleaved chunky strip into
-   three real Y/Cb/Cr planes with consistent strip arrays, and the second lays
-   the same stripped 2x2 cell data out as 16x16 tiles in a 4x3 grid (12 tiles
-   of 384 bytes) with all four YCbCr tags and `PhotometricInterpretation = 6`
-   written into the tiled TIFF itself. `tiffcp` is not used for tiled output:
-   it refuses subsampled input.
+   Separate-plane coverage for `ycbcr-planar-1x1.tif` (61x47) uses
+   `tiffcp -p separate -r 16` followed by restoring
+   `PhotometricInterpretation` and the four YCbCr tags with `tiffset`, giving
+   nine real Y/Cb/Cr strips (three per plane). `ycbcr-planar-2x2.tif` (63x61)
+   and `ycbcr-tiled-2x2.tif` (64x48) are written by pure-Python `struct`-based
+   TIFF writers: the first de-interleaves the cell-interleaved chunky strip
+   into three real Y/Cb/Cr planes with 16 rows per strip (12 strips: 4 per
+   plane), and the second lays the stripped 2x2 cell data out as 16x16 tiles
+   in a 4x3 grid (12 tiles of 384 bytes) with all four YCbCr tags and
+   `PhotometricInterpretation = 6` written into the tiled TIFF itself. For
+   planar subsampled data libtiff's scanline size is the full image width in
+   every plane and it maps a scanline to strip `row / RowsPerStrip`, so the
+   chroma strips use that full-width stride and are padded to 16 scanlines;
+   libtiff counts chroma strips with the luma `RowsPerStrip` too, hence four
+   strips per plane. `tiffcp` is not used for tiled output: it refuses
+   subsampled input.
 5. Every ground-truth P6 PPM is produced by libtiff decoding the SAME TIFF it
    belongs to. For 14 fixtures that is `tiff2rgba -n -c none <tif> <rgba.tif>`
    followed by `tifftopnm <rgba.tif> > ycbcr-*.ppm`. For `ycbcr-1x4.tif`,
@@ -242,9 +248,9 @@ The pipeline for each fixture is:
    is ever rendered from an equivalent or substitute image.
 6. Every emitted TIFF is checked by the generator's `validate_fixture`
    routine: it parses the IFD with `struct`, verifies the YCbCr tags and
-   values, checks the strip/tile array lengths against the image geometry
-   (catching inconsistent planar strip arrays), and rejects any `tiffinfo`
-   warning or error.
+   values, checks the strip/tile array lengths and per-strip byte counts
+   against the image geometry (including every planar strip), and rejects any
+   `tiffinfo` warning or error.
 
 The 17 fixtures are described in the matrix below. Every fixture is a
 conversion test: its tag values and pixel data describe the same image. The
@@ -276,17 +282,19 @@ carries a real `YCbCrSubsampling` value written by `rgb2ycbcr`.
 
 ### Variant fixtures
 
-Five 64x48 images with one non-default attribute each. The two non-default-tag
-fixtures encode their source pixels with the tag values they carry, the two
-planar fixtures hold genuine separate planes, and the tiled fixture holds
-genuine tiled, subsampled pixel data.
+Five images with one non-default attribute each: 64x48 for the two
+non-default-tag fixtures and the tiled fixture, 61x47 and 63x61 for the two
+planar fixtures. The non-default-tag fixtures encode their source pixels with
+the tag values they carry, the planar fixtures hold genuine separate planes
+with several strips per plane, and the tiled fixture holds genuine tiled,
+subsampled pixel data.
 
 | Test image | Attribute | Validates |
 |---|---|---|
 | `ycbcr-custom-coeffs.tif` | Coefficients = 0.2126/0.7152/0.0722 on a 1x1 base | Non-default luma coefficients (tag 529) applied to the pixel data; libtiff's decoded PPM differs from the source by a mean of 0.33 per channel. |
 | `ycbcr-custom-refbw.tif` | RefBW = 15/235/128/240/128/240 on a 1x1 base | Headroom/footroom reference values (tag 532) applied to the pixel data; libtiff's decoded PPM differs from the source by a mean of 0.84 per channel. |
-| `ycbcr-planar-1x1.tif` | PlanarConfig = 2, separate planes on a 1x1 base | Genuine separate planes: Y, Cb and Cr each in their own strips (6 strips total), with all four YCbCr tags. |
-| `ycbcr-planar-2x2.tif` | PlanarConfig = 2, separate planes on a 2x2 base | Genuine separate planes: Y, Cb and Cr each in their own strips (3 strips total), with consistent strip arrays and all four YCbCr tags. |
+| `ycbcr-planar-1x1.tif` | PlanarConfig = 2, separate planes on a 61x47 1x1 base, RowsPerStrip = 16 | Genuine separate planes: Y, Cb and Cr in nine strips (three per plane), with all four YCbCr tags. |
+| `ycbcr-planar-2x2.tif` | PlanarConfig = 2, separate planes on a 63x61 2x2 base, RowsPerStrip = 16 | Genuine separate planes: Y, Cb and Cr in 12 strips (four per plane, as libtiff counts chroma strips with the luma RowsPerStrip), with consistent strip arrays and all four YCbCr tags. |
 | `ycbcr-tiled-2x2.tif` | 16x16 tiles, 4x3 grid (12 tiles of 384 bytes), real 2x2 subsampling | Tile tag path with genuinely subsampled tiled YCbCr data and all four tags; its PPM matches the stripped 2x2 reference byte-for-byte. |
 
 `ycbcr-tiled-2x2.tif` is a genuine conversion fixture: a pure-Python TIFF tile
@@ -322,3 +330,10 @@ images (4x vertical subsampling, or planar + subsampled), but
 `TIFFReadScanline` decodes their pixels correctly. No reference is rendered
 from an equivalent or substitute image. Each P6 header matches the dimensions
 of its TIFF (64x48, or the odd dimensions 61x47, 63x61 and 62x47).
+
+The `tests/libtiff-pics/dscf0013.tif` fixture has two YCbCr IFDs. Its
+ground-truth references are `tests/reference_images/dscf0013.ppm` for the
+default 640x480 IFD and `tests/reference_images/dscf0013-ifd1.ppm` for the
+160x120 thumbnail. `tiffsplit` separates the IFDs and `tiff2rgba` followed by
+`tifftopnm` decodes each one, so these references also come from libtiff
+decoding the fixture itself.

@@ -10,14 +10,21 @@ The 17-case matrix
 * 9 subsampling fixtures (64x48): 1x1, 2x1, 1x2, 2x2, 4x1, 1x4, 4x2,
   2x4 and 4x4. These exercise real chroma subsampling written by
   ``rgb2ycbcr``; tags and pixel data agree.
-* 5 variant fixtures (64x48): ``ycbcr-custom-coeffs`` (BT.709 luma
-  coefficients), ``ycbcr-custom-refbw`` (headroom/footroom reference values),
-  ``ycbcr-planar-1x1`` (genuine separate planes on a 1x1 base),
-  ``ycbcr-planar-2x2`` (genuine separate planes on a 2x2 base) and
-  ``ycbcr-tiled-2x2`` (genuine chunky tiles on a 2x2 base).
+* 5 variant fixtures: ``ycbcr-custom-coeffs`` (BT.709 luma coefficients,
+  64x48), ``ycbcr-custom-refbw`` (headroom/footroom reference values, 64x48),
+  ``ycbcr-planar-1x1`` (61x47, genuine separate planes on a 1x1 base),
+  ``ycbcr-planar-2x2`` (63x61, genuine separate planes on a 2x2 base) and
+  ``ycbcr-tiled-2x2`` (64x48, genuine chunky tiles on a 2x2 base).
 * 3 odd-dimension fixtures: ``ycbcr-odd-2x2`` (61x47),
   ``ycbcr-odd-4x4`` (63x61) and ``ycbcr-odd-mixed`` (62x47, 2x1).
   Tags and pixel data agree.
+
+The script also renders two references for the ``tests/libtiff-pics/dscf0013.tif``
+fixture listed in ``TEST_IMAGES.md``: ``dscf0013.ppm`` for the default 640x480
+IFD (what ``TiffImage::read`` opens) and ``dscf0013-ifd1.ppm`` for the 160x120
+thumbnail. ``tiffsplit`` separates the IFDs and libtiff's ``tiff2rgba`` and
+``tifftopnm`` decode them, so both references follow the same libtiff-only
+provenance rule as the generated fixtures.
 
 There is no co-sited (``YCbCrPositioning = 2``) fixture. libtiff 4.7.2 stores
 the tag but never consults it while decoding: ``tiff2rgba`` output for the
@@ -49,18 +56,26 @@ byte-identical to the ``ycbcr-2x2.ppm`` reference.
 
 The planar arrangements
 -----------------------
-``ycbcr-planar-1x1.tif`` is converted with ``tiffcp -p separate``, so its
-Y, Cb and Cr samples really do occupy separate strips (six strips in total,
-two per plane). Because ``tiffcp`` drops the four YCbCr tags and resets
-PhotometricInterpretation to RGB, those five tags are restored afterwards;
-its ground truth is rendered from the final planar TIFF.
+Both planar fixtures use odd, non-power-of-two dimensions and
+RowsPerStrip = 16, so every plane holds multiple strips.
 
-``ycbcr-planar-2x2.tif`` is rewritten by ``write_planar_subsampled_tiff``:
-the cell-interleaved strip of the chunky 2x2 TIFF is de-interleaved into a
-full Y plane and two quarter-size chroma planes, each with its own strip,
-PlanarConfiguration = 2, internally consistent strip arrays and all four
-YCbCr tags. libtiff's ``tiff2rgba`` cannot decode planar + subsampled YCbCr
-("Sorry, can not handle image"), so its ground truth comes from libtiff's
+``ycbcr-planar-1x1.tif`` (61x47) is converted with ``tiffcp -p separate -r 16``,
+so its Y, Cb and Cr samples really do occupy separate strips: nine strips in
+total, three per plane (16, 16 and 15 rows). Because ``tiffcp`` drops the
+four YCbCr tags and resets PhotometricInterpretation to RGB, those five tags
+are restored afterwards; its ground truth is rendered from the final planar
+TIFF with ``tiff2rgba`` + ``tifftopnm``.
+
+``ycbcr-planar-2x2.tif`` (63x61) is rewritten by
+``write_planar_subsampled_tiff``: the cell-interleaved strip of the chunky 2x2
+TIFF is de-interleaved into a full-width Y plane and two chroma planes whose
+rows use libtiff's full-width planar scanline stride. With RowsPerStrip = 16
+libtiff counts four strips per plane (the chroma planes are counted with the
+luma RowsPerStrip too), giving 12 strips: 4 Y + 4 Cb + 4 Cr, each chroma strip
+holding RowsPerStrip/2 = 8 chroma rows. PlanarConfiguration = 2, consistent
+strip arrays and all four YCbCr tags are written into the TIFF itself.
+libtiff's ``tiff2rgba`` cannot decode planar + subsampled YCbCr ("Sorry, can
+not handle image"), so its ground truth comes from libtiff's
 ``TIFFReadScanline`` decoding of that exact planar TIFF through the in-repo
 C helper, never from an equivalent chunky image.
 
@@ -78,9 +93,9 @@ Automatic structural validation
 -------------------------------
 At the end of every run ``validate_fixture`` checks all 17 emitted TIFFs: it
 parses the first IFD with ``struct``, verifies the YCbCr tag set and values,
-checks that strip/tile array lengths and byte counts match the image geometry
-(this catches inconsistent planar strip arrays and validates the 12-tile
-layout), and fails on any ``tiffinfo`` warning or error.
+checks that strip/tile array lengths and per-strip byte counts match the image
+geometry (this checks every planar strip and validates the 12-tile layout),
+and fails on any ``tiffinfo`` warning or error.
 
 Toolchain
 ---------
@@ -106,6 +121,9 @@ from fractions import Fraction
 from pathlib import Path
 
 BASE_W, BASE_H = 64, 48
+PLANAR_1X1_W, PLANAR_1X1_H = 61, 47
+PLANAR_2X2_W, PLANAR_2X2_H = 63, 61
+PLANAR_RPS = 16
 
 IMAGE_DIR = Path(__file__).resolve().parent
 REFERENCE_DIR = Path(__file__).resolve().parent.parent / "reference_images"
@@ -269,18 +287,26 @@ def _encode_values(values, typ):
     raise ValueError(f"unsupported TIFF type {typ}")
 
 
-def write_planar_subsampled_tiff(chunky_tif, out_tif, hs, vs, w, h):
+def write_planar_subsampled_tiff(chunky_tif, out_tif, hs, vs, w, h, rps):
     """Rewrite a chunky subsampled YCbCr TIFF as a genuine three-plane TIFF.
 
     ``rgb2ycbcr`` stores subsampled YCbCr as ``hs*vs`` luma samples followed
     by one Cb and one Cr sample per chroma cell (cell-interleaved, not
     plane-interleaved). This helper reads the strip bytes using the source
     TIFF's own StripOffsets/StripByteCounts, de-interleaves the cells into a
-    full-width Y plane and two quarter-size chroma planes, gives each plane
-    its own strip, and writes a new classic little-endian TIFF with
-    PlanarConfiguration = 2 and matching strip arrays. YCbCr tags are copied
-    from the source (BT.601 defaults are used as a fallback). No hard-coded
-    offsets, no external imaging library.
+    full-width Y plane and two chroma planes, and writes a new classic
+    little-endian TIFF with PlanarConfiguration = 2 and matching strip arrays.
+
+    libtiff's planar scanline size is the full image width for *every* plane,
+    so each chroma row is stored in ``w`` bytes (the first ``ceil(w/hs)`` are
+    chroma samples; the tail is edge-replicated padding). libtiff maps a
+    scanline to strip ``row / RowsPerStrip`` in every plane, so a chroma strip
+    holds ``rps`` full-width scanlines rather than ``rps/vs`` chroma rows;
+    trailing chroma scanlines past ``ceil(h/vs)`` are padded. libtiff also
+    counts strips per plane from the luma RowsPerStrip, so all three planes
+    get ``ceil(h/rps)`` strips. YCbCr tags are copied from the source (BT.601
+    defaults are used as a fallback). No hard-coded offsets, no external
+    imaging library.
     """
     chunky_tif = Path(chunky_tif)
     out_tif = Path(out_tif)
@@ -299,6 +325,8 @@ def write_planar_subsampled_tiff(chunky_tif, out_tif, hs, vs, w, h):
     if (src_hs, src_vs) != (hs, vs):
         raise ValueError(
             f"{chunky_tif.name}: subsampling differs from {hs}x{vs}")
+    if rps <= 0 or rps % vs:
+        raise ValueError("RowsPerStrip must be a positive multiple of vertical subsampling")
 
     offsets, counts = src[273][1], src[279][1]
     if not offsets or len(offsets) != len(counts):
@@ -307,27 +335,48 @@ def write_planar_subsampled_tiff(chunky_tif, out_tif, hs, vs, w, h):
     pixels = b"".join(data[off:off + count]
                       for off, count in sorted(zip(offsets, counts)))
 
-    y_size = w * h
     chroma_w = (w + hs - 1) // hs
     chroma_h = (h + vs - 1) // vs
-    c_size = chroma_w * chroma_h
+    strips_per_plane = (h + rps - 1) // rps
+    chroma_scanlines = strips_per_plane * rps
     cell_size = hs * vs + 2
-    if len(pixels) != c_size * cell_size:
+    if len(pixels) != chroma_w * chroma_h * cell_size:
         raise ValueError(
             f"{chunky_tif.name}: strip data is {len(pixels)} bytes, expected "
-            f"{c_size * cell_size} for {w}x{h} {hs}x{vs}")
-    y_plane = bytearray(y_size)
-    cb_plane = bytearray(c_size)
-    cr_plane = bytearray(c_size)
+            f"{chroma_w * chroma_h * cell_size} for {w}x{h} {hs}x{vs}")
+    y_plane = bytearray(w * h)
+    cb_plane = bytearray(w * chroma_scanlines)
+    cr_plane = bytearray(w * chroma_scanlines)
     for cy in range(chroma_h):
         for cx in range(chroma_w):
             cell = pixels[(cy * chroma_w + cx) * cell_size:
                           (cy * chroma_w + cx + 1) * cell_size]
             for j in range(hs * vs):
                 yy, xx = cy * vs + j // hs, cx * hs + j % hs
-                y_plane[yy * w + xx] = cell[j]
-            cb_plane[cy * chroma_w + cx] = cell[hs * vs]
-            cr_plane[cy * chroma_w + cx] = cell[hs * vs + 1]
+                if yy < h and xx < w:       # odd-sized edge cell
+                    y_plane[yy * w + xx] = cell[j]
+            cb_plane[cy * w + cx] = cell[hs * vs]
+            cr_plane[cy * w + cx] = cell[hs * vs + 1]
+    for cy in range(chroma_scanlines):     # pad every chroma scanline to width w
+        base = cy * w
+        cb_plane[base + chroma_w:(cy + 1) * w] = (
+            bytes([cb_plane[base + chroma_w - 1]]) * (w - chroma_w))
+        cr_plane[base + chroma_w:(cy + 1) * w] = (
+            bytes([cr_plane[base + chroma_w - 1]]) * (w - chroma_w))
+
+    def plane_strips(plane, rows, rows_per_strip):
+        chunks = []
+        for i in range(strips_per_plane):
+            first = i * rows_per_strip
+            nrows = max(0, min(rows_per_strip, rows - first))
+            chunks.append(bytes(plane[first * w:(first + nrows) * w]))
+        return chunks
+
+    strip_blobs = (plane_strips(y_plane, h, rps)
+                   + plane_strips(cb_plane, chroma_scanlines, rps)
+                   + plane_strips(cr_plane, chroma_scanlines, rps))
+    strip_counts = [len(blob) for blob in strip_blobs]
+    nstrips = len(strip_blobs)
 
     coeffs = (src[529][1] if 529 in src else
               [(299, 1000), (587, 1000), (114, 1000)])
@@ -349,7 +398,7 @@ def write_planar_subsampled_tiff(chunky_tif, out_tif, hs, vs, w, h):
         (266, _TIFF_SHORT, [fill_order]),
         (273, _TIFF_LONG, None),          # StripOffsets, patched below
         (277, _TIFF_SHORT, [spp]),
-        (278, _TIFF_SHORT, [h]),          # one strip per plane
+        (278, _TIFF_SHORT, [rps]),
         (279, _TIFF_LONG, None),          # StripByteCounts, patched below
         (284, _TIFF_SHORT, [2]),          # PlanarConfiguration = separate
         (529, _TIFF_RATIONAL, coeffs),
@@ -361,18 +410,22 @@ def write_planar_subsampled_tiff(chunky_tif, out_tif, hs, vs, w, h):
     n = len(specs)
     ext_off = 8 + 2 + n * 12 + 4
 
-    # Placeholder strip arrays only determine payload sizes (3 LONGs each).
-    placeholder = [(tag, typ, values if values is not None else [0, 0, 0])
+    # Placeholder strip arrays only determine the external payload sizes.
+    placeholder = [(tag, typ, values if values is not None else [0] * nstrips)
                    for tag, typ, values in specs]
     encoded = [(tag, typ, len(values), _encode_values(values, typ))
                for tag, typ, values in placeholder]
     ext_sizes = {tag: len(payload) + (len(payload) % 2)
                  for tag, _, _, payload in encoded if len(payload) > 4}
     pix_off = ext_off + sum(ext_sizes.values())
-    strips = [pix_off, pix_off + y_size, pix_off + y_size + c_size]
-    strip_counts = [y_size, c_size, c_size]
+    strip_offsets = []
+    cursor = pix_off
+    for blob in strip_blobs:
+        strip_offsets.append(cursor)
+        cursor += len(blob)
     specs = [(tag, typ,
-              strips if tag == 273 else strip_counts if tag == 279 else values)
+              strip_offsets if tag == 273 else
+              strip_counts if tag == 279 else values)
              for tag, typ, values in specs]
     encoded = [(tag, typ, len(values), _encode_values(values, typ))
                for tag, typ, values in specs]
@@ -397,8 +450,9 @@ def write_planar_subsampled_tiff(chunky_tif, out_tif, hs, vs, w, h):
     for tag, _, _, payload in encoded:
         if tag in ext_offsets:
             out += payload + (b"\0" if len(payload) % 2 else b"")
-    out += y_plane + cb_plane + cr_plane
-    if len(out) != pix_off + y_size + 2 * c_size:
+    for blob in strip_blobs:
+        out += blob
+    if len(out) != pix_off + sum(strip_counts):
         raise AssertionError(f"{out_tif.name}: unexpected output size {len(out)}")
     out_tif.write_bytes(out)
 
@@ -804,25 +858,53 @@ def validate_fixture(path):
     else:
         rps = one(278)
         offsets, counts = need(273), need(279)
+        strips_per_plane = (h + rps - 1) // rps
+
+        def plane_counts(rows, rows_per_strip):
+            return [w * max(0, min(rows_per_strip, rows - i * rows_per_strip))
+                    for i in range(strips_per_plane)]
+
         if planar == 1:
-            expected_strips = (h + rps - 1) // rps
+            # libtiff pads luma dimensions up to multiples of the subsampling
+            # factors when W/H are not evenly divisible (the odd fixtures).
+            pad_w = ((w + hs - 1) // hs) * hs
+            pad_h = ((h + vs - 1) // vs) * vs
+            expected_bytes = pad_w * pad_h + 2 * (pad_w // hs) * (pad_h // vs)
+            expected_counts = [expected_bytes] if strips_per_plane == 1 else None
+            expected_strips = strips_per_plane
         else:
-            chroma_rows = (h + vs - 1) // vs
-            expected_strips = ((h + rps - 1) // rps
-                               + 2 * ((chroma_rows + rps - 1) // rps))
+            if rps % vs:
+                raise ValueError(
+                    f"{path.name}: RowsPerStrip {rps} is not a multiple of "
+                    f"vertical subsampling {vs}")
+            y_counts = plane_counts(h, rps)
+            # libtiff uses a full-width scanline stride and maps scanlines to
+            # strips by row/RowsPerStrip in every plane, so a subsampled chroma
+            # strip holds rps full-width scanlines (the tail is padding).
+            chroma_counts = (y_counts if vs == 1 else
+                             [w * rps] * strips_per_plane)
+            expected_counts = y_counts + chroma_counts + chroma_counts
+            # libtiff counts chroma strips with the luma RowsPerStrip too, so
+            # every plane contributes ceil(h / RowsPerStrip) strips.
+            expected_strips = 3 * strips_per_plane
         if len(offsets) != len(counts) or len(offsets) != expected_strips:
             raise ValueError(
                 f"{path.name}: strip arrays have {len(offsets)}/{len(counts)} "
                 f"entries, expected {expected_strips}")
-        # libtiff pads luma dimensions up to multiples of the subsampling
-        # factors when W/H are not evenly divisible (the odd fixtures).
-        pad_w = ((w + hs - 1) // hs) * hs
-        pad_h = ((h + vs - 1) // vs) * vs
-        expected_bytes = pad_w * pad_h + 2 * (pad_w // hs) * (pad_h // vs)
-        if sum(counts) != expected_bytes:
+        if expected_counts is not None and counts != expected_counts:
+            raise ValueError(
+                f"{path.name}: strip byte counts {counts}, "
+                f"expected {expected_counts}")
+        if planar == 1 and strips_per_plane == 1 and sum(counts) != expected_bytes:
             raise ValueError(
                 f"{path.name}: strip byte total {sum(counts)}, "
                 f"expected {expected_bytes}")
+        size = path.stat().st_size
+        if len(set(offsets)) != len(offsets):
+            raise ValueError(f"{path.name}: duplicate strip offsets")
+        if any(off < 8 or off + cnt > size
+               for off, cnt in zip(offsets, counts)):
+            raise ValueError(f"{path.name}: strip offset/count out of range")
 
     proc = subprocess.run(["tiffinfo", str(path)], stdout=subprocess.PIPE,
                           stderr=subprocess.PIPE, universal_newlines=True)
@@ -844,6 +926,38 @@ def make_ground_truth(name, tif):
     with open(rgba, "rb") as fin, open(ppm, "wb") as fout:
         run("tifftopnm", stdin=fin, stdout=fout,
             stderr=subprocess.DEVNULL)
+
+
+def make_dscf0013_ground_truth():
+    """Render references for both dscf0013 IFDs with libtiff only.
+
+    ``tests/libtiff-pics/dscf0013.tif`` holds two YCbCr IFDs: the default
+    640x480 image (``TiffImage::read`` opens IFD 0) and a 160x120 thumbnail.
+    ``tiffsplit`` separates them (``tiffcp`` refuses subsampled images), then
+    ``tiff2rgba`` and ``tifftopnm`` produce ``dscf0013.ppm`` and
+    ``dscf0013-ifd1.ppm`` respectively.
+    """
+    source = (IMAGE_DIR.parent / "libtiff-pics" / "dscf0013.tif").resolve()
+    if not source.is_file():
+        raise RuntimeError(f"missing libtiff-pics fixture: {source}")
+    prefix = TMP_DIR / "dscf0013-split-"
+    for stale in TMP_DIR.glob("dscf0013-split-*.tif"):
+        stale.unlink()
+    run("tiffsplit", source, prefix, stderr=subprocess.DEVNULL)
+    parts = sorted(TMP_DIR.glob("dscf0013-split-*.tif"))
+    if len(parts) != 2:
+        raise RuntimeError(f"tiffsplit produced {len(parts)} dscf0013 IFDs, expected 2")
+    for index, (part, name, expected) in enumerate(zip(
+            parts, ("dscf0013", "dscf0013-ifd1"), (b"P6 640 480", b"P6 160 120"))):
+        rgba = TMP_DIR / f"dscf0013-ifd{index}-rgba.tif"
+        run("tiff2rgba", "-n", "-c", "none", part, rgba)
+        ppm = REFERENCE_DIR / f"{name}.ppm"
+        with open(rgba, "rb") as fin, open(ppm, "wb") as fout:
+            run("tifftopnm", stdin=fin, stdout=fout, stderr=subprocess.DEVNULL)
+        with open(ppm, "rb") as f:
+            header = f.readline().strip() + b" " + f.readline().strip()
+        if header != expected:
+            raise ValueError(f"{name}.ppm unexpected header: {header!r}")
 
 
 # --- libtiff scanline decoding for paths tiff2rgba rejects ------------------
@@ -962,11 +1076,16 @@ def decode_planar_scanlines_to_ppm(tif_path, ppm_path, w, h, hs, vs, helper):
     """Write a P6 PPM from libtiff's decoded PLANAR YCbCr scanlines.
 
     ``ycbcr_scanline_dump.c`` emits a PlanarConfiguration = 2 image's three
-    planes back-to-back: all Y samples (w*h bytes in row order), then all Cb
-    samples, then all Cr samples (each ceil(w/hs)*ceil(h/vs) bytes in row
-    order). This function converts those libtiff-decoded bytes to RGB with the
-    TIFF's own YCbCrCoefficients and ReferenceBlackWhite values, using the
-    same nearest-cell chroma replication and CodingRange 255/127 scaling as
+    planes back-to-back: all Y scanlines (h rows of w bytes), then all Cb
+    scanlines, then all Cr scanlines (up to h rows of w bytes each; TIFF's
+    padded chroma strips are read only for valid image rows). For a
+    subsampled plane only the first ceil(w/hs) bytes of each real chroma row
+    are chroma samples; the tail is edge-replicated padding. libtiff's
+    planar scanline size is the full image width for every plane, including
+    the odd-sized 63x61 fixture. This function converts those libtiff-decoded
+    bytes to RGB with the TIFF's own
+    YCbCrCoefficients and ReferenceBlackWhite values, using the same
+    nearest-cell chroma replication and CodingRange 255/127 scaling as
     ``decode_scanlines_to_ppm``. It is used for ``ycbcr-planar-2x2.tif``,
     whose planar + subsampled pixels libtiff's RGBA helper cannot decode.
     """
@@ -995,8 +1114,9 @@ def decode_planar_scanlines_to_ppm(tif_path, ppm_path, w, h, hs, vs, helper):
     if tags[530][1] != [hs, vs]:
         raise ValueError(
             f"{tif_path.name}: subsampling differs from {hs}x{vs}")
-    if w % hs or h % vs:
-        raise ValueError(f"{tif_path.name}: dimensions are not a multiple of {hs}x{vs}")
+    rps = one(278)
+    if rps % vs:
+        raise ValueError(f"{tif_path.name}: RowsPerStrip is not a multiple of {vs}")
 
     proc = subprocess.run([str(helper), str(tif_path)],
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -1006,8 +1126,10 @@ def decode_planar_scanlines_to_ppm(tif_path, ppm_path, w, h, hs, vs, helper):
             f"{Path(helper).name} failed on {tif_path.name} "
             f"(exit {proc.returncode}): {diag}")
 
-    chroma_w, chroma_h = w // hs, h // vs
-    y_size, c_size = w * h, chroma_w * chroma_h
+    chroma_w, chroma_h = (w + hs - 1) // hs, (h + vs - 1) // vs
+    # The helper reads at most h scanlines per plane (TIFFReadScanline
+    # rejects row >= ImageLength), even when chroma strips are padded.
+    y_size = c_size = w * h
     expected = y_size + 2 * c_size
     samples = proc.stdout
     if len(samples) != expected:
@@ -1033,14 +1155,15 @@ def decode_planar_scanlines_to_ppm(tif_path, ppm_path, w, h, hs, vs, helper):
         return (code - black) * 127 / (white - black)
 
     out = bytearray(f"P6\n{w} {h}\n255\n".encode("ascii"))
-    # Same raster order as decode_scanlines_to_ppm, with the three planes
-    # indexed directly instead of through cell-interleaved samples.
+    # Same raster order as decode_scanlines_to_ppm. Each plane row has a
+    # full-width stride; only the first chroma_w samples of a chroma row are
+    # real Cb/Cr values (the tail is edge-replicated padding).
     for yy in range(h):
         for xx in range(w):
             cy, cx = yy // vs, xx // hs
             Ycode = Y[yy * w + xx]
-            C = chroma_full(Cb[cy * chroma_w + cx], Cbb, Cbw)
-            R = chroma_full(Cr[cy * chroma_w + cx], Crb, Crw)
+            C = chroma_full(Cb[cy * w + cx], Cbb, Cbw)
+            R = chroma_full(Cr[cy * w + cx], Crb, Crw)
             Yval = y_full(Ycode)
             rgb = (Yval + Lrp * R,
                    Yval - (Lb * Lbp / Lg) * C - (Lr * Lrp / Lg) * R,
@@ -1127,17 +1250,18 @@ def main():
     make_ground_truth(name, out)
     verify_ground_truth(name, BASE_W, BASE_H, 3.0)
 
-    # genuine separate planes on a 1x1 base -- tiffcp -p separate reorganizes
-    # the pixels into Y/Cb/Cr strips; tiffcp drops the YCbCr tags and resets
+    # genuine separate planes on a 1x1 base, 61x47 with 16 rows per strip:
+    # tiffcp -p separate reorganizes the pixels into nine Y/Cb/Cr strips
+    # (three per plane). tiffcp drops the YCbCr tags and resets
     # PhotometricInterpretation to RGB, so all five tags are restored after.
     # The ground truth is rendered from the FINAL planar TIFF.
     name = "ycbcr-planar-1x1"
-    rgb = make_rgb_tiff(name, BASE_W, BASE_H)
+    rgb = make_rgb_tiff(name, PLANAR_1X1_W, PLANAR_1X1_H)
     stripped = TMP_DIR / f"{name}-1x1.tif"
     out = IMAGE_DIR / f"{name}.tif"
-    make_ycbcr_tiff(name, rgb, BASE_W, BASE_H, 1, 1, stripped)
-    run("tiffcp", "-p", "separate", "-c", "none", stripped, out,
-        stderr=subprocess.DEVNULL)
+    make_ycbcr_tiff(name, rgb, PLANAR_1X1_W, PLANAR_1X1_H, 1, 1, stripped)
+    run("tiffcp", "-p", "separate", "-c", "none", "-r", PLANAR_RPS,
+        stripped, out, stderr=subprocess.DEVNULL)
     set_tag(out, "PhotometricInterpretation", 6)
     set_tag(out, "YCbCrCoefficients", 0.299, 0.587, 0.114)
     set_tag(out, "YCbCrPositioning", 1)
@@ -1145,19 +1269,22 @@ def main():
     set_tag(out, "YCbCrSubsampling", 1, 1)
     make_ground_truth(name, out)
 
-    # genuine separate planes on a 2x2 base -- rgb2ycbcr writes cell-interleaved
-    # Y/Cb/Cr samples into one chunky strip; the pure-Python writer de-interleaves
-    # them into three strips. tiff2rgba cannot decode planar + subsampled YCbCr,
-    # so the ground truth comes from libtiff TIFFReadScanline decoding of the
-    # FINAL planar TIFF, never from the equivalent chunky TIFF.
+    # genuine separate planes on a 2x2 base, 63x61 with 16 luma rows per strip:
+    # rgb2ycbcr writes cell-interleaved Y/Cb/Cr samples into one chunky strip;
+    # the pure-Python writer de-interleaves them into four strips per plane
+    # (12 total). libtiff counts chroma strips with the luma RowsPerStrip too.
+    # tiff2rgba cannot decode planar + subsampled YCbCr, so the ground truth
+    # comes from libtiff TIFFReadScanline decoding of the FINAL planar TIFF,
+    # never from the equivalent chunky TIFF.
     name = "ycbcr-planar-2x2"
-    rgb = make_rgb_tiff(name, BASE_W, BASE_H)
+    rgb = make_rgb_tiff(name, PLANAR_2X2_W, PLANAR_2X2_H)
     chunky = TMP_DIR / f"{name}-chunky.tif"
     out = IMAGE_DIR / f"{name}.tif"
-    make_ycbcr_tiff(name, rgb, BASE_W, BASE_H, 2, 2, chunky)
-    write_planar_subsampled_tiff(chunky, out, 2, 2, BASE_W, BASE_H)
+    make_ycbcr_tiff(name, rgb, PLANAR_2X2_W, PLANAR_2X2_H, 2, 2, chunky)
+    write_planar_subsampled_tiff(chunky, out, 2, 2,
+                                 PLANAR_2X2_W, PLANAR_2X2_H, PLANAR_RPS)
     decode_planar_scanlines_to_ppm(
-        out, REFERENCE_DIR / f"{name}.ppm", BASE_W, BASE_H, 2, 2,
+        out, REFERENCE_DIR / f"{name}.ppm", PLANAR_2X2_W, PLANAR_2X2_H, 2, 2,
         scanline_helper)
 
     # genuine chunky tiles on a 2x2 base -- the pure-Python tile writer lays
@@ -1177,6 +1304,7 @@ def main():
         raise ValueError(f"expected exactly {len(ALL_NAMES)} YCbCr TIFFs")
     for name in ALL_NAMES:
         validate_fixture(IMAGE_DIR / f"{name}.tif")
+    make_dscf0013_ground_truth()
     print(f"Generated and validated {len(ALL_NAMES)} YCbCr TIFF fixtures.")
 
 
