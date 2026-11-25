@@ -19,7 +19,7 @@ The following table lists the test images.
 | `caspian.tif` | 279x220 | 64 bpp x3 | RGB (3 samples) | Deflate | Separate | No | ❌ Not supported |
 | `cramps-tile.tif` | 800x607 | 8 bpp | Gray (1 sample) | None | Chunky | Yes (Tile 256x256) | ✅ Supported |
 | `cramps.tif` | 800x607 | 8 bpp | Gray (1 sample) | PackBits | Chunky | No | ❌ Not supported |
-| `dscf0013.tif` | 160x120 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | No | ❌ Not supported |
+| `dscf0013.tif` | 640x480 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | No | ❌ Not supported |
 | `fax2d.tif` | 1728x1082 | 1 bpp | Gray (1 sample) | CCITT G3 | Chunky | No | ❌ Not supported |
 | `g3test.tif` | 1728x1103 | 1 bpp | Gray (1 sample) | CCITT G3 | Chunky | No | ❌ Not supported |
 | `jello.tif` | 256x192 | 8 bpp | Palette (1 sample) | PackBits | Chunky | No | ❌ Not supported |
@@ -126,8 +126,8 @@ supported.
 | `ycbcr-4x4.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 4x4 | No | ❌ Not supported |
 | `ycbcr-custom-coeffs.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 1x1 | No | ❌ Not supported |
 | `ycbcr-custom-refbw.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 1x1 | No | ❌ Not supported |
-| `ycbcr-planar-1x1.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Separate | 1x1 | No | ✅ Supported |
-| `ycbcr-planar-2x2.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Separate | 2x2 | No | ❌ Not supported |
+| `ycbcr-planar-1x1.tif` | 61x47 | 8 bpp x3 | YCbCr (3 samples) | None | Separate | 1x1 | No | ✅ Supported |
+| `ycbcr-planar-2x2.tif` | 63x61 | 8 bpp x3 | YCbCr (3 samples) | None | Separate | 2x2 | No | ❌ Not supported |
 | `ycbcr-tiled-2x2.tif` | 64x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 2x2 | Yes (Tile 16x16) | ❌ Not supported |
 | `ycbcr-odd-2x2.tif` | 61x47 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 2x2 | No | ❌ Not supported |
 | `ycbcr-odd-4x4.tif` | 63x61 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 4x4 | No | ❌ Not supported |

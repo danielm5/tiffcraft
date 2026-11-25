@@ -78,9 +78,10 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
   spec-versus-practice note on default reference values, and a 17-row matrix
   of conversion tests. The custom-coefficient and custom-reference-value
   fixtures encode their pixel data with the tag values they carry. Both planar
-  fixtures contain genuine separate
-  planes (six strips for the 1x1 base and three for the 2x2 base), the tiled 2x2
-  fixture carries real subsampled data in 16x16 tiles (4x3 grid, 12 tiles), and
+  fixtures contain genuine separate planes with odd dimensions and several
+  strips per plane (61x47 1x1: nine strips, three per plane; 63x61 2x2: 12
+  strips, four per plane), the tiled 2x2 fixture carries real subsampled data
+  in 16x16 tiles (4x3 grid, 12 tiles), and
   the generator automatically validates the structure of every TIFF it emits
   (#42, #48).
 - `TiffExporter.hpp` no longer includes the umbrella header `TiffCraft.hpp`;
