@@ -29,7 +29,7 @@
  *   gcc -I/usr/local/include -L/usr/local/lib \
  *       tests/ycbcr_images/ycbcr_scanline_dump.c -ltiff -o ycbcr_scanline_dump
  * Run with:
- *   ./ycbcr_scanline_dump tests/ycbcr_images/ycbcr-1x4.tif > scanlines.bin
+ *   ./ycbcr_scanline_dump tests/ycbcr_images/ycbcr-chunky-2x1.tif > scanlines.bin
  * Only binary scanline bytes go to stdout; diagnostics go to stderr.
  */
 #include <stdint.h>
