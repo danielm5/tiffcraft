@@ -1,7 +1,11 @@
 # YCbCr (PhotometricInterpretation = 6) Support Reference
 
-This document describes YCbCr (`PhotometricInterpretation = 6`) images as
-defined by Section 21 of the TIFF 6.0 specification.
+YCbCr is the color encoding carried by TIFF images whose
+`PhotometricInterpretation` is 6. This document describes the format rules from
+TIFF 6.0 Section 21 and Technical Note 2, and the test images this repository uses
+to validate YCbCr decoding. A reader looking for a specific image should go to
+**Test image matrix**; a reader asking where the expected pixel values come from
+should read **Ground-truth references**.
 
 ## Scope
 
@@ -115,10 +119,10 @@ and the reverse scaling is:
 
 `CodingRange` is the range of full-range values: `2^BitsPerSample - 1` for Y and
 RGB (255 for 8-bit samples), but **127 for Cb and Cr**. That difference matters:
-with the default reference values Cb/Cr run from code 128 to code 255, so the
-chroma scaling reduces to `(code - 128) * 127 / (255 - 128) = code - 128`. In
-other words `Cb_full = Cb_code - 128` and `Cr_full = Cr_code - 128` under the
-defaults. The generalized formulas above consume these full-range values, so
+with the default reference values, chroma code 128 is neutral, codes below it
+carry negative chroma and codes above it carry positive chroma; the scaling
+reduces to `(code - 128) * 127 / (255 - 128) = code - 128`. In other words
+`Cb_full = Cb_code - 128` and `Cr_full = Cr_code - 128` under the defaults. The generalized formulas above consume these full-range values, so
 the traditional `R = Y + 1.402 * (Cr - 128)` is exactly the default-coefficient
 case (`Lr = 0.299`, hence `Lr' = 1.402`): the `128` is the Cb/Cr
 `ReferenceBlack` code in that special case, not a magic number.
@@ -146,9 +150,9 @@ libtiff's JPEG subset.
   factors, and the vertical factor must not exceed the horizontal factor.
 - Legal subsampling factors are **1, 2 and 4**. The spec default is **2, 2** —
   YCbCr is subsampled by default; an image without tag 530 is not implicitly
-  1x1. TiffCraft's exporter currently supports only explicit 1x1 subsampling,
-  so files that omit the tag are rejected rather than treated as full
-  resolution.
+  1x1. TiffCraft's YCbCr exporter (`TiffExporterYCbCr`, dispatched by
+  `TiffExporterAny`) supports only explicit 1x1 subsampling, so files that omit
+  the tag are rejected rather than treated as full resolution.
 - All TIFF dimensions (`ImageWidth`, `ImageLength`, `RowsPerStrip`,
   `TileWidth`, `TileLength`) are measured in luma samples. TIFF 6.0 originally
   required image dimensions to be multiples of the subsampling factors;
@@ -156,7 +160,7 @@ libtiff's JPEG subset.
   before downsampling, so the number of stored chroma samples is the **ceiling**
   of the luma dimension divided by the factor, and readers ignore the extra
   samples after upsampling. That is the source of the ceiling rule used by the
-  odd-dimension fixtures below.
+  odd-dimension test images below.
 - `RowsPerStrip` must be an integer multiple of the vertical subsampling factor
   (unless the image is a single strip), and for tiled images `TileWidth` and
   `TileLength` must be multiples of the horizontal and vertical factors.
@@ -170,9 +174,10 @@ libtiff's JPEG subset.
 - `YCbCrPositioning = 2`: **co-sited** positioning (chroma sample points aligned
   with luma sample points, e.g. recommended for 4:2:2 workflows).
 
-libtiff 4.7.2 stores this tag but never consults it while decoding: rendering
-the same TIFF with `tiff2rgba` is byte-for-byte identical for values 1 and 2.
-The fixture set therefore contains no co-sited image, since the tag would have
+libtiff 4.7.2 (the version used for the references in this repository) stores
+this tag but never consults it while decoding: rendering the same TIFF with
+`tiff2rgba` is byte-for-byte identical for values 1 and 2.
+The test image set therefore contains no co-sited image, since the tag would have
 no effect on libtiff's decoded pixels.
 
 ## Minimum requirements for YCbCr images
@@ -192,148 +197,310 @@ In addition to the general Baseline TIFF requirements, a YCbCr file must have:
   YCbCr values above (Y 0/255, Cb/Cr 128/255), because many real-world files
   omit tag 532.
 
+### Terms used in the test image sections
+
+- **Declared dimensions** — `ImageWidth` and `ImageLength`: the size of the
+  visible image, which may be odd.
+- **Stored luma** — the padded Y sample grid permitted by Technical Note 2. For
+  stripped images the stored size is the declared size rounded up to a multiple
+  of the subsampling factors; for tiled images it is rounded up to the tile grid.
+  Readers crop it after upsampling.
+- **Chroma cell** — the block of `hs x vs` luma positions that share one Cb/Cr
+  pair.
+- **Chroma stride** — the number of stored samples in one chroma row. A packed
+  row holds `ceil(w/hs)` real samples; a padded (full-width) row allocates `w`
+  samples, with real samples in the first `ceil(w/hs)` columns and
+  edge-replicated values in the rest. The dimension table below counts **real**
+  chroma samples; the stride describes how they are stored.
+- **Equivalent TIFF** — a planar 1x1 TIFF carrying the same Y/Cb/Cr codes as a
+  test image, used to obtain a libtiff reference when a direct decode is
+  unavailable or, for tiled planar images, kept for route uniformity.
+- **Headroom/footroom** — the codes reserved beyond nominal black and white;
+  `ReferenceBlackWhite` maps those boundaries to full-range values.
+- **Class Y** — TIFF's term for images whose components carry luma and chroma
+  information, including YCbCr.
+- **Genuine conversion test** — a test image whose tags and pixel data describe
+  the image they claim to represent, so decoding it is a real conversion rather
+  than a tag-reading check.
+- **Origin luma pixel** — the top-left luma position of a subsampling cell in
+  the stored image.
+- **Padded edges** — the stored positions beyond the declared image width or
+  height, where the nearest in-image sample is replicated.
+
+## test image set
+
+`tests/ycbcr_images/` contains 36 YCbCr test images, each with a ground-truth PPM
+in `tests/reference_images/`:
+
+- 6 chunky, stripped conversion test images.
+- 6 planar, stripped conversion test images.
+- 10 planar stride-variant conversion test images (packed and padded chroma rows).
+- 6 tiled chunky conversion test images.
+- 6 tiled planar conversion test images.
+- 2 color-reference test images with non-default coefficient or reference-level
+  tags.
+
+Every conversion test image is genuine: its tags and pixel data describe an
+image whose RGB reference comes from libtiff decoding, directly or through an
+equivalent planar-1x1 TIFF. The test images cover
+the subsampling factors `[1,1]`, `[2,1]`, `[2,2]`, `[4,1]`, `[4,2]` and `[4,4]`;
+no other factor combinations are present.
+
 ## Generating the test images
 
-`tests/ycbcr_images/generate_ycbcr.py` recreates the fixture set. It requires
-Python 3, gcc with libtiff development headers, and the libtiff and netpbm
-command-line tools (`pnmtotiff`, `rgb2ycbcr`, `tiffset`, `tiffcp`, `tiff2rgba`,
-`tifftopnm`). From the repository root, run:
+From the repository root:
 
 ```sh
 python3 tests/ycbcr_images/generate_ycbcr.py
 ```
 
-The pipeline for each fixture is:
+The generator writes test images to `tests/ycbcr_images/*.tif`, P6 references to
+`tests/reference_images/ycbcr-*.ppm`, and the equivalent source TIFFs to
+`tests/reference_images/ycbcr-*-equiv.tif`.
 
-1. Write a deterministic binary P6 source PPM in pure Python (standard-library
-   `bytes` and `zlib.crc32`; no external imaging library).
-2. `pnmtotiff < src.ppm > src.tif` creates an RGB TIFF.
-3. `rgb2ycbcr -c none -h H -v V -r HEIGHT src.tif out.tif` writes the YCbCr
-   image. This writes all four YCbCr tags (529, 530, 531, 532) with the BT.601
-   coefficients, centered positioning and default reference values.
-4. Non-default tag values are produced together with their pixel data, not
-   patched onto an unrelated image. `ycbcr-custom-coeffs.tif` and
-   `ycbcr-custom-refbw.tif` are built by a pure-Python encoder and TIFF writer:
-   the encoder applies the inverse of libtiff's `TIFFYCbCrtoRGB` transform to
-   the deterministic source pixels using exactly the values written into
-   `YCbCrCoefficients` (BT.709 luma) or `ReferenceBlackWhite` (headroom/
-   footroom), and the writer writes those tag values into the TIFF itself.
-   Separate-plane coverage for `ycbcr-planar-1x1.tif` (61x47) uses
-   `tiffcp -p separate -r 16` followed by restoring
-   `PhotometricInterpretation` and the four YCbCr tags with `tiffset`, giving
-   nine real Y/Cb/Cr strips (three per plane). `ycbcr-planar-2x2.tif` (63x61)
-   and `ycbcr-tiled-2x2.tif` (64x48) are written by pure-Python `struct`-based
-   TIFF writers: the first de-interleaves the cell-interleaved chunky strip
-   into three real Y/Cb/Cr planes with 16 rows per strip (12 strips: 4 per
-   plane), and the second lays the stripped 2x2 cell data out as 16x16 tiles
-   in a 4x3 grid (12 tiles of 384 bytes) with all four YCbCr tags and
-   `PhotometricInterpretation = 6` written into the tiled TIFF itself. For
-   planar subsampled data libtiff's scanline size is the full image width in
-   every plane and it maps a scanline to strip `row / RowsPerStrip`, so the
-   chroma strips use that full-width stride and are padded to 16 scanlines;
-   libtiff counts chroma strips with the luma `RowsPerStrip` too, hence four
-   strips per plane. `tiffcp` is not used for tiled output: it refuses
-   subsampled input.
-5. Every ground-truth P6 PPM is produced by libtiff decoding the SAME TIFF it
-   belongs to. For 14 fixtures that is `tiff2rgba -n -c none <tif> <rgba.tif>`
-   followed by `tifftopnm <rgba.tif> > ycbcr-*.ppm`. For `ycbcr-1x4.tif`,
-   `ycbcr-2x4.tif` and `ycbcr-planar-2x2.tif`, libtiff's `TIFFRGBAImage` /
-   `tiff2rgba` path rejects the image (4x vertical subsampling, or planar +
-   subsampled), while `TIFFReadScanline` decodes their pixels. The generator
-   compiles the in-repo C helper
-   `tests/ycbcr_images/ycbcr_scanline_dump.c`, runs it on each final TIFF, and
-   converts the libtiff scanline bytes to RGB with the TIFF's own
-   `YCbCrCoefficients` and `ReferenceBlackWhite` values, using nearest-cell
-   chroma replication and writing the pixels in PPM raster order. No reference
-   is ever rendered from an equivalent or substitute image.
-6. Every emitted TIFF is checked by the generator's `validate_fixture`
-   routine: it parses the IFD with `struct`, verifies the YCbCr tags and
-   values, checks the strip/tile array lengths and per-strip byte counts
-   against the image geometry (including every planar strip), and rejects any
-   `tiffinfo` warning or error.
+The generator uses only the Python 3 standard library plus the libtiff and
+netpbm command-line tools (`tiff2rgba`, `tifftopnm`, `tiffinfo`, and `tiffsplit`
+for IFD selection). No imaging library synthesizes or converts pixels. Each
+TIFF is written directly with `struct`-based tag and data layouts using:
 
-The 17 fixtures are described in the matrix below. Every fixture is a
-conversion test: its tag values and pixel data describe the same image. The
-two non-default-tag variants encode the source pixels with the coefficients or
-reference values they carry; the two planar fixtures hold genuinely separate
-planes; and the tiled fixture holds genuine 2x2-subsampled tile data.
+- `BitsPerSample = 8, 8, 8`, `SamplesPerPixel = 3`,
+  `PhotometricInterpretation = 6`, `Compression = 1`.
+- `PlanarConfiguration = 1` (chunky) or `2` (separate planes).
+- Little-endian ClassicTIFF (`II*\0`), `FillOrder = 1` (msb-to-lsb),
+  `YCbCrPositioning = 1` (centered).
+- BT.601 `YCbCrCoefficients` (0.299 / 0.587 / 0.114) and default
+  `ReferenceBlackWhite` values (Y 0/255, Cb/Cr 128/255).
+- `RowsPerStrip = 16` for stripped images; `TileWidth = TileLength = 16` and
+  no `RowsPerStrip` for tiled images.
+
+The in-repo C helper `tests/ycbcr_images/ycbcr_scanline_dump.c` is provided for
+raw-sample inspection and is not part of reference generation.
+
+### Source pattern
+
+Every test image is generated from a deterministic pattern. For a test image with
+declared size `W x H` and base name `name` (the file name without `.tif`):
+
+- `seed = zlib.crc32(name.encode()) & 0xFFFFFFFF`
+- Six vertical stripes `i = 0..5`; stripe `i` covers columns
+  `[floor(W*i/6), floor(W*(i+1)/6))`, so stripe widths differ by at most one
+  column.
+- Stripe `i` has a constant RGB color, identical in every row:
+  - `R_i = (seed*(i+1) + 11) % 256`
+  - `G_i = (seed*(i+3) + 29) % 256`
+  - `B_i = (seed*(i+5) + 47) % 256`
+
+The stored Y/Cb/Cr codes are the exact inverse of libtiff's `TIFFYCbCrtoRGB`
+transform applied to those RGB pixels, with a coding range of 255 for Y and
+127 for Cb/Cr and round-half-up quantization to 8-bit codes. This inverse is
+what makes libtiff reproduce the source RGB when it decodes the test image or
+its equivalent.
+Chroma is sampled at the origin luma pixel of each subsampling cell; padding
+outside the declared area edge-replicates the nearest in-image sample.
+
+### Dimensions, padding and strip/tile layout
+
+Declared `ImageWidth`/`ImageLength` are odd. Stored luma is padded up to the
+next multiple of each subsampling factor; chroma dimensions are
+`ceil(declared / factor)`:
+
+| Factor | Declared WxH | Stored luma WxH | Chroma WxH |
+|---|---|---|---|
+| 1x1 | 63x47 | 63x47 | 63x47 |
+| 2x1 | 63x47 | 64x47 | 32x47 |
+| 2x2 | 61x45 | 62x46 | 31x23 |
+| 4x1 | 61x47 | 64x47 | 16x47 |
+| 4x2 | 57x43 | 60x44 | 15x22 |
+| 4x4 | 63x61 | 64x64 | 16x16 |
+
+Stripped images use `RowsPerStrip = 16`, which is a multiple of the vertical
+factor. Their stored-luma strip row counts are:
+
+| Factor | Strips | Row counts |
+|---|---|---|
+| 1x1 | 3 | 16, 16, 15 |
+| 2x1 | 3 | 16, 16, 15 |
+| 2x2 | 3 | 16, 16, 14 |
+| 4x1 | 3 | 16, 16, 15 |
+| 4x2 | 3 | 16, 16, 12 |
+| 4x4 | 4 | 16, 16, 16, 16 |
+
+Tiled images have no `RowsPerStrip`. Only the stored tile area is padded to the
+tile grid: factors 1x1, 2x1, 2x2, 4x1 and 4x2 store 64x48 luma as a 4x3 grid of
+12 tiles of 16x16 luma samples; 4x4 stores 64x64 as a 4x4 grid of 16 tiles.
+Boundary tiles are edge-replicated. Chroma tile sizes apply to planar-tiled
+images: 1x1 → 16x16, 2x1 → 8x16, 2x2 → 8x8, 4x1 → 4x16, 4x2 → 4x8,
+4x4 → 4x4. Chunky-tiled images interleave chroma inside their luma tiles and
+have no separate chroma tile grid.
+
+### Planar chroma layouts
+
+Separate-plane test images store genuine Y, Cb and Cr planes. Chroma rows use one
+of two spec-conformant layouts:
+
+- `-packed`: each chroma row holds exactly `ceil(w/hs)` real samples, with no
+  padding.
+- `-padded`: each chroma row is padded out to the full declared width `w`, with
+  real samples in the first `ceil(w/hs)` columns and edge-replicated values in
+  the rest.
+
+A *full-width stride* allocates `w` samples per chroma row. The base planar
+test images use it; the `-packed` and `-padded` test images exercise both layouts
+explicitly, with the same real chroma samples; every test image's source
+pattern is seeded from its own file name. A reader uses only the first
+`ceil(w/hs)` samples of each chroma row and ignores any padding.
+
+### Structural validation
+
+The generator's `validate_fixture` routine parses each test image's IFD with
+`struct`, checks tag types, counts and values, verifies declared dimensions and
+strip/tile array lengths and byte counts for both chroma strides, and rejects
+any `tiffinfo` warning or error. It applies to the 36 test image files in
+`tests/ycbcr_images/` and enforces the subsampling gate: only the six legal
+factor pairs above are emitted, with the vertical factor never exceeding the
+horizontal one.
 
 ## Test image matrix
 
-All files are in `tests/ycbcr_images/`.
+All files below are in `tests/ycbcr_images/`.
 
-### Subsampling fixtures
-
-Nine 64x48 images with default BT.601 coefficients, centered positioning,
-default reference values, 8-bit contiguous planes and no compression. Each
-carries a real `YCbCrSubsampling` value written by `rgb2ycbcr`.
+### Chunky, stripped (6)
 
 | Test image | Subsampling | Validates |
 |---|---|---|
-| `ycbcr-1x1.tif` | 1x1 | Full-resolution YCbCr with all four tags at their defaults; stripped organization. |
-| `ycbcr-2x1.tif` | 2x1 | Horizontal-only chroma subsampling. |
-| `ycbcr-1x2.tif` | 1x2 | Vertical-only chroma subsampling. |
-| `ycbcr-2x2.tif` | 2x2 | Half-resolution chroma on both axes. |
-| `ycbcr-4x1.tif` | 4x1 | Quarter-resolution horizontal chroma. |
-| `ycbcr-1x4.tif` | 1x4 | Quarter-resolution vertical chroma. |
-| `ycbcr-4x2.tif` | 4x2 | Mixed 4x2 chroma grid. |
-| `ycbcr-2x4.tif` | 2x4 | Mixed 2x4 chroma grid. |
-| `ycbcr-4x4.tif` | 4x4 | Quarter-resolution chroma on both axes. |
+| `ycbcr-chunky-1x1.tif` | 1x1 | Full-resolution chunky YCbCr with `YCbCrSubsampling` explicitly 1x1, the other tags at defaults and 16-row strips. |
+| `ycbcr-chunky-2x1.tif` | 2x1 | Horizontal-only chroma subsampling. |
+| `ycbcr-chunky-2x2.tif` | 2x2 | Half-resolution chroma on both axes. |
+| `ycbcr-chunky-4x1.tif` | 4x1 | Quarter-resolution horizontal chroma. |
+| `ycbcr-chunky-4x2.tif` | 4x2 | Mixed 4x2 chroma grid. |
+| `ycbcr-chunky-4x4.tif` | 4x4 | Quarter-resolution chroma on both axes. |
 
-### Variant fixtures
+### Planar, stripped (6)
 
-Five images with one non-default attribute each: 64x48 for the two
-non-default-tag fixtures and the tiled fixture, 61x47 and 63x61 for the two
-planar fixtures. The non-default-tag fixtures encode their source pixels with
-the tag values they carry, the planar fixtures hold genuine separate planes
-with several strips per plane, and the tiled fixture holds genuine tiled,
-subsampled pixel data.
+| Test image | Subsampling | Validates |
+|---|---|---|
+| `ycbcr-planar-1x1.tif` | 1x1 | Genuine separate planes at full resolution with 16-row strips. |
+| `ycbcr-planar-2x1.tif` | 2x1 | Separate planes with horizontal-only chroma subsampling. |
+| `ycbcr-planar-2x2.tif` | 2x2 | Separate planes with half-resolution chroma on both axes. |
+| `ycbcr-planar-4x1.tif` | 4x1 | Separate planes with quarter-resolution horizontal chroma. |
+| `ycbcr-planar-4x2.tif` | 4x2 | Separate planes with a mixed 4x2 chroma grid. |
+| `ycbcr-planar-4x4.tif` | 4x4 | Separate planes with quarter-resolution chroma on both axes. |
+
+### Planar stride variants, stripped (10)
+
+| Test image | Subsampling | Chroma row layout | Validates |
+|---|---|---|---|
+| `ycbcr-planar-2x1-packed.tif` | 2x1 | Packed | `ceil(w/2)` real chroma samples per row. |
+| `ycbcr-planar-2x1-padded.tif` | 2x1 | Padded | Full-width chroma rows with padding after the real samples. |
+| `ycbcr-planar-2x2-packed.tif` | 2x2 | Packed | `ceil(w/2)` real chroma samples per row. |
+| `ycbcr-planar-2x2-padded.tif` | 2x2 | Padded | Full-width chroma rows with padding after the real samples. |
+| `ycbcr-planar-4x1-packed.tif` | 4x1 | Packed | `ceil(w/4)` real chroma samples per row. |
+| `ycbcr-planar-4x1-padded.tif` | 4x1 | Padded | Full-width chroma rows with padding after the real samples. |
+| `ycbcr-planar-4x2-packed.tif` | 4x2 | Packed | `ceil(w/4)` real chroma samples per row. |
+| `ycbcr-planar-4x2-padded.tif` | 4x2 | Padded | Full-width chroma rows with padding after the real samples. |
+| `ycbcr-planar-4x4-packed.tif` | 4x4 | Packed | `ceil(w/4)` real chroma samples per row. |
+| `ycbcr-planar-4x4-padded.tif` | 4x4 | Padded | Full-width chroma rows with padding after the real samples. |
+
+### Tiled chunky (6)
+
+| Test image | Subsampling | Validates |
+|---|---|---|
+| `ycbcr-chunky-tiled-1x1.tif` | 1x1 | 16x16 luma tiles with interleaved chroma, no `RowsPerStrip`. |
+| `ycbcr-chunky-tiled-2x1.tif` | 2x1 | Interleaved chroma in 16x16 tiles with 2x1 subsampling. |
+| `ycbcr-chunky-tiled-2x2.tif` | 2x2 | Interleaved chroma in 16x16 tiles with 2x2 subsampling. |
+| `ycbcr-chunky-tiled-4x1.tif` | 4x1 | Interleaved chroma in 16x16 tiles with 4x1 subsampling. |
+| `ycbcr-chunky-tiled-4x2.tif` | 4x2 | Interleaved chroma in 16x16 tiles with 4x2 subsampling. |
+| `ycbcr-chunky-tiled-4x4.tif` | 4x4 | 4x4 tile grid with 4x4 subsampling in interleaved tiles. |
+
+### Tiled planar (6)
+
+| Test image | Subsampling | Validates |
+|---|---|---|
+| `ycbcr-planar-tiled-1x1.tif` | 1x1 | Separate 16x16 luma and 16x16 chroma tile grids. |
+| `ycbcr-planar-tiled-2x1.tif` | 2x1 | Separate planes with 8x16 chroma tiles. |
+| `ycbcr-planar-tiled-2x2.tif` | 2x2 | Separate planes with 8x8 chroma tiles. |
+| `ycbcr-planar-tiled-4x1.tif` | 4x1 | Separate planes with 4x16 chroma tiles. |
+| `ycbcr-planar-tiled-4x2.tif` | 4x2 | Separate planes with 4x8 chroma tiles. |
+| `ycbcr-planar-tiled-4x4.tif` | 4x4 | Separate planes with 4x4 chroma tiles on a 4x4 luma grid. |
+
+### Color-reference test images (2)
 
 | Test image | Attribute | Validates |
 |---|---|---|
-| `ycbcr-custom-coeffs.tif` | Coefficients = 0.2126/0.7152/0.0722 on a 1x1 base | Non-default luma coefficients (tag 529) applied to the pixel data; libtiff's decoded PPM differs from the source by a mean of 0.33 per channel. |
-| `ycbcr-custom-refbw.tif` | RefBW = 15/235/128/240/128/240 on a 1x1 base | Headroom/footroom reference values (tag 532) applied to the pixel data; libtiff's decoded PPM differs from the source by a mean of 0.84 per channel. |
-| `ycbcr-planar-1x1.tif` | PlanarConfig = 2, separate planes on a 61x47 1x1 base, RowsPerStrip = 16 | Genuine separate planes: Y, Cb and Cr in nine strips (three per plane), with all four YCbCr tags. |
-| `ycbcr-planar-2x2.tif` | PlanarConfig = 2, separate planes on a 63x61 2x2 base, RowsPerStrip = 16 | Genuine separate planes: Y, Cb and Cr in 12 strips (four per plane, as libtiff counts chroma strips with the luma RowsPerStrip), with consistent strip arrays and all four YCbCr tags. |
-| `ycbcr-tiled-2x2.tif` | 16x16 tiles, 4x3 grid (12 tiles of 384 bytes), real 2x2 subsampling | Tile tag path with genuinely subsampled tiled YCbCr data and all four tags; its PPM matches the stripped 2x2 reference byte-for-byte. |
+| `ycbcr-custom-coeffs.tif` | 64x48, 1x1, `RowsPerStrip = 48`, `YCbCrCoefficients = 0.2126 / 0.7152 / 0.0722` (BT.709) | Non-default luma coefficients (tag 529) applied to the pixel data. |
+| `ycbcr-custom-refbw.tif` | 64x48, 1x1, `RowsPerStrip = 48`, `ReferenceBlackWhite = (15,235), (128,240), (128,240)` | Headroom/footroom reference levels (tag 532) applied to the pixel data. |
 
-`ycbcr-tiled-2x2.tif` is a genuine conversion fixture: a pure-Python TIFF tile
-writer lays the stripped 2x2 cell-interleaved strip out into 16x16 luma tiles,
-with all four YCbCr tags and `PhotometricInterpretation = 6` written into the
-tiled TIFF itself. `tiffcp` cannot tile subsampled input, so it is not used
-for this fixture.
+## Ground-truth references
 
-### Odd-dimension fixtures
+libtiff's `tiff2rgba` decodes chunky YCbCr and planar 1x1 YCbCr, but rejects
+planar images with subsampled chroma. Every reference pixel value in this
+repository comes from libtiff through one of two routes. The following rule is
+mandatory:
 
-Three images whose width and height are not multiples of the subsampling
-factors, so the chroma dimensions use the ceiling rule. Tags and pixel data
-agree.
+- All reference pixel values are generated with libtiff decode functions only.
+- `tiff2rgba` + `tifftopnm` for direct conversion.
+- No Python, Pillow, ImageMagick, or TiffCraft code may convert YCbCr samples
+  to RGB for a reference.
+- Where libtiff cannot convert a test image directly, generate an equivalent
+  TIFF from the same Y/Cb/Cr codes of the test image that libtiff can convert,
+  and take its `tiff2rgba` output as the reference.
 
-| Test image | Dimensions | Subsampling | Validates |
-|---|---|---|---|
-| `ycbcr-odd-2x2.tif` | 61x47 | 2x2 | Ceiling of odd luma dimensions for 2x2 chroma. |
-| `ycbcr-odd-4x4.tif` | 63x61 | 4x4 | Ceiling of odd luma dimensions for 4x4 chroma. |
-| `ycbcr-odd-mixed.tif` | 62x47 | 2x1 | Ceiling on one axis only for mixed subsampling. |
+`tests/reference_images/ycbcr-*.ppm` holds one binary P6 PPM per test image. Each
+P6 header matches the test image's declared dimensions. The two routes below cover
+the 34 conversion test images; the 2 color-reference test images and the 2 `dscf0013`
+references are produced by libtiff directly, as described at the end of this
+section.
 
-## Ground-truth reference images
+- **Direct route (13 conversion test images):** `tiff2rgba -n -c none <tif> <rgba.tif>` followed
+  by `tifftopnm <rgba.tif> > <name>.ppm`, applied to the test image itself. This
+  covers the 6 chunky stripped test images, `ycbcr-planar-1x1.tif` and the 6 tiled
+  chunky test images.
+- **Equivalent route (21 conversion test images):** for the 5 planar subsampled test images
+  (2x1 through 4x4), the 10 stride variants and the 6 tiled planar test images,
+  the generator writes an equivalent planar-1x1 TIFF from the test image's own
+  Y/Cb/Cr codes with chroma replicated to full resolution, then decodes that
+  file with the same `tiff2rgba` + `tifftopnm` chain. For `-padded` sources only
+  the first `ceil(w/hs)` real chroma samples of each row are used; padding bytes
+  are ignored.
 
-`tests/reference_images/ycbcr-*.ppm` holds the RGB ground-truth images
-corresponding to the 17 YCbCr test images, in binary Netpbm PPM (P6) format.
-Every reference is produced by libtiff decoding the SAME TIFF fixture it
-belongs to: 14 with `tiff2rgba` followed by `tifftopnm`, and three with the
-in-repo libtiff `TIFFReadScanline` helper
-`tests/ycbcr_images/ycbcr_scanline_dump.c` (`ycbcr-1x4.tif`, `ycbcr-2x4.tif`
-and `ycbcr-planar-2x2.tif`). The helper's raw YCbCr bytes are converted to RGB
-with each TIFF's own coefficients and reference values, using nearest-cell
-chroma replication and PPM raster order. `tiff2rgba` cannot decode those three
-images (4x vertical subsampling, or planar + subsampled), but
-`TIFFReadScanline` decodes their pixels correctly. No reference is rendered
-from an equivalent or substitute image. Each P6 header matches the dimensions
-of its TIFF (64x48, or the odd dimensions 61x47, 63x61 and 62x47).
+Each chroma cell `(cx, cy)` supplies its Cb/Cr to luma positions
+`[cx*hs, (cx+1)*hs) x [cy*vs, (cy+1)*vs)` within the declared dimensions, with
+the outermost cell edge-replicated at padded edges. This nearest-cell
+replication matches libtiff's own decode, so the equivalent reproduces
+libtiff's upsampling. An equivalent declares the source test image's odd
+`ImageWidth`/`ImageLength` and stores its 1x1 luma and chroma at the unpadded
+declared sizes; the padded stored-luma sizes in **Dimensions, padding and
+strip/tile layout** do not apply because a 1x1 equivalent has no subsampling
+padding. Tiled equivalents use the source's
+16x16 luma tile grid (4x3 or 4x4). The tiled planar 1x1 test image is also handled
+by this route for uniformity: libtiff can decode it directly, but no chroma
+replication is needed and the equivalent carries the same 16x16 tile grid and
+odd declared dimensions. The equivalents are ground-truth sources in
+`tests/reference_images/`, not test images.
 
-The `tests/libtiff-pics/dscf0013.tif` fixture has two YCbCr IFDs. Its
-ground-truth references are `tests/reference_images/dscf0013.ppm` for the
-default 640x480 IFD and `tests/reference_images/dscf0013-ifd1.ppm` for the
-160x120 thumbnail. `tiffsplit` separates the IFDs and `tiff2rgba` followed by
-`tifftopnm` decodes each one, so these references also come from libtiff
-decoding the fixture itself.
+The equivalent source TIFFs are:
+
+- Planar stripped (5): `ycbcr-planar-2x1-equiv.tif`,
+  `ycbcr-planar-2x2-equiv.tif`, `ycbcr-planar-4x1-equiv.tif`,
+  `ycbcr-planar-4x2-equiv.tif`, `ycbcr-planar-4x4-equiv.tif`
+- Planar stride variants (10): `ycbcr-planar-2x1-packed-equiv.tif`,
+  `ycbcr-planar-2x1-padded-equiv.tif`, `ycbcr-planar-2x2-packed-equiv.tif`,
+  `ycbcr-planar-2x2-padded-equiv.tif`, `ycbcr-planar-4x1-packed-equiv.tif`,
+  `ycbcr-planar-4x1-padded-equiv.tif`, `ycbcr-planar-4x2-packed-equiv.tif`,
+  `ycbcr-planar-4x2-padded-equiv.tif`, `ycbcr-planar-4x4-packed-equiv.tif`,
+  `ycbcr-planar-4x4-padded-equiv.tif`
+- Tiled planar (6): `ycbcr-planar-tiled-1x1-equiv.tif`,
+  `ycbcr-planar-tiled-2x1-equiv.tif`, `ycbcr-planar-tiled-2x2-equiv.tif`,
+  `ycbcr-planar-tiled-4x1-equiv.tif`, `ycbcr-planar-tiled-4x2-equiv.tif`,
+  `ycbcr-planar-tiled-4x4-equiv.tif`
+
+The color-reference test images `ycbcr-custom-coeffs.tif` and
+`ycbcr-custom-refbw.tif` use PPM references in `tests/reference_images/` that
+libtiff produces directly from each test image.
+
+`tests/libtiff-pics/dscf0013.tif` has two YCbCr IFDs. Its references are
+`tests/reference_images/dscf0013.ppm` for the 640x480 IFD and
+`tests/reference_images/dscf0013-ifd1.ppm` for the 160x120 thumbnail.
+`tiffsplit` separates the IFDs and `tiff2rgba` followed by `tifftopnm` decodes
+each one, so these references also come from libtiff decoding the test image
+itself.

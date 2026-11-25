@@ -395,7 +395,7 @@ TEST_CASE("TiffExporterLibTiffPicsTest") {
 
 TEST_CASE("TiffExporterYCbCrTest") {
   // {
-  //   std::string filename = "ycbcr_images/ycbcr-1x1.tif";
+  //   std::string filename = "ycbcr_images/ycbcr-chunky-1x1.tif";
   //   const auto tiffFilePath = getFilePath(filename);
   //   TiffCraft::load(tiffFilePath.string(), [](const TiffCraft::TiffImage::Header& header,
   //       const TiffCraft::TiffImage::IFD& ifd,
@@ -406,8 +406,8 @@ TEST_CASE("TiffExporterYCbCrTest") {
   // }
   { // 1x1
      std::vector<std::string> testFiles = {
-      "ycbcr_images/ycbcr-1x1.tif",
-      "reference_images/ycbcr-1x1.ppm",
+      "ycbcr_images/ycbcr-chunky-1x1.tif",
+      "reference_images/ycbcr-chunky-1x1.ppm",
       "ycbcr_images/ycbcr-planar-1x1.tif",
       "reference_images/ycbcr-planar-1x1.ppm",
     };
@@ -524,8 +524,8 @@ TEST_CASE("TiffExporterAnyTest") {
   }
   { // YCbCr images
      std::vector<std::string> testFiles = {
-      "ycbcr_images/ycbcr-1x1.tif",
-      "reference_images/ycbcr-1x1.ppm",
+      "ycbcr_images/ycbcr-chunky-1x1.tif",
+      "reference_images/ycbcr-chunky-1x1.ppm",
       "ycbcr_images/ycbcr-planar-1x1.tif",
       "reference_images/ycbcr-planar-1x1.ppm",
     };

@@ -31,18 +31,22 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
 - Version-consistency test between the CMake `PROJECT_VERSION` and the header
   version constants (`TiffCraft::version()`), failing with both values named on
   mismatch.
-- YCbCr (PI=6) test coverage: added the TIFF 6.0 Section 21
-  `tests/YCBCR_SUPPORT.md` specification reference, 17 generated YCbCr test
-  images under `tests/ycbcr_images/` (nine subsampling, five variant and three
-  odd-dimension cases), and the corresponding `ycbcr-*.ppm` ground-truth
-  reference images (child issue of the YCbCr support effort, #38).
+- YCbCr (PI=6) test coverage: added the TIFF 6.0 Section 21 / Technical Note 2
+  `tests/YCBCR_SUPPORT.md` specification reference and rebuilt 34 YCbCr test
+  images under `tests/ycbcr_images/` (6 chunky stripped, 6 planar stripped, 10
+  planar packed/padded stride variants, 6 tiled chunky and 6 tiled planar),
+  plus the 2 retained color-reference images, with matching `ycbcr-*.ppm`
+  ground-truth references produced by libtiff. 21 committed planar-1x1
+  equivalent TIFFs under `tests/reference_images/` supply references where
+  libtiff cannot decode a test image directly (child issue of the YCbCr support
+  effort, #37/#52).
 - YCbCr (PI=6) export support for 1x1 subsampling (#45): new `TiffExporterYCbCr`
   class converts Y, Cb and Cr samples to RGB using `YCbCrCoefficients` and
   `ReferenceBlackWhite` (default ITU-R BT.601 values), for both chunky and
   separate-plane data. Coefficients are validated to sum to 1. `TiffExporterAny`
   dispatches PI=6 images to it, and `TiffStdOut` prints the four YCbCr tag
-  names. Conversion tests cover `ycbcr-1x1.tif` and `ycbcr-planar-1x1.tif`
-  against their PPM ground truth.
+  names. Conversion tests cover `ycbcr-chunky-1x1.tif` and
+  `ycbcr-planar-1x1.tif` against their PPM ground truth.
 
 ### Changed
 
@@ -50,8 +54,10 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
   generic `ReferenceBlackWhite` default, no-headroom YCbCr profile,
   subsampling constraints and default, and legacy vs new-style JPEG codes.
 - Vendored `doctest` test framework upgraded from 2.4.12 to 2.5.0.
-- Test-image documentation now lists the YCbCr fixtures and explains why the
-  8-bit CMYK images are excluded from the exporter tests.
+- Test-image documentation now lists the rebuilt YCbCr test images and explains
+  why the 8-bit CMYK images are excluded from the exporter tests. The YCbCr
+  matrices document odd declared dimensions with padded stored luma,
+  `RowsPerStrip = 16` / 16x16 tiles, and packed and padded planar chroma rows.
 - CMake project version bumped to `0.2.0` to match the header version
   constants and the `[0.2.0-Unreleased]` changelog section.
 
@@ -63,27 +69,23 @@ Given a version number MAJOR.MINOR.PATCH, increment the:
 - `TestExporter` returned after the first successful reference comparison, so
   only the first TIFF/reference pair in each test list was actually verified.
   It now continues through every pair. With all images exercised, the 4-channel
-  CMYK fixtures were confirmed unsupported by the RGB exporter; their test cases
+  CMYK test images were confirmed unsupported by the RGB exporter; their test cases
   were removed, and `tests/TEST_IMAGES.md` lists them as not supported and now
   explains why they are excluded from the exporter tests.
-- Completed the YCbCr documentation and test data in `tests/YCBCR_SUPPORT.md`
-  and rebuilt the 17-image fixture set. Every ground-truth PPM now comes
-  from libtiff decoding of the SAME TIFF: `tiff2rgba` + `tifftopnm` for 14
-  fixtures, and an in-repo libtiff `TIFFReadScanline` helper for the
-  1x4/2x4/planar-2x2 references that the `tiff2rgba` RGBA path rejects — no
-  equivalent or substitute image is used.
-  The document now carries generalized RGB/YCbCr conversion formulas
-  parameterized by the luma coefficients in `YCbCrCoefficients`, the full
-  `ReferenceBlackWhite` scaling formula with `code` terminology, the
-  spec-versus-practice note on default reference values, and a 17-row matrix
-  of conversion tests. The custom-coefficient and custom-reference-value
-  fixtures encode their pixel data with the tag values they carry. Both planar
-  fixtures contain genuine separate planes with odd dimensions and several
-  strips per plane (61x47 1x1: nine strips, three per plane; 63x61 2x2: 12
-  strips, four per plane), the tiled 2x2 fixture carries real subsampled data
-  in 16x16 tiles (4x3 grid, 12 tiles), and
-  the generator automatically validates the structure of every TIFF it emits
-  (#42, #48).
+- Rebuilt the YCbCr documentation and test data in `tests/YCBCR_SUPPORT.md`
+  and the test image set: 34 conversion test images (6 chunky stripped, 6 planar
+  stripped, 10 stride variants, 6 tiled chunky, 6 tiled planar) plus the 2
+  retained color-reference images. Every ground-truth PPM comes from libtiff
+  only: 13 direct `tiff2rgba` + `tifftopnm` conversions and 21 committed
+  planar-1x1 equivalents under `tests/reference_images/` for the planar
+  subsampled cases libtiff's RGBA converter cannot decode. No Python, Pillow,
+  ImageMagick or TiffCraft code converts YCbCr samples to RGB for a reference.
+  test images declare odd dimensions and pad stored luma to the subsampling
+  factors, using `RowsPerStrip = 16` or 16x16 tiles with packed or padded
+  planar chroma; equivalents store luma and chroma at the unpadded declared
+  sizes. The generator's `validate_fixture` covers all 34 test images and
+  `tiffinfo` is clean across those and the 21 equivalents. No TiffCraft
+  library code changed (#37, #52).
 - `TiffExporter.hpp` no longer includes the umbrella header `TiffCraft.hpp`;
   it now includes `TiffImage.hpp` directly, resolving the include cycle and
   making the exporter header standalone.
