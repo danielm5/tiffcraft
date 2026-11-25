@@ -150,13 +150,16 @@ libtiff's JPEG subset.
   so files that omit the tag are rejected rather than treated as full
   resolution.
 - All TIFF dimensions (`ImageWidth`, `ImageLength`, `RowsPerStrip`,
-  `TileWidth`, `TileLength`) are measured in luma samples. TIFF 6.0 originally
-  required image dimensions to be multiples of the subsampling factors;
-  Technical Note 2 relaxes this: the source is padded to the next multiple
-  before downsampling, so the number of stored chroma samples is the **ceiling**
-  of the luma dimension divided by the factor, and readers ignore the extra
-  samples after upsampling. That is the source of the ceiling rule used by the
-  odd-dimension fixtures below.
+  `TileWidth`, `TileLength`) are measured in luma samples. Two conventions
+  describe how chroma dimensions follow from them. TIFF 6.0 stores the true
+  image size in `ImageWidth`/`ImageLength` and derives chroma dimensions as
+  `ceil(width / hsub)` and `ceil(height / vsub)`. Technical Note 2
+  (JPEG-in-TIFF) instead stores luma width and height padded to multiples of
+  the subsampling factors, so chroma dimensions are exactly `width / hsub` and
+  `height / vsub`. `ycbcr-odd-2x2.tif` (61x47), `ycbcr-odd-4x4.tif` (63x61)
+  and `ycbcr-odd-mixed.tif` (62x47) cover the TIFF 6.0 convention;
+  `ycbcr-tn2-2x2.tif` (62x48) covers the TN2 padded-luma convention (61x47
+  rounded up to 62x48).
 - `RowsPerStrip` must be an integer multiple of the vertical subsampling factor
   (unless the image is a single strip), and for tiled images `TileWidth` and
   `TileLength` must be multiples of the horizontal and vertical factors.
@@ -235,7 +238,7 @@ The pipeline for each fixture is:
    strips per plane. `tiffcp` is not used for tiled output: it refuses
    subsampled input.
 5. Every ground-truth P6 PPM is produced by libtiff decoding the SAME TIFF it
-   belongs to. For 14 fixtures that is `tiff2rgba -n -c none <tif> <rgba.tif>`
+   belongs to. For 15 fixtures that is `tiff2rgba -n -c none <tif> <rgba.tif>`
    followed by `tifftopnm <rgba.tif> > ycbcr-*.ppm`. For `ycbcr-1x4.tif`,
    `ycbcr-2x4.tif` and `ycbcr-planar-2x2.tif`, libtiff's `TIFFRGBAImage` /
    `tiff2rgba` path rejects the image (4x vertical subsampling, or planar +
@@ -252,11 +255,12 @@ The pipeline for each fixture is:
    against the image geometry (including every planar strip), and rejects any
    `tiffinfo` warning or error.
 
-The 17 fixtures are described in the matrix below. Every fixture is a
+The 18 fixtures are described in the matrix below. Every fixture is a
 conversion test: its tag values and pixel data describe the same image. The
 two non-default-tag variants encode the source pixels with the coefficients or
 reference values they carry; the two planar fixtures hold genuinely separate
-planes; and the tiled fixture holds genuine 2x2-subsampled tile data.
+planes; the tiled fixture holds genuine 2x2-subsampled tile data; and one
+odd-dimension fixture uses the TN2 padded-luma convention.
 
 ## Test image matrix
 
@@ -305,22 +309,24 @@ for this fixture.
 
 ### Odd-dimension fixtures
 
-Three images whose width and height are not multiples of the subsampling
-factors, so the chroma dimensions use the ceiling rule. Tags and pixel data
-agree.
+Four images exercising the two dimension conventions above. The first three
+store true TIFF 6.0 luma dimensions and use ceiling-derived chroma; the last
+stores TN2 padded luma dimensions with chroma derived by exact division. Tags
+and pixel data agree.
 
 | Test image | Dimensions | Subsampling | Validates |
 |---|---|---|---|
 | `ycbcr-odd-2x2.tif` | 61x47 | 2x2 | Ceiling of odd luma dimensions for 2x2 chroma. |
 | `ycbcr-odd-4x4.tif` | 63x61 | 4x4 | Ceiling of odd luma dimensions for 4x4 chroma. |
 | `ycbcr-odd-mixed.tif` | 62x47 | 2x1 | Ceiling on one axis only for mixed subsampling. |
+| `ycbcr-tn2-2x2.tif` | 62x48 | 2x2 | TN2 padded luma: 61x47 rounded up to 62x48, with 31x24 chroma by exact division. |
 
 ## Ground-truth reference images
 
 `tests/reference_images/ycbcr-*.ppm` holds the RGB ground-truth images
-corresponding to the 17 YCbCr test images, in binary Netpbm PPM (P6) format.
+corresponding to the 18 YCbCr test images, in binary Netpbm PPM (P6) format.
 Every reference is produced by libtiff decoding the SAME TIFF fixture it
-belongs to: 14 with `tiff2rgba` followed by `tifftopnm`, and three with the
+belongs to: 15 with `tiff2rgba` followed by `tifftopnm`, and three with the
 in-repo libtiff `TIFFReadScanline` helper
 `tests/ycbcr_images/ycbcr_scanline_dump.c` (`ycbcr-1x4.tif`, `ycbcr-2x4.tif`
 and `ycbcr-planar-2x2.tif`). The helper's raw YCbCr bytes are converted to RGB
@@ -329,7 +335,7 @@ chroma replication and PPM raster order. `tiff2rgba` cannot decode those three
 images (4x vertical subsampling, or planar + subsampled), but
 `TIFFReadScanline` decodes their pixels correctly. No reference is rendered
 from an equivalent or substitute image. Each P6 header matches the dimensions
-of its TIFF (64x48, or the odd dimensions 61x47, 63x61 and 62x47).
+of its TIFF (64x48, 61x47, 63x61, 62x47 and 62x48).
 
 The `tests/libtiff-pics/dscf0013.tif` fixture has two YCbCr IFDs. Its
 ground-truth references are `tests/reference_images/dscf0013.ppm` for the

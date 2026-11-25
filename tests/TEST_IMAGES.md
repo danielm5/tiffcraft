@@ -132,3 +132,4 @@ supported.
 | `ycbcr-odd-2x2.tif` | 61x47 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 2x2 | No | ❌ Not supported |
 | `ycbcr-odd-4x4.tif` | 63x61 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 4x4 | No | ❌ Not supported |
 | `ycbcr-odd-mixed.tif` | 62x47 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 2x1 | No | ❌ Not supported |
+| `ycbcr-tn2-2x2.tif` | 62x48 | 8 bpp x3 | YCbCr (3 samples) | None | Chunky | 2x2 | No | ❌ Not supported |

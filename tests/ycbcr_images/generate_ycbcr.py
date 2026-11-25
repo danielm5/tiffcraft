@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Deterministic generator for the YCbCr test-image matrix.
 
-This script produces 17 YCbCr (``PhotometricInterpretation = 6``) TIFF
+This script produces 18 YCbCr (``PhotometricInterpretation = 6``) TIFF
 fixtures in ``tests/ycbcr_images/`` and one matching ground-truth P6 PPM
 per fixture in ``tests/reference_images/``.
 
-The 17-case matrix
+The 18-case matrix
 ------------------
 * 9 subsampling fixtures (64x48): 1x1, 2x1, 1x2, 2x2, 4x1, 1x4, 4x2,
   2x4 and 4x4. These exercise real chroma subsampling written by
@@ -15,9 +15,13 @@ The 17-case matrix
   ``ycbcr-planar-1x1`` (61x47, genuine separate planes on a 1x1 base),
   ``ycbcr-planar-2x2`` (63x61, genuine separate planes on a 2x2 base) and
   ``ycbcr-tiled-2x2`` (64x48, genuine chunky tiles on a 2x2 base).
-* 3 odd-dimension fixtures: ``ycbcr-odd-2x2`` (61x47),
-  ``ycbcr-odd-4x4`` (63x61) and ``ycbcr-odd-mixed`` (62x47, 2x1).
-  Tags and pixel data agree.
+* 4 odd-dimension fixtures: ``ycbcr-odd-2x2`` (61x47),
+  ``ycbcr-odd-4x4`` (63x61) and ``ycbcr-odd-mixed`` (62x47, 2x1) use
+  TIFF 6.0's true luma dimensions, with chroma dimensions derived by
+  rounding up. ``ycbcr-tn2-2x2`` (62x48) is the Technical Note 2
+  padded-luma example: the 61x47 source is rounded up to luma dimensions
+  that are multiples of the subsampling factors, so the chroma dimensions
+  are 31x24 by exact division. Tags and pixel data agree.
 
 The script also renders two references for the ``tests/libtiff-pics/dscf0013.tif``
 fixture listed in ``TEST_IMAGES.md``: ``dscf0013.ppm`` for the default 640x480
@@ -82,7 +86,7 @@ C helper, never from an equivalent chunky image.
 Ground-truth provenance
 -----------------------
 Every reference PPM is produced by libtiff decoding the SAME TIFF fixture:
-14 via ``tiff2rgba`` + ``tifftopnm``, and 3 (``ycbcr-1x4``, ``ycbcr-2x4`` and
+15 via ``tiff2rgba`` + ``tifftopnm``, and 3 (``ycbcr-1x4``, ``ycbcr-2x4`` and
 ``ycbcr-planar-2x2``) via the libtiff ``TIFFReadScanline`` C helper, whose
 raw YCbCr bytes are converted to RGB with the TIFF's own
 ``YCbCrCoefficients`` and ``ReferenceBlackWhite`` values. libtiff's
@@ -91,7 +95,7 @@ subsampled YCbCr even though ``TIFFReadScanline`` decodes those pixels.
 
 Automatic structural validation
 -------------------------------
-At the end of every run ``validate_fixture`` checks all 17 emitted TIFFs: it
+At the end of every run ``validate_fixture`` checks all 18 emitted TIFFs: it
 parses the first IFD with ``struct``, verifies the YCbCr tag set and values,
 checks that strip/tile array lengths and per-strip byte counts match the image
 geometry (this checks every planar strip and validates the 12-tile layout),
@@ -145,10 +149,14 @@ SUBSAMPLING_CASES = [
 ]
 
 # (name, width, height, horizontal subsampling, vertical subsampling).
+# The first three use TIFF 6.0's true luma dimensions (ceil-derived chroma).
+# ycbcr-tn2-2x2 is the TN2 padded-luma example: 61x47 rounded up to 62x48,
+# with chroma dimensions 31x24 by exact division.
 ODD_CASES = [
     ("ycbcr-odd-2x2", 61, 47, 2, 2),
     ("ycbcr-odd-4x4", 63, 61, 4, 4),
     ("ycbcr-odd-mixed", 62, 47, 2, 1),
+    ("ycbcr-tn2-2x2", 62, 48, 2, 2),
 ]
 
 VARIANT_NAMES = [
@@ -865,8 +873,9 @@ def validate_fixture(path):
                     for i in range(strips_per_plane)]
 
         if planar == 1:
-            # libtiff pads luma dimensions up to multiples of the subsampling
-            # factors when W/H are not evenly divisible (the odd fixtures).
+            # TIFF 6.0 stores true luma dimensions and decoders pad to
+            # subsampling multiples; TN2 stores luma already padded to those
+            # multiples. Both conventions yield this padded byte count here.
             pad_w = ((w + hs - 1) // hs) * hs
             pad_h = ((h + vs - 1) // vs) * vs
             expected_bytes = pad_w * pad_h + 2 * (pad_w // hs) * (pad_h // vs)
@@ -917,7 +926,7 @@ def validate_fixture(path):
 def make_ground_truth(name, tif):
     """Produce the P6 PPM ground truth with tiff2rgba + tifftopnm.
 
-    Used for the 14 fixtures libtiff's RGBA helper can decode. The 1x4, 2x4
+    Used for the 15 fixtures libtiff's RGBA helper can decode. The 1x4, 2x4
     and planar-2x2 cases use the libtiff TIFFReadScanline helper instead.
     """
     rgba = TMP_DIR / f"{name}-rgba.tif"
@@ -1179,7 +1188,7 @@ NEEDS_LIBTIFF_SCANLINE = {(1, 4), (2, 4)}
 
 
 def remove_stale_fixtures():
-    """Remove fixtures that are not part of the current 17-case matrix."""
+    """Remove fixtures that are not part of the current 18-case matrix."""
     expected_tifs = {f"{name}.tif" for name in ALL_NAMES}
     expected_ppms = {f"{name}.ppm" for name in ALL_NAMES}
     for path in IMAGE_DIR.glob("ycbcr-*.tif"):
@@ -1209,7 +1218,7 @@ def main():
         else:
             make_ground_truth(name, out)
 
-    # 3 odd-dimension fixtures: conversion-verified.
+    # 4 odd-dimension fixtures: conversion-verified (last one is TN2 padded luma).
     for name, w, h, hs, vs in ODD_CASES:
         rgb = make_rgb_tiff(name, w, h)
         out = IMAGE_DIR / f"{name}.tif"
