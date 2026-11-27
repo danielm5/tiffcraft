@@ -130,11 +130,19 @@ TiffCraft supports the following features:
   - Bilevel, grayscale, palette-color, RGB, and YCbCr images
     - Varying number of bits per sample
     - RGB images are supported only for 3-channel images (no extra samples)
-    - YCbCr images are supported only with 1x1 subsampling and centered
-      positioning; they are converted to RGB on export. Subsampled, co-sited,
-      tiled and compressed YCbCr images are not supported yet.
+    - YCbCr images are converted to RGB on export. All spec-legal subsampling
+      factors ([1,1], [2,1], [2,2], [4,1], [4,2] and [4,4]) are supported for
+      both chunky (cell-interleaved) and separate-plane images, in stripped
+      and tiled files, with packed or padded planar chroma rows and
+      non-default `YCbCrCoefficients` / `ReferenceBlackWhite` values.
+      `YCbCrPositioning` is read but not used: co-sited images are decoded
+      with centered chroma placement. Compressed YCbCr images are not
+      supported.
 - Compression is NOT supported yet.
 - Writing TIFF images is NOT supported yet.
+
+For details on the supported image formats, see
+[`tests/TEST_IMAGES.md`](tests/TEST_IMAGES.md).
 
 Advanced users could use TiffCraft for other configurations than those
 enumerated above by writing their customizing any of the existing exporter

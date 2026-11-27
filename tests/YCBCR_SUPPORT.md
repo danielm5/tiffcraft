@@ -151,8 +151,10 @@ libtiff's JPEG subset.
 - Legal subsampling factors are **1, 2 and 4**. The spec default is **2, 2** —
   YCbCr is subsampled by default; an image without tag 530 is not implicitly
   1x1. TiffCraft's YCbCr exporter (`TiffExporterYCbCr`, dispatched by
-  `TiffExporterAny`) supports only explicit 1x1 subsampling, so files that omit
-  the tag are rejected rather than treated as full resolution.
+  `TiffExporterAny`) handles the spec-legal combinations `[1,1]`, `[2,1]`,
+  `[2,2]`, `[4,1]`, `[4,2]` and `[4,4]`, for both chunky (cell-interleaved)
+  and separate-plane images, stripped or tiled. When tag 530 is absent the
+  spec default `[2,2]` is used.
 - All TIFF dimensions (`ImageWidth`, `ImageLength`, `RowsPerStrip`,
   `TileWidth`, `TileLength`) are measured in luma samples. TIFF 6.0 originally
   required image dimensions to be multiples of the subsampling factors;
@@ -177,6 +179,8 @@ libtiff's JPEG subset.
 libtiff 4.7.2 (the version used for the references in this repository) stores
 this tag but never consults it while decoding: rendering the same TIFF with
 `tiff2rgba` is byte-for-byte identical for values 1 and 2.
+TiffCraft likewise reads `YCbCrPositioning` but does not use it during
+conversion, so co-sited images are decoded with centered chroma placement.
 The test image set therefore contains no co-sited image, since the tag would have
 no effect on libtiff's decoded pixels.
 
@@ -255,7 +259,10 @@ Every conversion test image is genuine: its tags and pixel data describe an
 image whose RGB reference comes from libtiff decoding, directly or through an
 equivalent planar-1x1 TIFF. The test images cover
 the subsampling factors `[1,1]`, `[2,1]`, `[2,2]`, `[4,1]`, `[4,2]` and `[4,4]`;
-no other factor combinations are present.
+no other factor combinations are present. All 31 generated images are exercised
+by both `TiffExporterYCbCr<uint8_t>` and `TiffExporterAny` in
+`tests/tiffExporterTest.cpp`; the same tests also cover
+`tests/libtiff-pics/dscf0013.tif`.
 
 ## Generating the test images
 

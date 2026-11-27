@@ -120,7 +120,7 @@ void TestExporter(const std::vector<std::string>& testFiles,
   if (testFiles.size() % 2 != 0) {
     throw std::runtime_error("Test files must be in pairs.");
   }
-  LoadParams loadParams{ 0 };
+  LoadParams loadParams{ .ifdIndex = 0 };
   Exporter exporter;
   for (size_t i = 0; i < testFiles.size() / 2; ++i) {
     const auto tiffFilePath = getFilePath(testFiles[2*i + 0]);
@@ -130,6 +130,11 @@ void TestExporter(const std::vector<std::string>& testFiles,
     load(tiffFilePath.string(), std::ref(exporter), loadParams);
 
     const auto& image = exporter.image();
+
+    // Check if the reference file exists
+    if (!std::filesystem::exists(refFilePath)) {
+      FAIL(("Reference file not found: " + refFilePath.string()));
+    }
 
     try { // Gray 8bits
       compareToReference<uint8_t>(image, refFilePath, margin.value_or(1));
@@ -352,6 +357,68 @@ TEST_CASE("TiffExporterRgbTest") {
   }
 }
 
+TEST_CASE("TiffExporterYCbCrTest") {
+  { // YCbCr 8 bits - Chunky images
+    std::vector<std::string> testFiles = {
+      "ycbcr_images/ycbcr-chunky-1x1.tif", "reference_images/ycbcr-chunky-1x1.ppm",
+      "ycbcr_images/ycbcr-chunky-2x1.tif", "reference_images/ycbcr-chunky-2x1.ppm",
+      "ycbcr_images/ycbcr-chunky-2x2.tif", "reference_images/ycbcr-chunky-2x2.ppm",
+      "ycbcr_images/ycbcr-chunky-4x1.tif", "reference_images/ycbcr-chunky-4x1.ppm",
+      "ycbcr_images/ycbcr-chunky-4x2.tif", "reference_images/ycbcr-chunky-4x2.ppm",
+      "ycbcr_images/ycbcr-chunky-4x4.tif", "reference_images/ycbcr-chunky-4x4.ppm",
+    };
+    using Exporter = TiffExporterYCbCr<uint8_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+  { // YCbCr 8 bits - Planar images
+    std::vector<std::string> testFiles = {
+      // packed planar images
+      "ycbcr_images/ycbcr-planar-packed-1x1.tif", "reference_images/ycbcr-planar-packed-1x1.ppm",
+      "ycbcr_images/ycbcr-planar-packed-2x1.tif", "reference_images/ycbcr-planar-packed-2x1.ppm",
+      "ycbcr_images/ycbcr-planar-packed-2x2.tif", "reference_images/ycbcr-planar-packed-2x2.ppm",
+      "ycbcr_images/ycbcr-planar-packed-4x1.tif", "reference_images/ycbcr-planar-packed-4x1.ppm",
+      "ycbcr_images/ycbcr-planar-packed-4x2.tif", "reference_images/ycbcr-planar-packed-4x2.ppm",
+      "ycbcr_images/ycbcr-planar-packed-4x4.tif", "reference_images/ycbcr-planar-packed-4x4.ppm",
+      // padded planar images
+      "ycbcr_images/ycbcr-planar-padded-2x1.tif", "reference_images/ycbcr-planar-padded-2x1.ppm",
+      "ycbcr_images/ycbcr-planar-padded-2x2.tif", "reference_images/ycbcr-planar-padded-2x2.ppm",
+      "ycbcr_images/ycbcr-planar-padded-4x1.tif", "reference_images/ycbcr-planar-padded-4x1.ppm",
+      "ycbcr_images/ycbcr-planar-padded-4x2.tif", "reference_images/ycbcr-planar-padded-4x2.ppm",
+      "ycbcr_images/ycbcr-planar-padded-4x4.tif", "reference_images/ycbcr-planar-padded-4x4.ppm",
+    };
+    using Exporter = TiffExporterYCbCr<uint8_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+  { // YCbCr 8 bits - Tile images
+    std::vector<std::string> testFiles = {
+      // chunky tile images
+      "ycbcr_images/ycbcr-chunky-tiled-1x1.tif", "reference_images/ycbcr-chunky-tiled-1x1.ppm",
+      "ycbcr_images/ycbcr-chunky-tiled-2x1.tif", "reference_images/ycbcr-chunky-tiled-2x1.ppm",
+      "ycbcr_images/ycbcr-chunky-tiled-2x2.tif", "reference_images/ycbcr-chunky-tiled-2x2.ppm",
+      "ycbcr_images/ycbcr-chunky-tiled-4x1.tif", "reference_images/ycbcr-chunky-tiled-4x1.ppm",
+      "ycbcr_images/ycbcr-chunky-tiled-4x2.tif", "reference_images/ycbcr-chunky-tiled-4x2.ppm",
+      "ycbcr_images/ycbcr-chunky-tiled-4x4.tif", "reference_images/ycbcr-chunky-tiled-4x4.ppm",
+      // planar tile images
+      "ycbcr_images/ycbcr-planar-tiled-1x1.tif", "reference_images/ycbcr-planar-tiled-1x1.ppm",
+      "ycbcr_images/ycbcr-planar-tiled-2x1.tif", "reference_images/ycbcr-planar-tiled-2x1.ppm",
+      "ycbcr_images/ycbcr-planar-tiled-2x2.tif", "reference_images/ycbcr-planar-tiled-2x2.ppm",
+      "ycbcr_images/ycbcr-planar-tiled-4x1.tif", "reference_images/ycbcr-planar-tiled-4x1.ppm",
+      "ycbcr_images/ycbcr-planar-tiled-4x2.tif", "reference_images/ycbcr-planar-tiled-4x2.ppm",
+      "ycbcr_images/ycbcr-planar-tiled-4x4.tif", "reference_images/ycbcr-planar-tiled-4x4.ppm",
+    };
+    using Exporter = TiffExporterYCbCr<uint8_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+  { // YCbCr 8 bits - Non-default color mapping
+    std::vector<std::string> testFiles = {
+      "ycbcr_images/ycbcr-color-coeffs-bt709.tif", "reference_images/ycbcr-color-coeffs-bt709.ppm",
+      "ycbcr_images/ycbcr-color-refbw-limited-range.tif", "reference_images/ycbcr-color-refbw-limited-range.ppm",
+    };
+    using Exporter = TiffExporterYCbCr<uint8_t>;
+    TestExporter<Exporter>(testFiles);
+  }
+}
+
 TEST_CASE("TiffExporterLibTiffPicsTest") {
   { // 1 bit
     std::vector<std::string> testFiles = {
@@ -389,27 +456,10 @@ TEST_CASE("TiffExporterLibTiffPicsTest") {
     using Exporter = TiffExporterGray<uint8_t>;
     TestExporter<Exporter>(testFiles);
   }
-}
-
-//#include <tiffcraft/TiffStdOut.hpp> //tmp
-
-TEST_CASE("TiffExporterYCbCrTest") {
-  // {
-  //   std::string filename = "ycbcr_images/ycbcr-chunky-1x1.tif";
-  //   const auto tiffFilePath = getFilePath(filename);
-  //   TiffCraft::load(tiffFilePath.string(), [](const TiffCraft::TiffImage::Header& header,
-  //       const TiffCraft::TiffImage::IFD& ifd,
-  //       TiffCraft::TiffImage::ImageData) {
-  //     std::cout << header << "\n";
-  //     std::cout << ifd << "\n";   // prints all entries with names, types, counts, values
-  //   });
-  // }
-  { // 1x1
-     std::vector<std::string> testFiles = {
-      "ycbcr_images/ycbcr-chunky-1x1.tif",
-      "reference_images/ycbcr-chunky-1x1.ppm",
-      "ycbcr_images/ycbcr-planar-packed-1x1.tif",
-      "reference_images/ycbcr-planar-packed-1x1.ppm",
+  { // YCbCr 8 bits uncompressed
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/dscf0013.tif",
+      "reference_images/dscf0013.ppm",
     };
     using Exporter = TiffExporterYCbCr<uint8_t>;
     TestExporter<Exporter>(testFiles);
@@ -417,7 +467,7 @@ TEST_CASE("TiffExporterYCbCrTest") {
 }
 
 TEST_CASE("TiffExporterAnyTest") {
-  { // grayscale images
+  { // Grayscale images
     std::vector<std::string> testFiles = {
       "libtiff-pics/depth/flower-minisblack-02.tif",
       "reference_images/flower-minisblack-02.pgm",
@@ -442,7 +492,7 @@ TEST_CASE("TiffExporterAnyTest") {
     };
     TestExporter<TiffExporterAny>(testFiles);
   }
-  { // palette-color images
+  { // Palette-color images
     std::vector<std::string> testFiles = {
       "libtiff-pics/depth/flower-palette-02.tif",
       "reference_images/flower-palette-02.ppm",
@@ -522,12 +572,65 @@ TEST_CASE("TiffExporterAnyTest") {
     };
     TestExporter<TiffExporterAny>(testFiles);
   }
-  { // YCbCr images
-     std::vector<std::string> testFiles = {
-      "ycbcr_images/ycbcr-chunky-1x1.tif",
-      "reference_images/ycbcr-chunky-1x1.ppm",
-      "ycbcr_images/ycbcr-planar-packed-1x1.tif",
-      "reference_images/ycbcr-planar-packed-1x1.ppm",
+  { // YCbCr 8 bits - Chunky images
+    std::vector<std::string> testFiles = {
+      "ycbcr_images/ycbcr-chunky-1x1.tif", "reference_images/ycbcr-chunky-1x1.ppm",
+      "ycbcr_images/ycbcr-chunky-2x1.tif", "reference_images/ycbcr-chunky-2x1.ppm",
+      "ycbcr_images/ycbcr-chunky-2x2.tif", "reference_images/ycbcr-chunky-2x2.ppm",
+      "ycbcr_images/ycbcr-chunky-4x1.tif", "reference_images/ycbcr-chunky-4x1.ppm",
+      "ycbcr_images/ycbcr-chunky-4x2.tif", "reference_images/ycbcr-chunky-4x2.ppm",
+      "ycbcr_images/ycbcr-chunky-4x4.tif", "reference_images/ycbcr-chunky-4x4.ppm",
+    };
+    TestExporter<TiffExporterAny>(testFiles);
+  }
+  { // YCbCr 8 bits - Planar images
+    std::vector<std::string> testFiles = {
+      // packed planar images
+      "ycbcr_images/ycbcr-planar-packed-1x1.tif", "reference_images/ycbcr-planar-packed-1x1.ppm",
+      "ycbcr_images/ycbcr-planar-packed-2x1.tif", "reference_images/ycbcr-planar-packed-2x1.ppm",
+      "ycbcr_images/ycbcr-planar-packed-2x2.tif", "reference_images/ycbcr-planar-packed-2x2.ppm",
+      "ycbcr_images/ycbcr-planar-packed-4x1.tif", "reference_images/ycbcr-planar-packed-4x1.ppm",
+      "ycbcr_images/ycbcr-planar-packed-4x2.tif", "reference_images/ycbcr-planar-packed-4x2.ppm",
+      "ycbcr_images/ycbcr-planar-packed-4x4.tif", "reference_images/ycbcr-planar-packed-4x4.ppm",
+      // padded planar images
+      "ycbcr_images/ycbcr-planar-padded-2x1.tif", "reference_images/ycbcr-planar-padded-2x1.ppm",
+      "ycbcr_images/ycbcr-planar-padded-2x2.tif", "reference_images/ycbcr-planar-padded-2x2.ppm",
+      "ycbcr_images/ycbcr-planar-padded-4x1.tif", "reference_images/ycbcr-planar-padded-4x1.ppm",
+      "ycbcr_images/ycbcr-planar-padded-4x2.tif", "reference_images/ycbcr-planar-padded-4x2.ppm",
+      "ycbcr_images/ycbcr-planar-padded-4x4.tif", "reference_images/ycbcr-planar-padded-4x4.ppm",
+    };
+    TestExporter<TiffExporterAny>(testFiles);
+  }
+  { // YCbCr 8 bits - Tile images
+    std::vector<std::string> testFiles = {
+      // chunky tile images
+      "ycbcr_images/ycbcr-chunky-tiled-1x1.tif", "reference_images/ycbcr-chunky-tiled-1x1.ppm",
+      "ycbcr_images/ycbcr-chunky-tiled-2x1.tif", "reference_images/ycbcr-chunky-tiled-2x1.ppm",
+      "ycbcr_images/ycbcr-chunky-tiled-2x2.tif", "reference_images/ycbcr-chunky-tiled-2x2.ppm",
+      "ycbcr_images/ycbcr-chunky-tiled-4x1.tif", "reference_images/ycbcr-chunky-tiled-4x1.ppm",
+      "ycbcr_images/ycbcr-chunky-tiled-4x2.tif", "reference_images/ycbcr-chunky-tiled-4x2.ppm",
+      "ycbcr_images/ycbcr-chunky-tiled-4x4.tif", "reference_images/ycbcr-chunky-tiled-4x4.ppm",
+      // planar tile images
+      "ycbcr_images/ycbcr-planar-tiled-1x1.tif", "reference_images/ycbcr-planar-tiled-1x1.ppm",
+      "ycbcr_images/ycbcr-planar-tiled-2x1.tif", "reference_images/ycbcr-planar-tiled-2x1.ppm",
+      "ycbcr_images/ycbcr-planar-tiled-2x2.tif", "reference_images/ycbcr-planar-tiled-2x2.ppm",
+      "ycbcr_images/ycbcr-planar-tiled-4x1.tif", "reference_images/ycbcr-planar-tiled-4x1.ppm",
+      "ycbcr_images/ycbcr-planar-tiled-4x2.tif", "reference_images/ycbcr-planar-tiled-4x2.ppm",
+      "ycbcr_images/ycbcr-planar-tiled-4x4.tif", "reference_images/ycbcr-planar-tiled-4x4.ppm",
+    };
+    TestExporter<TiffExporterAny>(testFiles);
+  }
+  { // YCbCr 8 bits - Non-default color mapping
+    std::vector<std::string> testFiles = {
+      "ycbcr_images/ycbcr-color-coeffs-bt709.tif", "reference_images/ycbcr-color-coeffs-bt709.ppm",
+      "ycbcr_images/ycbcr-color-refbw-limited-range.tif", "reference_images/ycbcr-color-refbw-limited-range.ppm",
+    };
+    TestExporter<TiffExporterAny>(testFiles);
+  }
+  { // YCbCr 8 bits uncompressed
+    std::vector<std::string> testFiles = {
+      "libtiff-pics/dscf0013.tif",
+      "reference_images/dscf0013.ppm",
     };
     TestExporter<TiffExporterAny>(testFiles);
   }

@@ -541,8 +541,13 @@ TEST_CASE("Malformed TIFF input") {
         entries.push_back(entry);
     };
     // Entries must be sorted in ascending tag order
-    addEntry(0x0103, Type::SHORT, 1, { 1 });                  // Compression = none
-    addEntry(0x0106, Type::SHORT, 1, { 0 });                  // PhotometricInterpretation = WhiteIsZero
+    //   -----
+    //   Note: the last argument of addEntry is a vector of bytes, therefore,
+    //         for SHORT and LONG types more than one byte is needed to represent
+    //         the value(s).
+    //   -----
+    addEntry(0x0103, Type::SHORT, 1, { 1, 0 });               // Compression = none
+    addEntry(0x0106, Type::SHORT, 1, { 0, 0 });               // PhotometricInterpretation = WhiteIsZero
     addEntry(0x0111, Type::LONG, 1, { 100, 0, 0, 0 });        // StripOffsets = 100 (beyond end of stream)
     addEntry(0x0117, Type::LONG, 1, { 232, 3, 0, 0 });        // StripByteCounts = 1000
 
