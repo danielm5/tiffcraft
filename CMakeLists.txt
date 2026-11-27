@@ -54,6 +54,9 @@ option(TIFFCRAFT_BUILD_ALL
   "Build the TiffCraft tests, apps, and examples" ${TIFFCRAFT_BUILD_ALL_DEFAULT})
 
 if(TIFFCRAFT_BUILD_ALL)
+  # Include ASan options
+  include(cmake/ASan.cmake)
+
   # Enable testing
   enable_testing()
   add_subdirectory(tests)

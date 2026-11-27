@@ -61,6 +61,18 @@
 
 namespace TiffCraft
 {
+  //! \brief A simple struct to hold the width and height of a rectangle.
+  struct RectSize
+  {
+    int width = 0;
+    int height = 0;
+  };
+
+  //! \brief A simple struct to hold 2-dimensional values.
+  template <typename T>
+  struct Vec2 { T x, y; };
+
+  using Vec2i = Vec2<int>;
 
   struct Image
   {
@@ -73,22 +85,35 @@ namespace TiffCraft
     int bitDepth = 0;       // Bits per channel
     std::vector<std::byte> data;  // Raw pixel data
 
-    template <typename T, int N = 1>
-    static Image make(int width, int height, bool isPlanar = false)
+    template <typename T>
+    static Image make(int width, int height, int channels = 1, bool isPlanar = false)
     {
       constexpr int sT = static_cast<int>(sizeof(T));
       if (isPlanar) {
         return Image{
-          width, height, N,                     // width, height, channels
+          width, height, channels,              // width, height, channels
           width * sT,  sT, width * height * sT, // strides: row, column, channel
           sT * 8,                               // bit depth
-          std::vector<std::byte>(width * height * N * sT) };
+          std::vector<std::byte>(width * height * channels * sT) };
       }
       return Image{
-        width, height, N,             // width, height, channels
-        width * N * sT,  N * sT, sT,  // strides: row, column, channel
-        sT * 8,                       // bit depth
-        std::vector<std::byte>(width * height * N * sT) };
+        width, height, channels,                   // width, height, channels
+        width * channels * sT,  channels * sT, sT, // strides: row, column, channel
+        sT * 8,                                    // bit depth
+        std::vector<std::byte>(width * height * channels * sT) };
+    }
+
+    template <typename T>
+    static Image make(const RectSize& rectSize, int channels = 1, bool isPlanar = false)
+    {
+      return make<T>(rectSize.width, rectSize.height, channels, isPlanar);
+    }
+
+    bool isPlanar() const
+    {
+      return channels > 1
+        && rowStride / colStride == width
+        && chanStride / colStride == width * height;
     }
 
     size_t dataSize() const { return data.size(); }
@@ -127,13 +152,22 @@ namespace TiffCraft
     return { swap(rgb.b), swap(rgb.g), swap(rgb.r) };
   }
 
-  struct RectInfo
+  struct YCbCr
   {
-    int width = 0;
-    int height = 0;
-    int stride = 0; // Bytes per row
-    int bitsPerSample = 0;
+    uint8_t y, cb, cr;
   };
+  static_assert(sizeof(YCbCr) == 3, "YCbCr size must be 3 bytes");
+
+
+  //! \brief Round up the division of two integers.
+  //! \tparam T An integer type.
+  //! \param value The numerator.
+  //! \param divisor The denominator.
+  //! \return The result of the division rounded up to the nearest integer.
+  template <typename T>
+  constexpr inline T roundUpDiv(T value, T divisor) {
+    return (value + divisor - 1) / divisor;
+  }
 
   class FormatNotSupportedError : public std::runtime_error
   {
@@ -142,18 +176,57 @@ namespace TiffCraft
       : std::runtime_error("Format not supported: " + format) {}
   };
 
-  template <Tag valueTag, typename T = uint8_t, size_t N = 1>
+  template <Tag valueTag, typename ContainerType = std::array<uint8_t, 1>>
   class TagValue
   {
-    std::array<T, N> values_;
+    ContainerType values_;
   public:
-    using Type = T;
-    constexpr static size_t size = N;
+    using Container = ContainerType;
+    using Type = typename Container::value_type;
     constexpr static Tag tag = valueTag;
-    TagValue(std::array<T, N> values) : values_{std::move(values)} {}
-    T value(size_t index = 0) const { return values_[index]; }
-    const T* data() const { return values_.data(); }
-    T* data() { return values_.data(); }
+    TagValue(Container values) : values_{std::move(values)} {}
+    void setRequiredSize(size_t size) {
+      if constexpr (requires { values_.resize(size); }) {
+        // Resize the container if it supports resizing (e.g., std::vector)
+        values_.resize(size);
+      }
+    }
+    size_t size() const { return values_.size(); }
+    Type value(size_t index = 0) const { return values_[index]; }
+    const Type* data() const { return values_.data(); }
+    Type* data() { return values_.data(); }
+    bool allEqual(Type v) const {
+      return std::all_of(values_.begin(), values_.end(),
+                         [v](Type x){ return x == v; });
+    }
+  };
+
+  class SamplesPerPixel : public TagValue<Tag::SamplesPerPixel>
+  {
+  public:
+    constexpr static Type defaultValue = 1;
+    SamplesPerPixel(Type value = defaultValue) : TagValue{{value}}
+    {
+      if (value < 1) {
+        throw std::invalid_argument{"Invalid SamplesPerPixel value"};
+      }
+    }
+  };
+
+  class BitsPerSample
+    : public TagValue<Tag::BitsPerSample, std::vector<int>>
+  {
+  public:
+    constexpr static Type defaultValue = 1;
+    BitsPerSample(Container values = {{defaultValue}})
+      : TagValue{std::move(values)}
+    {
+      for (const auto& v : values) {
+        if (v < 1 || v > 32) {
+          throw std::invalid_argument{"Invalid BitsPerSample value"};
+        }
+      }
+    }
   };
 
   class PlanarConfiguration : public TagValue<Tag::PlanarConfiguration>
@@ -184,11 +257,12 @@ namespace TiffCraft
     bool isCosited() const { return value() == Cosited; }
   };
 
-  class YCbCrCoefficients : public TagValue<Tag::YCbCrCoefficients, float, 3>
+  class YCbCrCoefficients
+    : public TagValue<Tag::YCbCrCoefficients, std::array<float, 3>>
   {
   public:
-    constexpr static std::array<Type, size> defaultValue{ 0.299f, 0.587f, 0.114f };
-    YCbCrCoefficients(std::array<Type, size> values = defaultValue)
+    constexpr static Container defaultValue{ 0.299f, 0.587f, 0.114f };
+    YCbCrCoefficients(Container values = defaultValue)
       : TagValue{std::move(values)}
     {
       for (const auto& v : values) {
@@ -207,11 +281,12 @@ namespace TiffCraft
     Type blue() const { return value(2); }
   };
 
-  class YCbCrSubSampling : public TagValue<Tag::YCbCrSubSampling, int, 2>
+  class YCbCrSubSampling
+    : public TagValue<Tag::YCbCrSubSampling, std::array<int, 2>>
   {
   public:
-    constexpr static std::array<Type, size> defaultValue{ 2, 2 };
-    YCbCrSubSampling(std::array<Type, size> values = defaultValue)
+    constexpr static Container defaultValue{ 2, 2 };
+    YCbCrSubSampling(Container values = defaultValue)
       : TagValue{std::move(values)}
     {
       for (const auto& v : values) {
@@ -226,14 +301,15 @@ namespace TiffCraft
   };
 
   template <float R1, float R2, float G1, float G2, float B1, float B2>
-  class ReferenceBlackWhite : public TagValue<Tag::ReferenceBlackWhite, float, 6>
+  class ReferenceBlackWhite
+    : public TagValue<Tag::ReferenceBlackWhite, std::array<float, 6>>
   {
   public:
-    constexpr static std::array<Type, size> defaultValue{R1, R2, G1, G2, B1, B2 };
-    ReferenceBlackWhite(std::array<Type, size> values = defaultValue)
+    constexpr static Container defaultValue{R1, R2, G1, G2, B1, B2 };
+    ReferenceBlackWhite(Container values = defaultValue)
       : TagValue{std::move(values)}
     {
-      for (size_t i = 0; i < size; i += 2) {
+      for (size_t i = 0; i < size(); i += 2) {
         if (data()[i] >= data()[i + 1]) {
           throw std::invalid_argument{
             "Invalid ReferenceBlackWhite value: black must be less than white"};
@@ -335,9 +411,10 @@ namespace TiffCraft
       auto entry = getEntry(ifd, Value::tag);
       if (entry.has_value()) {
         // Tag found, copy the values to the value object
-        if (entry->count() != Value::size) {
+        value.setRequiredSize(entry->count());
+        if (entry->count() != value.size()) {
           throw std::runtime_error{
-            "Expected " + std::to_string(Value::size) +
+            "Expected " + std::to_string(value.size()) +
             " values for tag " + std::to_string(static_cast<int>(Value::tag))};
         }
         copy<typename Value::Type>(*entry, value.data());
@@ -498,79 +575,158 @@ namespace TiffCraft
       return { 1 }; // default value if missing
     }
 
-    static RectInfo getRectInfo(const TiffImage::IFD& ifd)
+    static RectSize getRectSize(const TiffImage::IFD& ifd)
     {
-      const std::vector<int> bitsPerSampleVec = getBitsPerSample(ifd);
-      if (bitsPerSampleVec.empty()
-        || std::any_of(bitsPerSampleVec.begin(), bitsPerSampleVec.end(),
-          [&](int n) { return n != bitsPerSampleVec.front(); })) {
-         throw FormatNotSupportedError("Unsupported bits per sample");
-      }
-      const int bitsPerSample = bitsPerSampleVec.front();
-      const int samplesPerPixel = getValue<int>(ifd, Tag::SamplesPerPixel, 1);
-      const int planarConfiguration = getValue<int>(ifd, Tag::PlanarConfiguration, 1);
-
       const int imageWidth = getWidth(ifd);
       const int imageHeight = getHeight(ifd);
 
-      const int rowsPerStrip = getValue<int>(ifd, Tag::RowsPerStrip, imageHeight);
+      const int rowsPerStrip =
+        std::min(getValue<int>(ifd, Tag::RowsPerStrip, imageHeight), imageHeight);
 
       const int tileWidth = getValue<int>(ifd, Tag::TileWidth, imageWidth);
       const int tileHeight = getValue<int>(ifd, Tag::TileLength, rowsPerStrip);
-      const int tileChannels = (planarConfiguration == 1 ? samplesPerPixel : 1);
-      const int tileStride = (tileWidth * tileChannels * bitsPerSample + 7) / 8;
 
-      return { tileWidth, tileHeight, tileStride, bitsPerSample };
+      return { tileWidth, tileHeight };
     }
 
-    template <typename SrcType, typename DstType, typename UnaryOp>
-    void copyRectangles(
+    template <typename SrcType, typename DstType, typename UnaryOp = std::nullptr_t>
+    static Image makeImage(
+      const TiffImage::IFD& ifd,              // source IFD
       const TiffImage::ImageData& imageData,  // source pixel data
-      const RectInfo& rectInfo,               // source rectangle info
-      size_t channels,                        // source image channels
-      size_t planes,                          // source image planes
+      int dstSamplesPerPixel,                 // destination image channels
       bool equalsHostByteOrder,               // source data byte order
-      UnaryOp&& op)
+      UnaryOp unaryOp = nullptr)
     {
-      const int imageWidth = image_.width;
-      const int imageHeight = image_.height;
+      // Create a destination image with the information from the source IFD
+      const int imageWidth = getWidth(ifd);
+      const int imageHeight =  getHeight(ifd);
+      const int samplesPerPixel = get<SamplesPerPixel>(ifd).value();
+      const bool isPlanar = get<PlanarConfiguration>(ifd).isPlanar();
+      Image image = Image::make<DstType>(imageWidth, imageHeight,
+                                         dstSamplesPerPixel, isPlanar);
 
-      const int rectAcross = (imageWidth + (rectInfo.width - 1)) / rectInfo.width;
-      const int rectDown = (imageHeight + (rectInfo.height - 1)) / rectInfo.height;
-      const int rectsInPlane = rectAcross * rectDown;
+      // Get the rectangle size from the source IFD
+      const auto rectSize = getRectSize(ifd);
 
-      const int rectsInImage = rectAcross * rectDown * planes;
-      if (rectsInImage != imageData.size()) {
-        throw std::runtime_error("Rectangle count mismatch");
+      // Copy the image data
+      std::vector<Image> images{ std::move(image) };
+      copyImageData<SrcType, DstType, UnaryOp>(
+        images, ifd, imageData, rectSize, equalsHostByteOrder, samplesPerPixel,
+        std::move(unaryOp));
+
+      // Return the filled image
+      return std::move(images.front());
+    }
+
+    template <typename SrcType, typename DstType, typename UnaryOp = std::nullptr_t>
+    static void copyImageData(
+      std::vector<Image>& images,             // destination images
+      const TiffImage::IFD& ifd,              // source IFD
+      const TiffImage::ImageData& imageData,  // source pixel data
+      const RectSize& rectSize,               // source rectangle size
+      bool equalsHostByteOrder,               // source data byte order
+      int srcSamplesPerPixel,                 // source image channels
+      UnaryOp unaryOp = nullptr)
+    {
+      if (images.empty()) {
+        throw std::runtime_error("No destination images provided");
       }
 
+      // We take the first image as a reference for size calculations
+      const Image& refImg = images.front();
+      const int width = refImg.width;
+      const int height = refImg.height;
+
+      // Process as planar if there is more than one image or if the first image
+      // is planar. The convention is that a single image is given, which it
+      // could be planar or chunky, or if more than one image is given then each
+      // image is a separate plane of a planar image.
+      const bool isPlanar = images.size() > 1 || refImg.isPlanar();
+      const int planes = isPlanar ? images.size() > 1
+        ? static_cast<int>(images.size()) : refImg.channels : 1;
+
+      // Determine the number of channels in the source image
+      const int channels = isPlanar ? 1 : srcSamplesPerPixel;
+
+      // Rectangle number and dimensions
+      const int rectAcross = roundUpDiv(width, rectSize.width);
+      const int rectDown = roundUpDiv(height, rectSize.height);
+      const int rectsInPlane = rectAcross * rectDown;
+      const int rectsInImage = rectAcross * rectDown * planes;
+      if (rectsInImage != imageData.size()) {
+        throw std::invalid_argument{
+          "Mismatch between expected number of rectangles and image data"};
+      }
+      auto getRect = [&](int plane, int rectY, int rectX) {
+        return imageData[plane * rectsInPlane + rectY * rectAcross + rectX];
+      };
+
+      // Calculate the maximum source and destination values
+      const auto bitsPerSample = get<BitsPerSample>(ifd).value();
+      constexpr size_t maxDstValue = std::numeric_limits<DstType>::max();
+      const size_t maxSrcValue = bitsPerSample < sizeof(size_t) * 8
+        ? (size_t(1) << bitsPerSample) - 1 : std::numeric_limits<size_t>::max();
+
+      // TODO: if DstType is small create a lookup table for the conversion to
+      //       avoid repeated division
+
+      // Operator to map from the source value range to the destination value
+      // range, or apply a user-provided unary
+      auto op = [&](DstType value) {
+        if constexpr (std::is_same_v<UnaryOp, std::nullptr_t>) {
+          // Scale the value to the destination range
+          return static_cast<DstType>((value * maxDstValue) / maxSrcValue);
+        } else {
+          // Apply the user-provided unary operation
+          return std::invoke(unaryOp, value);
+        }
+      };
+      using OpType = decltype(op);
+
       for (int plane = 0; plane < planes; ++plane) {
+        Image& image = images.size() > 1 ? images[plane] : images.front();
+        const int dstPlane = images.size() > 1 ? 0 : plane;
+
+        const int subsampleX = roundUpDiv(width, image.width);
+        const int subsampleY = roundUpDiv(height, image.height);
+        const int planeWidth = roundUpDiv(rectSize.width, subsampleX);
+        const int planeHeight = roundUpDiv(rectSize.height, subsampleY);
+        const int planeStride = getRect(plane, 0, 0).size() / planeHeight;
+
+        RectSize currRectSize;
         for (int rectY = 0; rectY < rectDown; ++rectY) {
+          const int dstRow = rectY * planeHeight;
+          currRectSize.height = std::min(planeHeight, image.height - dstRow);
           for (int rectX = 0; rectX < rectAcross; ++rectX) {
-            const auto& rectData = imageData[plane * rectsInPlane + rectY * rectAcross + rectX];
-            auto currRectInfo = rectInfo;
-            currRectInfo.width = std::min(rectInfo.width, imageWidth - rectX * rectInfo.width);
-            currRectInfo.height = std::min(rectInfo.height, imageHeight - rectY * rectInfo.height);
-            copyRectangle<SrcType, DstType, UnaryOp>(
+            const int dstCol = rectX * planeWidth;
+            currRectSize.width = std::min(planeWidth, image.width - dstCol);
+            const auto& rectData = getRect(plane, rectY, rectX);
+            copyRectangle<SrcType, DstType, OpType>(
               rectData,                    // source pixel data
-              currRectInfo,                // source rectangle info
+              currRectSize,                // source rectangle size
               channels,                    // source image channels
+              planeStride,                 // source image stride
+              bitsPerSample,               // source image bits per sample
               equalsHostByteOrder,         // source data byte order
-              plane,                       // destination plane
-              rectX * rectInfo.width,      // destination column
-              rectY * rectInfo.height,     // destination row
-              std::forward<UnaryOp>(op));
+              image,                       // destination image
+              dstPlane,                    // destination plane
+              dstCol,                      // destination column
+              dstRow,                      // destination row
+              std::forward<OpType>(op));
           }
         }
       }
     }
 
     template <typename SrcType, typename DstType, typename UnaryOp>
-    void copyRectangle(
+    static void copyRectangle(
       const std::vector<std::byte>& rectData, // source pixel data
-      const RectInfo& rectInfo,               // source rectangle info
+      const RectSize& rectSize,               // source rectangle size
       size_t channels,                        // source image channels
+      size_t stride,                          // source image stride
+      size_t bitsPerSample,                   // source image bits per sample
       bool equalsHostByteOrder,               // source data byte order
+      Image& image,                           // destination image
       size_t dstPlane,                        // destination plane
       size_t dstX,                            // destination column
       size_t dstY,                            // destination row
@@ -585,11 +741,11 @@ namespace TiffCraft
 
       using ValueType = std::invoke_result_t<UnaryOp, DstType>;
 
-      const size_t dstRowStride = image_.rowStride / sizeof(ValueType);
-      const size_t dstColStride = image_.colStride / sizeof(ValueType);
-      const size_t dstChanStride = image_.chanStride / sizeof(ValueType);
-      const size_t dstPlaneStride = dstRowStride * image_.height;
-      auto* dst = image_.dataPtr<ValueType>()
+      const size_t dstRowStride = image.rowStride / sizeof(ValueType);
+      const size_t dstColStride = image.colStride / sizeof(ValueType);
+      const size_t dstChanStride = image.chanStride / sizeof(ValueType);
+      const size_t dstPlaneStride = dstRowStride * image.height;
+      auto* dst = image.dataPtr<ValueType>()
         + dstPlane * dstPlaneStride
         + dstY * dstRowStride
         + dstX * dstColStride;
@@ -598,14 +754,14 @@ namespace TiffCraft
       auto* dstRow = dst;
 
       auto loop = [&](auto processor) {
-        for (int row = 0; row < rectInfo.height; ++row) {
+        for (int row = 0; row < rectSize.height; ++row) {
           if (src >= srcEnd) {
             // We've reached the end of the source tile
             throw std::runtime_error("Unexpected end of source tile");
           }
           srcRow = src;
           dstRow = dst;
-          for (int col = 0; col < rectInfo.width; ++col) {
+          for (int col = 0; col < rectSize.width; ++col) {
             auto* dstChan = dstRow;
             for (int chan = 0; chan < channels; ++chan) {
               DstType value = processor();
@@ -614,7 +770,7 @@ namespace TiffCraft
             }
             dstRow += dstColStride;
           }
-          src += rectInfo.stride;
+          src += stride;
           dst += dstRowStride;
           // flush partial words when the row is complete
           if (countAvail > 0) {
@@ -636,7 +792,7 @@ namespace TiffCraft
       auto process_bits = [&]() -> DstType {
         size_t count = 0;
         DstType value = 0;
-        while (count < rectInfo.bitsPerSample) {
+        while (count < bitsPerSample) {
           // make sure we have some bits available
           if (countAvail == 0) {
             bitsAvail = *reinterpret_cast<const SrcType*>(&(*srcRow));
@@ -647,7 +803,7 @@ namespace TiffCraft
             countAvail = bitsPerSrcPixel;
           }
           // consume available bits
-          const size_t n = std::min(rectInfo.bitsPerSample - count, countAvail);
+          const size_t n = std::min(bitsPerSample - count, countAvail);
           value <<= n;
           value |= (bitsAvail >> (bitsPerSrcPixel - n));
           count += n;
@@ -655,11 +811,11 @@ namespace TiffCraft
           countAvail -= n;
           bitsAvail <<= n;
         }
-        assert(count == rectInfo.bitsPerSample);
+        assert(count == bitsPerSample);
         return value;
       };
 
-      if (rectInfo.bitsPerSample == bitsPerSrcPixel) {
+      if (bitsPerSample == bitsPerSrcPixel) {
         // Fast path: bits per sample matches source pixel size
         loop(process_word);
       } else {
@@ -687,31 +843,20 @@ namespace TiffCraft
       const TiffImage::IFD& ifd,
       TiffImage::ImageData imageData) override
     {
-      const int samplesPerPixel = requireSamplesPerPixel(ifd, 1);
-      const int photometricInterpretation = requirePhotometricInterpretation(ifd, 1, std::less_equal<>());
-      const int compression = requireCompression(ifd, 1);
-      const int fillOrder = requireFillOrder(ifd, 1);
+      requireSamplesPerPixel(ifd, 1);
+      requireCompression(ifd, 1);
+      requireFillOrder(ifd, 1);
 
-      const int bitsPerSample = getValue<int>(ifd, Tag::BitsPerSample, 1);
-
-      constexpr size_t maxDstValue = std::numeric_limits<DstType>::max();
-      const size_t maxSrcValue = bitsPerSample < sizeof(size_t) * 8
-        ? (size_t(1) << bitsPerSample) - 1 : std::numeric_limits<size_t>::max();
-
-      const auto rectInfo = getRectInfo(ifd);
+      const int photometricInterpretation =
+        requirePhotometricInterpretation(ifd, 1, std::less_equal<>());
 
       // create the image and copy the pixel data
-      image_ = Image::make<DstType, 1>(getWidth(ifd), getHeight(ifd));
-      using UnaryOp = std::function<DstType(DstType)>;
-      copyRectangles<SrcType,DstType,UnaryOp>(
-        imageData, // source pixel data
-        rectInfo,  // rectangle info
-        1, // source image channels
-        1, // source image planes
-        header.equalsHostByteOrder(), // source data byte order
-        [&](DstType value) -> DstType {
-          return (value * maxDstValue) / maxSrcValue;
-        }
+      constexpr int dstSamplesPerPixel = 1;
+      image_ = makeImage<SrcType,DstType>(
+        ifd,                            // source IFD
+        imageData,                      // source pixel data
+        dstSamplesPerPixel,             // destination image channels
+        header.equalsHostByteOrder()    // source data byte order
       );
 
       if (photometricInterpretation == 0) { // WhiteIsZero
@@ -731,13 +876,13 @@ namespace TiffCraft
       const TiffImage::IFD& ifd,
       TiffImage::ImageData imageData) override
     {
-      const int samplesPerPixel = requireSamplesPerPixel(ifd, 1);
-      const int photometricInterpretation = requirePhotometricInterpretation(ifd, 3);
-      const int compression = requireCompression(ifd, 1);
-      const int fillOrder = requireFillOrder(ifd, 1);
+      requireSamplesPerPixel(ifd, 1);
+      requirePhotometricInterpretation(ifd, 3);
+      requireCompression(ifd, 1);
+      requireFillOrder(ifd, 1);
 
-      const int bitsPerSample = getValue<int>(ifd, Tag::BitsPerSample, 1);
-
+      // Get the color map
+      const int bitsPerSample = get<BitsPerSample>(ifd).value();
       const auto numColors = (1 << bitsPerSample);
       const auto colorMap = getVec<int>(ifd, Tag::ColorMap);
       if (3 * numColors > colorMap.size()) {
@@ -745,20 +890,16 @@ namespace TiffCraft
       }
       const int chan[3] = { numColors * 0, numColors * 1, numColors * 2 };
 
-      constexpr int bitsPerDstPixel = 8 * sizeof(DstType);
-
-      const auto rectInfo = getRectInfo(ifd);
-
       // create the image and copy the pixel data
-      image_ = Image::make<DstType, 3>(getWidth(ifd), getHeight(ifd));
+      constexpr int dstSamplesPerPixel = 3;
       using UnaryOp = std::function<Rgb<DstType>(DstType)>;
-      copyRectangles<SrcType,DstType,UnaryOp>(
-        imageData, // source pixel data
-        rectInfo,  // rectangle info
-        1, // source image channels
-        1, // source image planes
-        header.equalsHostByteOrder(), // source data byte order
+      image_ = makeImage<SrcType,DstType, UnaryOp>(
+        ifd,                            // source IFD
+        imageData,                      // source pixel data
+        dstSamplesPerPixel,             // destination image channels
+        header.equalsHostByteOrder(),   // source data byte order
         [&](DstType value) -> Rgb<DstType> {
+          constexpr int bitsPerDstPixel = 8 * sizeof(DstType);
           return {
             static_cast<DstType>(colorMap[chan[0] + value] >> (16 - bitsPerDstPixel)),
             static_cast<DstType>(colorMap[chan[1] + value] >> (16 - bitsPerDstPixel)),
@@ -780,46 +921,24 @@ namespace TiffCraft
       const TiffImage::IFD& ifd,
       TiffImage::ImageData imageData) override
     {
-      const int samplesPerPixel = requireSamplesPerPixel(ifd, 3);
-      const int photometricInterpretation = requirePhotometricInterpretation(ifd, 2);
-      const int compression = requireCompression(ifd, 1);
+      requireSamplesPerPixel(ifd, 3);
+      requirePhotometricInterpretation(ifd, 2);
+      requireCompression(ifd, 1);
 
-      const int planarConfiguration = requirePlanarConfiguration(ifd, -1,
-        [](int value, int requiredValue) {
-          return value == 1 || value == 2; // 1 for Contiguous, 2 for Planar
-        });
-      const bool isPlanar = (planarConfiguration == 2);
-
-      const auto bitsPerSampleVec = getVec<int>(ifd, Tag::BitsPerSample);
-      if (bitsPerSampleVec.size() != 3) {
-        throw std::runtime_error("Expected 3 bits per sample for RGB image");
+      const auto bitsPerSample = get<BitsPerSample>(ifd);
+      if (bitsPerSample.size() != 3
+        || !bitsPerSample.allEqual(bitsPerSample.value(0))) {
+        throw std::runtime_error{
+          "Expected 3 bits per sample for RGB image with equal values"};
       }
-
-      const int bitsPerSample = bitsPerSampleVec.front();
-      for (auto bits : bitsPerSampleVec) {
-        if (bits != bitsPerSample) {
-          throw std::runtime_error("Unsupported bits per sample for RGB image");
-        }
-      }
-
-      constexpr size_t maxDstValue = std::numeric_limits<DstType>::max();
-      const size_t maxSrcValue = bitsPerSample < sizeof(size_t) * 8
-        ? (size_t(1) << bitsPerSample) - 1 : std::numeric_limits<size_t>::max();
-
-      const auto rectInfo = getRectInfo(ifd);
 
       // create the image and copy the pixel data
-      image_ = Image::make<DstType, 3>(getWidth(ifd), getHeight(ifd), isPlanar);
-      using UnaryOp = std::function<DstType(DstType)>;
-      copyRectangles<SrcType,DstType,UnaryOp>(
-        imageData, // source pixel data
-        rectInfo,  // rectangle info
-        isPlanar ? 1 : samplesPerPixel, // source image channels
-        isPlanar ? samplesPerPixel : 1, // source image planes
-        header.equalsHostByteOrder(),   // source data byte order
-        [&](DstType value) -> DstType {
-          return (value * maxDstValue) / maxSrcValue;
-        }
+      constexpr int dstSamplesPerPixel = 3;
+      image_ = makeImage<SrcType,DstType>(
+        ifd,                            // source IFD
+        imageData,                      // source pixel data
+        dstSamplesPerPixel,             // destination image channels
+        header.equalsHostByteOrder()    // source data byte order
       );
     }
   };
@@ -828,6 +947,8 @@ namespace TiffCraft
   template <typename DstType, typename SrcType = DstType>
   class TiffExporterYCbCr : public TiffExporter
   {
+    static_assert(std::is_same_v<SrcType, uint8_t> && std::is_same_v<DstType, uint8_t>,
+      "YCbCr images must use 8-bit source and destination type");
   public:
     // Callback for TiffCraft::load() function
     void operator()(
@@ -835,62 +956,142 @@ namespace TiffCraft
       const TiffImage::IFD& ifd,
       TiffImage::ImageData imageData) override
     {
-      const int samplesPerPixel = requireSamplesPerPixel(ifd, 3);
-      const int bitsPerSample = requireBitsPerSample(ifd, { 8, 8, 8 }).front();
-      const int compression = requireCompression(ifd, 1);
-      const int photometricInterpretation = requirePhotometricInterpretation(ifd, 6);
+      requireSamplesPerPixel(ifd, 3);
+      requireBitsPerSample(ifd, { 8, 8, 8 });
+      requireCompression(ifd, 1);
+      requirePhotometricInterpretation(ifd, 6);
 
       const auto yCbCrCoefficients = get<YCbCrCoefficients>(ifd);
       const auto referenceBlackWhiteYCbCr = get<ReferenceBlackWhiteYCbCr>(ifd);
 
       const auto yCbCrSubsampling = get<YCbCrSubSampling>(ifd);
-      const bool isCentered = get<YCbCrPositioning>(ifd).isCentered();
       const bool isPlanar = get<PlanarConfiguration>(ifd).isPlanar();
 
-      if (yCbCrSubsampling.isSubsampled()) {
-        throw std::runtime_error{"YCbCrSubSampling must be 1,1"};
+      // We will ignore the YCbCrPositioning tag
+      // const bool isCentered = get<YCbCrPositioning>(ifd).isCentered();
+      // if (!isCentered) {
+      //   throw std::runtime_error{"YCbCrPositioning must be Centered"};
+      // }
+
+      const int subsampleX = yCbCrSubsampling.horizontal();
+      const int subsampleY = yCbCrSubsampling.vertical();
+      const RectSize imageRect{
+        getWidth(ifd),
+        getHeight(ifd)
+      };
+      const RectSize subsampledRect{
+        roundUpDiv(imageRect.width, subsampleX),
+        roundUpDiv(imageRect.height, subsampleY)
+      };
+
+      const RectSize rectSize = getRectSize(ifd);
+      const RectSize subsampledRectSize{
+        roundUpDiv(rectSize.width, subsampleX),
+        roundUpDiv(rectSize.height, subsampleY)
+      };
+
+      int channels;
+      RectSize copyRectSize;
+      std::vector<Image> images;
+
+      if (isPlanar)
+      { // Planar images: use 3 separate images for Y, Cb, and Cr planes
+        channels = 1;
+        images = {
+          Image::make<DstType>(imageRect),
+          Image::make<DstType>(subsampledRect),
+          Image::make<DstType>(subsampledRect),
+        };
+        copyRectSize = rectSize;
       }
-      if (!isCentered) {
-        throw std::runtime_error{"YCbCrPositioning must be Centered"};
+      else
+      { // Chunky images: use a subsampled image with YCbCr blocks as pixels
+        channels = subsampleX * subsampleY + 2; // Y + Cb + Cr
+        images = { Image::make<DstType>(subsampledRect, channels) };
+        copyRectSize = subsampledRectSize;
       }
 
-      constexpr size_t maxDstValue = std::numeric_limits<DstType>::max();
-      const size_t maxSrcValue = bitsPerSample < sizeof(size_t) * 8
-        ? (size_t(1) << bitsPerSample) - 1 : std::numeric_limits<size_t>::max();
-
-      const auto rectInfo = getRectInfo(ifd);
-
-      // create the image and copy the pixel data
-      image_ = Image::make<DstType, 3>(getWidth(ifd), getHeight(ifd), isPlanar);
-      using UnaryOp = std::function<DstType(DstType)>;
-      copyRectangles<SrcType,DstType,UnaryOp>(
-        imageData, // source pixel data
-        rectInfo,  // rectangle info
-        isPlanar ? 1 : samplesPerPixel, // source image channels
-        isPlanar ? samplesPerPixel : 1, // source image planes
-        header.equalsHostByteOrder(),   // source data byte order
-        [&](DstType value) -> DstType {
-          return (value * maxDstValue) / maxSrcValue;
-        }
+      // Copy the image data to the intermediate image
+      copyImageData<SrcType, DstType>(
+        images,                        // destination images
+        ifd,                           // source IFD
+        imageData,                     // source pixel data
+        copyRectSize,                  // source rectangle size
+        header.equalsHostByteOrder(),  // source data byte order
+        channels                       // source image channels
       );
 
       // Convert YCbCr to RGB
-      convertYCbCrToRgb_(yCbCrCoefficients, referenceBlackWhiteYCbCr);
+      if (isPlanar)
+      {
+        auto makeYCbCr =
+          [&](const std::byte** rows, const Vec2i* indices,
+              [[maybe_unused]] int w, [[maybe_unused]] int h) -> YCbCr {
+            return {
+              *reinterpret_cast<const uint8_t*>(rows[0] + indices[0].x),
+              *reinterpret_cast<const uint8_t*>(rows[1] + indices[1].x),
+              *reinterpret_cast<const uint8_t*>(rows[2] + indices[2].x),
+            };
+          };
+        image_ = Image::make<DstType>(imageRect, 3);
+        convertYCbCrToRgb_(
+          image_, images, yCbCrCoefficients, referenceBlackWhiteYCbCr, makeYCbCr);
+      }
+      else
+      {
+        Image* dstImage = images.data();
+
+        if (yCbCrSubsampling.isSubsampled()) {
+          image_ = Image::make<DstType>(imageRect, 3);
+          dstImage = &image_;
+        }
+
+        const int blockSize = images.front().colStride;
+        const int cbOffset = blockSize - 2;
+        const int crOffset = blockSize - 1;
+        auto makeYCbCr =
+          [&](const std::byte** rows, const Vec2i* indices, int w, int h) -> YCbCr {
+            const std::byte* block = rows[0] + indices[0].x * blockSize;
+            const int row = h % subsampleY, col = w % subsampleX;
+            return {
+              *reinterpret_cast<const uint8_t*>(block + (row * subsampleX + col)),
+              *reinterpret_cast<const uint8_t*>(block + cbOffset),
+              *reinterpret_cast<const uint8_t*>(block + crOffset)
+            };
+          };
+
+        convertYCbCrToRgb_(
+          *dstImage, images, yCbCrCoefficients, referenceBlackWhiteYCbCr, makeYCbCr);
+
+        if (&image_ != dstImage) {
+          image_ = std::move(*dstImage);
+        }
+      }
     }
   private:
-    void convertYCbCrToRgb_(const YCbCrCoefficients& luma,
-                            const ReferenceBlackWhiteYCbCr& refBlackWhite)
-    {
-      if (image_.channels != 3) {
-        throw std::runtime_error("YCbCr to RGB conversion requires 3 channels");
+    struct LUT {
+      std::vector<int32_t> yLUT, cbbLUT, crrLUT, cbgLUT, crgLUT;
+
+      constexpr static int BitShift = 16;
+      constexpr static int32_t toFixed(float x) {
+        return static_cast<int32_t>(x * (1 << BitShift) + 0.5f);
       }
-      if (image_.bitDepth != 8) {
-        throw std::runtime_error("YCbCr to RGB conversion requires 8-bit depth");
-      }
-      auto channel = [this](std::byte* pixel, size_t index) -> uint8_t& {
-        return *reinterpret_cast<uint8_t*>(pixel + index * image_.chanStride);
+      constexpr static uint8_t fromFixed(int32_t x) {
+        return static_cast<uint8_t>(std::clamp(x >> BitShift, 0, 255));
       };
 
+      Rgb8 toRGB(YCbCr pixel) const {
+        return Rgb8{
+          fromFixed(yLUT[pixel.y] + crrLUT[pixel.cr]),                    // r
+          fromFixed(yLUT[pixel.y] + cbgLUT[pixel.cb] + crgLUT[pixel.cr]), // g
+          fromFixed(yLUT[pixel.y] + cbbLUT[pixel.cb])                     // b
+        };
+      }
+    };
+
+    static LUT computeConversionTables_(const YCbCrCoefficients& luma,
+                                        const ReferenceBlackWhiteYCbCr& refBlackWhite)
+    {
       // Conversion formulas
       // ===================
       // R = Cr * (2-2*Lr) + Y
@@ -925,14 +1126,6 @@ namespace TiffCraft
       const float Lbg = -Lb*Lbb/Lg;
       const float Lrg = -Lr*Lrr/Lg;
 
-      constexpr int BitShift = 16;
-      constexpr auto toFixed = [](float x) -> int32_t {
-        return static_cast<int32_t>(x * (1 << BitShift) + 0.5f);
-      };
-      constexpr auto fromFixed = [](int32_t x) -> uint8_t {
-        return static_cast<uint8_t>(std::clamp(x >> BitShift, 0, 255));
-      };
-
       std::vector<int32_t> yLUT(256), cbbLUT(256), crrLUT(256);
       std::vector<int32_t> cbgLUT(256), crgLUT(256);
       for (int i = 0; i < 256; ++i) {
@@ -940,25 +1133,64 @@ namespace TiffCraft
         const int32_t y = refBlackWhite.map<0, 255.0f>(i8);
         const int32_t cb = refBlackWhite.map<1, 127.0f>(i8);
         const int32_t cr = refBlackWhite.map<2, 127.0f>(i8);
-        yLUT[i] = toFixed(y);
-        cbbLUT[i] = toFixed(cb * Lbb);
-        crrLUT[i] = toFixed(cr * Lrr);
-        cbgLUT[i] = toFixed(cb * Lbg);
-        crgLUT[i] = toFixed(cr * Lrg);
+        yLUT[i] = LUT::toFixed(y);
+        cbbLUT[i] = LUT::toFixed(cb * Lbb);
+        crrLUT[i] = LUT::toFixed(cr * Lrr);
+        cbgLUT[i] = LUT::toFixed(cb * Lbg);
+        crgLUT[i] = LUT::toFixed(cr * Lrg);
       }
 
-      // Convert each pixel from YCbCr to RGB in place
-      std::byte* pixels = image_.dataPtr<std::byte>();
-      for (size_t h = 0; h < image_.height; ++h) {
-        std::byte* row = pixels + h * image_.rowStride;
-        for (size_t w = 0; w < image_.width; ++w) {
-          std::byte* pixelPtr = row + w * image_.colStride;
-          const uint8_t y = channel(pixelPtr, 0);
-          const uint8_t cb = channel(pixelPtr, 1);
-          const uint8_t cr = channel(pixelPtr, 2);
-          channel(pixelPtr, 0) = fromFixed(yLUT[y] + crrLUT[cr]);              // r
-          channel(pixelPtr, 1) = fromFixed(yLUT[y] + cbgLUT[cb] + crgLUT[cr]); // g
-          channel(pixelPtr, 2) = fromFixed(yLUT[y] + cbbLUT[cb]);              // b
+      return LUT{std::move(yLUT), std::move(cbbLUT), std::move(crrLUT),
+                 std::move(cbgLUT), std::move(crgLUT)};
+    }
+
+    template <typename MakeYCbCr>
+    static void convertYCbCrToRgb_(
+      Image& dstImage,
+      const std::vector<Image>& srcImages,
+      const YCbCrCoefficients& luma,
+      const ReferenceBlackWhiteYCbCr& refBlackWhite,
+      MakeYCbCr makeYCbCr)
+    {
+      if (srcImages.empty()) {
+        throw std::invalid_argument{
+          "YCbCr to RGB conversion requires at least 1 source image"};
+      }
+
+      auto channel = [&](std::byte* pixel, size_t index) -> uint8_t& {
+        return *reinterpret_cast<uint8_t*>(pixel + index * dstImage.chanStride);
+      };
+
+      const LUT lut = computeConversionTables_(luma, refBlackWhite);
+
+      std::vector<const std::byte*> srcPlanes( srcImages.size() );
+      std::vector<Vec2i> subsample( srcImages.size() );
+      for (size_t i = 0; i < srcImages.size(); ++i) {
+        srcPlanes[i] = srcImages[i].dataPtr<std::byte>();
+        subsample[i] = { roundUpDiv(dstImage.width, srcImages[i].width),
+                         roundUpDiv(dstImage.height, srcImages[i].height) };
+      }
+
+      std::vector<const std::byte*> srcRows( srcPlanes.size() );
+      std::vector<Vec2i> index( srcPlanes.size() );
+
+      std::byte* pixels = dstImage.dataPtr<std::byte>();
+      for (size_t h = 0; h < dstImage.height; ++h) {
+        for (size_t i = 0; i < srcImages.size(); ++i) {
+          const size_t hi = h / subsample[i].y;
+          srcRows[i] = srcPlanes[i] + hi * srcImages[i].rowStride;
+          index[i].y = hi;
+        }
+        std::byte* row = pixels + h * dstImage.rowStride;
+        for (size_t w = 0; w < dstImage.width; ++w) {
+          for (size_t i = 0; i < srcImages.size(); ++i) {
+            index[i].x = w / subsample[i].x;
+          }
+          const Rgb8 rgb = lut.toRGB(makeYCbCr(srcRows.data(), index.data(), w, h));
+          std::byte* pixelPtr = row + w * dstImage.colStride;
+          channel(pixelPtr, 0) = rgb.r;
+          channel(pixelPtr, 1) = rgb.g;
+          channel(pixelPtr, 2) = rgb.b;
         }
       }
     }

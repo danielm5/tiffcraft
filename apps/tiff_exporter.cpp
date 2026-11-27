@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Daniel Moreno
+// Copyright (c) 2025-2026 Daniel Moreno
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
@@ -85,18 +85,11 @@ int main(int argc, char* argv[]) {
 Image convertImageTo8Bits(Image image)
 {
   Image image8;
-  if (image.channels == 1)
-  {
-    image8 = Image::make<uint8_t, 1>(image.width, image.height);
-  }
-  else if (image.channels == 3)
-  {
-    image8 = Image::make<uint8_t, 3>(image.width, image.height);
-  }
-  else
+  if (image.channels != 1 && image.channels != 3)
   {
     throw std::runtime_error("Unsupported number of channels for conversion to 8 bits");
   }
+  image8 = Image::make<uint8_t>(image.width, image.height, image.channels);
 
   auto copyImage = [&]<typename SrcType>() {
 
