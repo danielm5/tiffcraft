@@ -408,8 +408,8 @@ TEST_CASE("TiffExporterYCbCrTest") {
      std::vector<std::string> testFiles = {
       "ycbcr_images/ycbcr-chunky-1x1.tif",
       "reference_images/ycbcr-chunky-1x1.ppm",
-      "ycbcr_images/ycbcr-planar-1x1.tif",
-      "reference_images/ycbcr-planar-1x1.ppm",
+      "ycbcr_images/ycbcr-planar-packed-1x1.tif",
+      "reference_images/ycbcr-planar-packed-1x1.ppm",
     };
     using Exporter = TiffExporterYCbCr<uint8_t>;
     TestExporter<Exporter>(testFiles);
@@ -526,8 +526,8 @@ TEST_CASE("TiffExporterAnyTest") {
      std::vector<std::string> testFiles = {
       "ycbcr_images/ycbcr-chunky-1x1.tif",
       "reference_images/ycbcr-chunky-1x1.ppm",
-      "ycbcr_images/ycbcr-planar-1x1.tif",
-      "reference_images/ycbcr-planar-1x1.ppm",
+      "ycbcr_images/ycbcr-planar-packed-1x1.tif",
+      "reference_images/ycbcr-planar-packed-1x1.ppm",
     };
     TestExporter<TiffExporterAny>(testFiles);
   }

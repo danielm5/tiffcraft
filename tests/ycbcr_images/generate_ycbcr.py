@@ -6,15 +6,32 @@ followed by ``tifftopnm``. No Python/Pillow/ImageMagick/TiffCraft code
 converts YCbCr samples to RGB. Where libtiff's RGBA converter cannot decode a
 fixture directly (planar + subsampled YCbCr), a planar 1x1 equivalent TIFF is
 built from the SAME Y/Cb/Cr codes and that equivalent is decoded with the same
-libtiff chain. The 21 equivalent TIFFs are committed in ``tests/reference_images/``.
+libtiff chain. The 16 equivalent TIFFs are committed in ``tests/reference_images/``.
 
-The 34 rebuilt fixtures use the TIFF 6.0 Section 21 (TN2) conventions: odd
+The 29 conversion fixtures use the TIFF 6.0 Section 21 (TN2) conventions: odd
 declared ImageWidth/ImageLength, stored luma padded up to multiples of the
 subsampling factors, RowsPerStrip = 16 (stripped) or 16x16 tiles (tiled),
 YCbCrPositioning = 1, BT.601 coefficients, default ReferenceBlackWhite, and
 planar chroma rows stored either packed (ceil(w/hs) samples) or padded to the
-declared image width. The two color-reference fixtures (``ycbcr-custom-coeffs``
-and ``ycbcr-custom-refbw``) are retained unchanged, as are their PPMs.
+declared image width. The two color-reference fixtures
+(``ycbcr-color-coeffs-bt709`` and ``ycbcr-color-refbw-limited-range``) are
+generated as well: 64x48 chunky 1x1 images (even dimensions, exempt from the
+odd-dimension convention) that declare their own non-default tags — BT.709
+coefficients and limited-range ReferenceBlackWhite respectively. All 31
+fixtures, including the color references, are encoded honestly with the same
+cell-interleaved encoder using the tag values they declare; no tag is patched
+after encoding.
+
+Each of the 31 generated fixtures has a libtiff-rendered PPM: 15 are decoded
+directly from the fixture itself (13 conversion + 2 color-reference), and 16
+conversion fixtures are decoded from planar 1x1 equivalents built from the same
+Y/Cb/Cr codes.
+
+The dscf0013 references are produced by ``tests/ycbcr_images/dscf0013_ppm.c``,
+which walks all IFDs with TIFFReadDirectory and decodes each one with
+TIFFReadRGBAImageOriented; regenerating them therefore also needs a C compiler
+and libtiff development headers (compile with -I/usr/local/include,
+-L/usr/local/lib and -ltiff).
 
 Usage (from the repository root)::
 
@@ -44,6 +61,14 @@ COEFFS = (Fraction(299, 1000), Fraction(587, 1000), Fraction(114, 1000))
 REFBW = (Fraction(0, 1), Fraction(255, 1), Fraction(128, 1),
          Fraction(255, 1), Fraction(128, 1), Fraction(255, 1))
 
+# Exact non-default tag values for the two generated color-reference fixtures.
+# BT.709 luma coefficients: 2126 + 7152 + 722 = 10000, so the sum is exactly 1.
+BT709_COEFFS = (Fraction(2126, 10000), Fraction(7152, 10000),
+                Fraction(722, 10000))
+# Limited-range (headroom/footroom) ReferenceBlackWhite: Y 15/235, Cb/Cr 128/240.
+LIMITED_REFBW = (Fraction(15, 1), Fraction(235, 1), Fraction(128, 1),
+                 Fraction(240, 1), Fraction(128, 1), Fraction(240, 1))
+
 # factor -> (declared W, declared H, stored luma W, stored luma H,
 #            chroma W, chroma H)
 GEOMETRIES = {
@@ -71,6 +96,10 @@ class Fixture:
     organization: str            # "chunky" or "planar"
     tiled: bool = False
     chroma_stride: str = "padded"  # planar stripped: "packed" or "padded"
+    size: tuple | None = None       # explicit geometry (color refs: 64x48)
+    coeffs: tuple | None = None     # explicit YCbCrCoefficients (tag 529)
+    refbw: tuple | None = None      # explicit ReferenceBlackWhite (tag 532)
+    color_reference: bool = False   # even dimensions / non-default tags allowed
 
     @property
     def hs(self):
@@ -82,7 +111,15 @@ class Fixture:
 
     @property
     def geometry(self):
-        return GEOMETRIES[self.factor]
+        return self.size if self.size is not None else GEOMETRIES[self.factor]
+
+    @property
+    def coeffs_values(self):
+        return self.coeffs if self.coeffs is not None else COEFFS
+
+    @property
+    def refbw_values(self):
+        return self.refbw if self.refbw is not None else REFBW
 
     @property
     def w(self):
@@ -138,27 +175,31 @@ def _factor_name(factor):
 
 
 def _build_manifest():
-    """The exact 34-fixture manifest, in deterministic order."""
+    """The exact 31-fixture manifest (29 conversion + 2 color), in order."""
     fixtures = []
     for factor in LEGAL_FACTORS:
         tag = _factor_name(factor)
         fixtures.append(Fixture(f"ycbcr-chunky-{tag}", factor, "chunky"))
-        fixtures.append(Fixture(f"ycbcr-planar-{tag}", factor, "planar"))
         fixtures.append(Fixture(f"ycbcr-chunky-tiled-{tag}", factor,
                                 "chunky", tiled=True))
         fixtures.append(Fixture(f"ycbcr-planar-tiled-{tag}", factor,
                                 "planar", tiled=True, chroma_stride="packed"))
-        if factor != (1, 1):
-            for stride in ("packed", "padded"):
-                fixtures.append(Fixture(f"ycbcr-planar-{tag}-{stride}",
-                                        factor, "planar",
-                                        chroma_stride=stride))
+        strides = ("packed", "padded") if factor != (1, 1) else ("packed",)
+        for stride in strides:
+            fixtures.append(Fixture(f"ycbcr-planar-{stride}-{tag}",
+                                    factor, "planar", chroma_stride=stride))
+    fixtures.append(Fixture(
+        "ycbcr-color-coeffs-bt709", (1, 1), "chunky",
+        size=(64, 48, 64, 48, 64, 48), coeffs=BT709_COEFFS,
+        color_reference=True))
+    fixtures.append(Fixture(
+        "ycbcr-color-refbw-limited-range", (1, 1), "chunky",
+        size=(64, 48, 64, 48, 64, 48), refbw=LIMITED_REFBW,
+        color_reference=True))
     return tuple(fixtures)
 
 
 FIXTURES = _build_manifest()
-RETAINED_TIFS = ("ycbcr-custom-coeffs.tif", "ycbcr-custom-refbw.tif")
-RETAINED_PPMS = ("ycbcr-custom-coeffs.ppm", "ycbcr-custom-refbw.ppm")
 DSCF_PPMS = ("dscf0013.ppm", "dscf0013-ifd1.ppm")
 
 
@@ -310,8 +351,13 @@ def write_tiff(path, specs, blobs, offset_tag):
     Path(path).write_bytes(out)
 
 
-def base_tags(w, h, hs, vs, planar, blobs, tiled):
-    """Common YCbCr tag set; all required YCbCr tags are written inline."""
+def base_tags(w, h, hs, vs, planar, blobs, tiled, coeffs=COEFFS, refbw=REFBW):
+    """Common YCbCr tag set; all required YCbCr tags are written inline.
+
+    ``coeffs`` and ``refbw`` are the fixture's own tag values: the conversion
+    fixtures use the module defaults, while the color references declare their
+    non-default BT.709 coefficients / limited-range reference levels.
+    """
     specs = {
         256: (_TIFF_SHORT, [w]),
         257: (_TIFF_SHORT, [h]),
@@ -321,10 +367,10 @@ def base_tags(w, h, hs, vs, planar, blobs, tiled):
         266: (_TIFF_SHORT, [1]),
         277: (_TIFF_SHORT, [3]),
         284: (_TIFF_SHORT, [2 if planar else 1]),
-        529: (_TIFF_RATIONAL, [as_tiff_rational(v) for v in COEFFS]),
+        529: (_TIFF_RATIONAL, [as_tiff_rational(v) for v in coeffs]),
         530: (_TIFF_SHORT, [hs, vs]),
         531: (_TIFF_SHORT, [1]),
-        532: (_TIFF_RATIONAL, [as_tiff_rational(v) for v in REFBW]),
+        532: (_TIFF_RATIONAL, [as_tiff_rational(v) for v in refbw]),
     }
     if tiled:
         specs[322] = (_TIFF_SHORT, [TILE])
@@ -478,7 +524,8 @@ def write_fixture(f, cells):
         blobs = (chunky_strip_blobs(f, cells) if f.organization == "chunky"
                  else planar_strip_blobs(f, cells))
     specs, offset_tag = base_tags(f.w, f.h, f.hs, f.vs,
-                                  f.organization == "planar", blobs, f.tiled)
+                                  f.organization == "planar", blobs, f.tiled,
+                                   coeffs=f.coeffs_values, refbw=f.refbw_values)
     write_tiff(f.tiff, specs, blobs, offset_tag)
 
 
@@ -594,8 +641,9 @@ def validate_fixture(f):
     """Structurally validate one rebuilt fixture against its manifest entry.
 
     Checks tag types/counts/values, the TN2 odd declared and padded stored
-    geometry, both planar chroma strides, strip/tile array lengths and byte
-    counts, and tiffinfo cleanliness.
+    geometry (except the even 64x48 color references), both planar chroma
+    strides, strip/tile array lengths and byte counts, each fixture's own
+    coefficients/reference levels, and tiffinfo cleanliness.
     """
     path = f.tiff
     tags = parse_tiff(path)
@@ -631,7 +679,10 @@ def validate_fixture(f):
 
     if (one(256, _TIFF_SHORT), one(257, _TIFF_SHORT)) != (f.w, f.h):
         raise ValueError(f"{f.name}: declared dimensions are not {f.w}x{f.h}")
-    if f.w % 2 == 0 or f.h % 2 == 0:
+    if f.color_reference:
+        if (f.w, f.h) != (64, 48):
+            raise ValueError(f"{f.name}: color reference must be 64x48")
+    elif f.w % 2 == 0 or f.h % 2 == 0:
         raise ValueError(f"{f.name}: declared dimensions must be odd")
     if one(262, _TIFF_SHORT) != 6:
         raise ValueError(f"{f.name}: PhotometricInterpretation is not 6")
@@ -646,16 +697,19 @@ def validate_fixture(f):
     expected_planar = 2 if f.organization == "planar" else 1
     if one(284, _TIFF_SHORT) != expected_planar:
         raise ValueError(f"{f.name}: wrong PlanarConfiguration")
-    if need(529, _TIFF_RATIONAL) != [as_tiff_rational(v) for v in COEFFS]:
-        raise ValueError(f"{f.name}: YCbCrCoefficients are not BT.601")
+    if need(529, _TIFF_RATIONAL) != [
+            as_tiff_rational(v) for v in f.coeffs_values]:
+        raise ValueError(f"{f.name}: YCbCrCoefficients do not match manifest")
     if need(530, _TIFF_SHORT) != [f.hs, f.vs]:
         raise ValueError(f"{f.name}: wrong YCbCrSubsampling")
     if (f.hs, f.vs) not in LEGAL_FACTORS or f.vs > f.hs:
         raise ValueError(f"{f.name}: illegal subsampling {f.hs}x{f.vs}")
     if one(531, _TIFF_SHORT) != 1:
         raise ValueError(f"{f.name}: YCbCrPositioning is not centered")
-    if need(532, _TIFF_RATIONAL) != [as_tiff_rational(v) for v in REFBW]:
-        raise ValueError(f"{f.name}: ReferenceBlackWhite is not the default")
+    if need(532, _TIFF_RATIONAL) != [
+            as_tiff_rational(v) for v in f.refbw_values]:
+        raise ValueError(
+            f"{f.name}: ReferenceBlackWhite does not match manifest")
 
     size = path.stat().st_size
     if f.tiled:
@@ -720,46 +774,62 @@ def make_ground_truth(name, source_tif):
 
 
 def make_dscf0013_ground_truth():
-    """Render references for both dscf0013 IFDs with libtiff only.
+    """Render both dscf0013 IFD references via the libtiff C helper.
 
-    ``tiffsplit`` is used solely to separate the two IFDs; both references
-    come from ``tiff2rgba`` and ``tifftopnm``.
+    The helper walks the original TIFF's IFDs with TIFFReadDirectory and
+    decodes each one with TIFFReadRGBAImageOriented(..., ORIENTATION_TOPLEFT,
+    0), so tags 530/531 stay intact. It needs a C compiler and libtiff
+    development headers at generation time.
     """
     source = (IMAGE_DIR.parent / "libtiff-pics" / "dscf0013.tif").resolve()
     if not source.is_file():
         raise RuntimeError(f"missing libtiff-pics fixture: {source}")
-    prefix = TMP_DIR / "dscf0013-split-"
-    for stale in TMP_DIR.glob("dscf0013-split-*.tif"):
-        stale.unlink()
-    run("tiffsplit", source, prefix, stderr=subprocess.DEVNULL)
-    parts = sorted(TMP_DIR.glob("dscf0013-split-*.tif"))
+    helper_source = IMAGE_DIR / "dscf0013_ppm.c"
+    if not helper_source.is_file():
+        raise RuntimeError(f"missing C helper: {helper_source}")
+    helper_bin = TMP_DIR / "dscf0013_ppm"
+    if (not helper_bin.is_file()
+            or helper_bin.stat().st_mtime < helper_source.stat().st_mtime):
+        run("cc", "-I/usr/local/include", "-L/usr/local/lib",
+            helper_source, "-ltiff", "-o", helper_bin)
+
+    out_dir = TMP_DIR / "dscf0013-ppms"
+    if out_dir.exists():
+        for stale in out_dir.glob("ifd*.ppm"):
+            stale.unlink()
+    else:
+        out_dir.mkdir(parents=True)
+    run(helper_bin, source, out_dir)
+
+    parts = sorted(out_dir.glob("ifd*.ppm"))
     if len(parts) != 2:
         raise RuntimeError(
-            f"tiffsplit produced {len(parts)} dscf0013 IFDs, expected 2")
-    for index, (part, name, expected) in enumerate(zip(
+            f"helper produced {len(parts)} dscf0013 PPMs, expected 2")
+    for part, name, expected in zip(
             parts, ("dscf0013", "dscf0013-ifd1"),
-            (b"P6 640 480", b"P6 160 120"))):
-        rgba = TMP_DIR / f"dscf0013-ifd{index}-rgba.tif"
-        run("tiff2rgba", "-n", "-c", "none", part, rgba)
-        ppm = REFERENCE_DIR / f"{name}.ppm"
-        with open(rgba, "rb") as fin, open(ppm, "wb") as fout:
-            run("tifftopnm", stdin=fin, stdout=fout, stderr=subprocess.DEVNULL)
-        with open(ppm, "rb") as f:
-            header = f.readline().strip() + b" " + f.readline().strip()
+            (b"P6 640 480", b"P6 160 120")):
+        data = part.read_bytes()
+        header = data.splitlines()[0] + b" " + data.splitlines()[1]
         if header != expected:
             raise ValueError(f"{name}.ppm unexpected header: {header!r}")
+        (REFERENCE_DIR / f"{name}.ppm").write_bytes(data)
 
 
 def remove_stale_fixtures():
-    """Delete only stale YCbCr artifacts, never equivalents or retained files."""
-    expected_tifs = {f"{f.name}.tif" for f in FIXTURES} | set(RETAINED_TIFS)
-    expected_ppms = ({f.ppm.name for f in FIXTURES} | set(RETAINED_PPMS)
-                     | set(DSCF_PPMS))
+    """Delete stale YCbCr TIFFs/PPMs/equivalents; the manifest is exhaustive."""
+    expected_tifs = {f"{f.name}.tif" for f in FIXTURES}
+    expected_ppms = {f.ppm.name for f in FIXTURES} | set(DSCF_PPMS)
+    expected_equivs = {f.equivalent.name for f in FIXTURES
+                       if not (f.organization == "chunky"
+                               or (not f.tiled and f.factor == (1, 1)))}
     for path in IMAGE_DIR.glob("ycbcr-*.tif"):
         if path.name not in expected_tifs:
             path.unlink()
     for path in REFERENCE_DIR.glob("ycbcr-*.ppm"):
         if path.name not in expected_ppms:
+            path.unlink()
+    for path in REFERENCE_DIR.glob("ycbcr-*-equiv.tif"):
+        if path.name not in expected_equivs:
             path.unlink()
 
 
@@ -769,23 +839,27 @@ def main():
     REFERENCE_DIR.mkdir(parents=True, exist_ok=True)
 
     fixtures = {f.name: f for f in FIXTURES}
-    if len(fixtures) != 34:
-        raise AssertionError(f"expected 34 fixtures, manifest has {len(fixtures)}")
+    if len(fixtures) != 31:
+        raise AssertionError(f"expected 31 fixtures, manifest has {len(fixtures)}")
+    direct_names = {f.name for f in FIXTURES
+                    if f.organization == "chunky"
+                    or (not f.tiled and f.factor == (1, 1))}
+    if len(direct_names) != 15:
+        raise AssertionError(f"expected 15 direct fixtures, got {len(direct_names)}")
     remove_stale_fixtures()
 
     for f in FIXTURES:
         seed = zlib.crc32(f.name.encode()) & 0xFFFFFFFF
         pixels = source_pixels(f.w, f.h, seed)
         cells, cw, ch = encode_ycbcr_codes(pixels, f.w, f.h, f.hs, f.vs,
-                                          COEFFS, REFBW)
+                                          f.coeffs_values, f.refbw_values)
         if (cw, ch) != (f.chroma_w, f.chroma_h):
             raise AssertionError(f"{f.name}: chroma geometry mismatch")
         if len(cells) != f.chroma_w * f.chroma_h * f.cell_size:
             raise AssertionError(f"{f.name}: cell byte count mismatch")
         write_fixture(f, cells)
 
-        direct = f.organization == "chunky" or (not f.tiled and f.factor == (1, 1))
-        if direct:
+        if f.name in direct_names:
             make_ground_truth(f.name, f.tiff)
         else:
             # libtiff's RGBA converter rejects planar + subsampled YCbCr.
@@ -801,24 +875,27 @@ def main():
     equivalents = [f.equivalent for f in FIXTURES
                    if not (f.organization == "chunky"
                            or (not f.tiled and f.factor == (1, 1)))]
-    if len(equivalents) != 21:
-        raise AssertionError(f"expected 21 equivalents, got {len(equivalents)}")
+    if len(equivalents) != 16:
+        raise AssertionError(f"expected 16 equivalents, got {len(equivalents)}")
     for path in equivalents:
         if not path.is_file():
             raise ValueError(f"missing equivalent source: {path}")
         check_tiffinfo_clean(path)
-    print("tiffinfo clean for 21 equivalent sources.")
+    print("tiffinfo clean for 16 equivalent sources.")
 
     make_dscf0013_ground_truth()
 
     actual_tifs = set(p.name for p in IMAGE_DIR.glob("ycbcr-*.tif"))
-    if actual_tifs != (set(f.tiff.name for f in FIXTURES) | set(RETAINED_TIFS)):
+    if actual_tifs != {f.tiff.name for f in FIXTURES}:
         raise AssertionError("unexpected files in tests/ycbcr_images/")
     actual_ppms = set(p.name for p in REFERENCE_DIR.glob("ycbcr-*.ppm"))
-    if actual_ppms != set(f.ppm.name for f in FIXTURES) | set(RETAINED_PPMS):
+    if actual_ppms != {f.ppm.name for f in FIXTURES}:
         raise AssertionError("unexpected YCbCr PPMs in tests/reference_images/")
     print(f"Generated {len(FIXTURES)} fixtures, {len(FIXTURES)} PPMs "
           f"and {len(equivalents)} equivalent sources.")
+    print("Fixture breakdown: 29 conversion + 2 color-reference; "
+          f"{len(direct_names)} direct and {len(equivalents)} equivalent-source "
+          "PPMs.")
 
 
 if __name__ == "__main__":
